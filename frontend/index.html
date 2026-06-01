@@ -5,81 +5,85 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AutoTube100k</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #ffffff;
-    --bg2: #f9fafb;
+    --bg: #faf8f5;
+    --bg2: #f3f0eb;
     --surface: #ffffff;
-    --border: #e5e7eb;
-    --border2: #d1d5db;
-    --text: #111827;
-    --text2: #374151;
-    --muted: #6b7280;
-    --muted2: #9ca3af;
-    --accent: #dc2626;
-    --accent-hover: #b91c1c;
-    --accent-light: #fef2f2;
-    --green: #16a34a;
-    --green-light: #f0fdf4;
+    --border: #e8e2d9;
+    --border2: #d6cfc4;
+    --text: #1a1713;
+    --text2: #3d3830;
+    --muted: #8c8278;
+    --muted2: #b5aca3;
+    --accent: #c9a227;
+    --accent-hover: #b08d1e;
+    --accent-light: #fdf8ec;
+    --green: #2d7a4f;
+    --green-light: #f0f9f4;
     --blue: #2563eb;
     --blue-light: #eff6ff;
-    --yellow: #d97706;
-    --yellow-light: #fffbeb;
-    --black: #111827;
+    --yellow: #c9a227;
+    --yellow-light: #fdf8ec;
+    --black: #1a1713;
+    --red: #c0392b;
+    --red-light: #fdf2f0;
     --radius: 10px;
-    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-    --shadow-md: 0 4px 6px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.04);
+    --shadow: 0 1px 4px rgba(26,23,19,0.06), 0 1px 2px rgba(26,23,19,0.04);
+    --shadow-md: 0 4px 12px rgba(26,23,19,0.08), 0 2px 4px rgba(26,23,19,0.04);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg2); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; min-height: 100vh; font-size: 14px; line-height: 1.5; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; min-height: 100vh; font-size: 14px; line-height: 1.5; }
   a { color: inherit; text-decoration: none; }
+  .serif { font-family: 'Playfair Display', Georgia, serif; }
 
   /* ── NAV ── */
   nav {
-    background: var(--bg); border-bottom: 1px solid var(--border);
-    padding: 0 24px; height: 56px; display: flex; align-items: center;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 0 32px; height: 56px; display: flex; align-items: center;
     justify-content: space-between; position: sticky; top: 0; z-index: 100;
   }
-  .nav-left { display: flex; align-items: center; gap: 32px; }
-  .logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: var(--text); }
-  .logo-icon { width: 28px; height: 28px; background: var(--accent); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
-  .logo-icon svg { width: 16px; height: 16px; }
-  .nav-tabs { display: flex; gap: 2px; }
+  .nav-left { display: flex; align-items: center; gap: 40px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 600; color: var(--text); letter-spacing: 0.01em; }
+  .logo-icon { width: 30px; height: 30px; background: var(--text); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+  .logo-icon svg { width: 14px; height: 14px; }
+  .logo span { color: var(--accent); }
+  .nav-tabs { display: flex; gap: 0; }
   .nav-tab {
-    padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500;
-    color: var(--muted); cursor: pointer; border: none; background: none;
-    transition: all 0.12s;
+    padding: 6px 16px; font-size: 11px; font-weight: 500; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); cursor: pointer; border: none;
+    background: none; transition: color 0.12s;
   }
-  .nav-tab:hover { background: var(--bg2); color: var(--text2); }
-  .nav-tab.active { background: var(--bg2); color: var(--text); }
+  .nav-tab:hover { color: var(--text2); }
+  .nav-tab.active { color: var(--text); }
   .nav-right { display: flex; align-items: center; gap: 8px; }
-  .nav-badge { font-size: 11px; font-weight: 600; background: var(--accent-light); color: var(--accent); padding: 2px 8px; border-radius: 20px; }
+  .nav-badge { font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.02em; }
 
   /* ── LAYOUT ── */
-  main { max-width: 1080px; margin: 0 auto; padding: 32px 24px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 36px 32px; }
   .page { display: none; }
   .page.active { display: block; }
-  .page-header { margin-bottom: 28px; }
-  .page-title { font-size: 22px; font-weight: 700; color: var(--text); }
-  .page-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .page-header { margin-bottom: 32px; }
+  .page-title { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 600; color: var(--text); }
+  .page-sub { font-size: 12px; color: var(--muted); margin-top: 5px; letter-spacing: 0.02em; }
 
   /* ── CARDS ── */
   .card {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--radius); box-shadow: var(--shadow);
   }
-  .card-body { padding: 20px 24px; }
-  .card-header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-  .card-title-sm { font-size: 13px; font-weight: 600; color: var(--text); }
+  .card-body { padding: 22px 26px; }
+  .card-header { padding: 16px 26px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .card-title-sm { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 
   /* ── STAT CARDS ── */
-  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; box-shadow: var(--shadow); }
-  .stat-label { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; }
-  .stat-value { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; }
-  .stat-sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 26px; box-shadow: var(--shadow); }
+  .stat-label { font-size: 10px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
+  .stat-value { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 600; color: var(--text); line-height: 1; }
+  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 8px; }
   .stat-up { color: var(--green); }
-  .stat-down { color: var(--accent); }
+  .stat-down { color: var(--red); }
 
   /* ── GRID ── */
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -88,16 +92,16 @@
   .gap-24 { gap: 24px; }
 
   /* ── FORM ── */
-  .form-group { margin-bottom: 16px; }
+  .form-group { margin-bottom: 18px; }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+  label { display: block; font-size: 10px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 7px; }
   input, select, textarea {
-    width: 100%; background: var(--bg); border: 1px solid var(--border2);
-    color: var(--text); border-radius: 8px; padding: 9px 12px; font-size: 13px;
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 10px 13px; font-size: 13px;
     font-family: inherit; outline: none; transition: border-color 0.12s, box-shadow 0.12s;
   }
   input:focus, select:focus, textarea:focus {
-    border-color: var(--black); box-shadow: 0 0 0 3px rgba(17,24,39,0.06);
+    border-color: var(--accent); box-shadow: 0 0 0 3px rgba(201,162,39,0.1);
   }
   textarea { resize: vertical; min-height: 80px; }
   select { cursor: pointer; }
@@ -105,20 +109,22 @@
   /* ── BUTTONS ── */
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500;
-    cursor: pointer; border: 1px solid transparent; transition: all 0.12s; font-family: inherit;
+    padding: 9px 18px; border-radius: 8px; font-size: 12px; font-weight: 500;
+    letter-spacing: 0.04em; cursor: pointer; border: 1px solid transparent;
+    transition: all 0.12s; font-family: inherit;
   }
-  .btn-primary { background: var(--black); color: #fff; border-color: var(--black); }
-  .btn-primary:hover { background: #1f2937; }
-  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-danger { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .btn-danger:hover { background: var(--accent-hover); }
+  .btn-primary { background: var(--text); color: #fff; border-color: var(--text); }
+  .btn-primary:hover { background: var(--text2); }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-gold { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-gold:hover { background: var(--accent-hover); }
+  .btn-danger { background: var(--red); color: #fff; border-color: var(--red); }
   .btn-outline { background: transparent; color: var(--text); border-color: var(--border2); }
-  .btn-outline:hover { background: var(--bg2); border-color: var(--border2); }
+  .btn-outline:hover { background: var(--bg2); }
   .btn-ghost { background: transparent; color: var(--muted); border-color: transparent; }
   .btn-ghost:hover { background: var(--bg2); color: var(--text); }
   .btn-green { background: var(--green); color: #fff; border-color: var(--green); }
-  .btn-sm { padding: 5px 12px; font-size: 12px; }
+  .btn-sm { padding: 5px 12px; font-size: 11px; }
   .btn-full { width: 100%; }
   .btn-icon { width: 32px; height: 32px; padding: 0; }
 
@@ -154,10 +160,10 @@
   /* ── COST CHIP ── */
   .cost-chip {
     display: inline-flex; align-items: center; gap: 6px;
-    background: var(--green-light); border: 1px solid #bbf7d0;
-    border-radius: 20px; padding: 4px 12px; font-size: 13px;
+    background: var(--accent-light); border: 1px solid #e8d48a;
+    border-radius: 20px; padding: 4px 14px; font-size: 12px;
   }
-  .cost-chip-val { font-weight: 700; color: var(--green); font-size: 15px; }
+  .cost-chip-val { font-family: 'Playfair Display', serif; font-weight: 600; color: var(--accent); font-size: 16px; }
 
   /* ── CHANNEL CARDS ── */
   .channel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
@@ -219,13 +225,14 @@
   /* ── TONE SELECTOR ── */
   .tone-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .tone-btn {
-    padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 8px;
-    font-size: 12px; font-weight: 500; text-align: center; cursor: pointer;
-    transition: all 0.12s; background: var(--bg2); color: var(--text2);
+    padding: 10px 8px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 11px; font-weight: 500; text-align: center; cursor: pointer;
+    transition: all 0.12s; background: var(--bg); color: var(--muted);
+    letter-spacing: 0.03em;
   }
-  .tone-btn:hover { border-color: var(--black); background: var(--bg); }
-  .tone-btn.selected { border-color: var(--black); background: var(--black); color: #fff; }
-  .tone-emoji { display: block; font-size: 18px; margin-bottom: 2px; }
+  .tone-btn:hover { border-color: var(--accent); color: var(--text2); }
+  .tone-btn.selected { border-color: var(--text); background: var(--text); color: #fff; }
+  .tone-emoji { display: block; font-size: 18px; margin-bottom: 4px; }
 
   /* ── RESULT BOX ── */
   .result-box { border: 1px solid var(--green); background: var(--green-light); border-radius: var(--radius); padding: 16px 20px; text-align: center; }
@@ -244,7 +251,7 @@
           <polygon points="4,2 13,8 4,14" fill="white"/>
         </svg>
       </div>
-      AutoTube100k
+      Auto<span>Tube</span>100k
     </div>
     <div class="nav-tabs">
       <button class="nav-tab active" onclick="showPage('crear',this)">Crear</button>
