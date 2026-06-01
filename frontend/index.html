@@ -3,432 +3,728 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AutoTube100k</title>
+<title>AutoTube 100k</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #faf8f5;
-    --bg2: #f3f0eb;
-    --surface: #ffffff;
-    --border: #e8e2d9;
-    --border2: #d6cfc4;
-    --text: #1a1713;
-    --text2: #3d3830;
-    --muted: #8c8278;
-    --muted2: #b5aca3;
-    --accent: #c9a227;
-    --accent-hover: #b08d1e;
-    --accent-light: #fdf8ec;
-    --green: #2d7a4f;
-    --green-light: #f0f9f4;
-    --blue: #2563eb;
-    --blue-light: #eff6ff;
-    --yellow: #c9a227;
-    --yellow-light: #fdf8ec;
-    --black: #1a1713;
-    --red: #c0392b;
-    --red-light: #fdf2f0;
-    --radius: 10px;
-    --shadow: 0 1px 4px rgba(26,23,19,0.06), 0 1px 2px rgba(26,23,19,0.04);
-    --shadow-md: 0 4px 12px rgba(26,23,19,0.08), 0 2px 4px rgba(26,23,19,0.04);
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; min-height: 100vh; font-size: 14px; line-height: 1.5; }
-  a { color: inherit; text-decoration: none; }
-  .serif { font-family: 'Playfair Display', Georgia, serif; }
+:root {
+  --paper: #f7f4ef;
+  --paper2: #eeebe4;
+  --white: #ffffff;
+  --ink: #1c1914;
+  --ink2: #3a352e;
+  --smoke: #8a837a;
+  --smoke2: #b8b0a6;
+  --rule: #ddd8d0;
+  --gold: #b8922a;
+  --gold-pale: #f9f3e4;
+  --green: #2a6b42;
+  --green-pale: #edf5f0;
+  --red: #b83030;
+  --red-pale: #fdf0f0;
+  --blue: #2d5fa6;
+}
 
-  /* ── NAV ── */
-  nav {
-    background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 0 32px; height: 56px; display: flex; align-items: center;
-    justify-content: space-between; position: sticky; top: 0; z-index: 100;
-  }
-  .nav-left { display: flex; align-items: center; gap: 40px; }
-  .logo { display: flex; align-items: center; gap: 10px; font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 600; color: var(--text); letter-spacing: 0.01em; }
-  .logo-icon { width: 30px; height: 30px; background: var(--text); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
-  .logo-icon svg { width: 14px; height: 14px; }
-  .logo span { color: var(--accent); }
-  .nav-tabs { display: flex; gap: 0; }
-  .nav-tab {
-    padding: 6px 16px; font-size: 11px; font-weight: 500; letter-spacing: 0.08em;
-    text-transform: uppercase; color: var(--muted); cursor: pointer; border: none;
-    background: none; transition: color 0.12s;
-  }
-  .nav-tab:hover { color: var(--text2); }
-  .nav-tab.active { color: var(--text); }
-  .nav-right { display: flex; align-items: center; gap: 8px; }
-  .nav-badge { font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.02em; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* ── LAYOUT ── */
-  main { max-width: 1100px; margin: 0 auto; padding: 36px 32px; }
-  .page { display: none; }
-  .page.active { display: block; }
-  .page-header { margin-bottom: 32px; }
-  .page-title { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 600; color: var(--text); }
-  .page-sub { font-size: 12px; color: var(--muted); margin-top: 5px; letter-spacing: 0.02em; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.55;
+  min-height: 100vh;
+}
 
-  /* ── CARDS ── */
-  .card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); box-shadow: var(--shadow);
-  }
-  .card-body { padding: 22px 26px; }
-  .card-header { padding: 16px 26px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-  .card-title-sm { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+/* ─── NAV ─── */
+nav {
+  background: var(--white);
+  border-bottom: 1px solid var(--rule);
+  height: 52px;
+  display: flex;
+  align-items: center;
+  padding: 0 40px;
+  gap: 48px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
 
-  /* ── STAT CARDS ── */
-  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 26px; box-shadow: var(--shadow); }
-  .stat-label { font-size: 10px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
-  .stat-value { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 600; color: var(--text); line-height: 1; }
-  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 8px; }
-  .stat-up { color: var(--green); }
-  .stat-down { color: var(--red); }
+.logo {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 19px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.logo em {
+  font-style: italic;
+  color: var(--gold);
+}
 
-  /* ── GRID ── */
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-  .gap-24 { gap: 24px; }
+.nav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex: 1;
+}
 
-  /* ── FORM ── */
-  .form-group { margin-bottom: 18px; }
-  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  label { display: block; font-size: 10px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 7px; }
-  input, select, textarea {
-    width: 100%; background: var(--bg); border: 1px solid var(--border);
-    color: var(--text); border-radius: 8px; padding: 10px 13px; font-size: 13px;
-    font-family: inherit; outline: none; transition: border-color 0.12s, box-shadow 0.12s;
-  }
-  input:focus, select:focus, textarea:focus {
-    border-color: var(--accent); box-shadow: 0 0 0 3px rgba(201,162,39,0.1);
-  }
-  textarea { resize: vertical; min-height: 80px; }
-  select { cursor: pointer; }
+.nav-tab {
+  padding: 0 16px;
+  height: 52px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--smoke);
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.1s, border-color 0.1s;
+}
+.nav-tab:hover { color: var(--ink2); }
+.nav-tab.active { color: var(--ink); border-bottom-color: var(--gold); }
 
-  /* ── BUTTONS ── */
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    padding: 9px 18px; border-radius: 8px; font-size: 12px; font-weight: 500;
-    letter-spacing: 0.04em; cursor: pointer; border: 1px solid transparent;
-    transition: all 0.12s; font-family: inherit;
-  }
-  .btn-primary { background: var(--text); color: #fff; border-color: var(--text); }
-  .btn-primary:hover { background: var(--text2); }
-  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
-  .btn-gold { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .btn-gold:hover { background: var(--accent-hover); }
-  .btn-danger { background: var(--red); color: #fff; border-color: var(--red); }
-  .btn-outline { background: transparent; color: var(--text); border-color: var(--border2); }
-  .btn-outline:hover { background: var(--bg2); }
-  .btn-ghost { background: transparent; color: var(--muted); border-color: transparent; }
-  .btn-ghost:hover { background: var(--bg2); color: var(--text); }
-  .btn-green { background: var(--green); color: #fff; border-color: var(--green); }
-  .btn-sm { padding: 5px 12px; font-size: 11px; }
-  .btn-full { width: 100%; }
-  .btn-icon { width: 32px; height: 32px; padding: 0; }
+.nav-end {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--smoke);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.nav-end strong { color: var(--gold); font-weight: 600; }
 
-  /* ── PIPELINE ── */
-  .step-list { display: flex; flex-direction: column; }
-  .step-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 0; border-bottom: 1px solid var(--border);
-  }
-  .step-item:last-child { border-bottom: none; }
-  .step-dot {
-    width: 32px; height: 32px; border-radius: 50%; display: flex; align-items:center;
-    justify-content: center; font-size: 14px; flex-shrink: 0; border: 1.5px solid var(--border2);
-    background: var(--bg2); color: var(--muted);
-  }
-  .step-dot.pending  { border-color: var(--border2); background: var(--bg2); }
-  .step-dot.running  { border-color: var(--blue); background: var(--blue-light); animation: spin-border 1.5s linear infinite; }
-  .step-dot.done     { border-color: var(--green); background: var(--green-light); color: var(--green); }
-  .step-dot.error    { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
-  .step-dot.warning  { border-color: var(--yellow); background: var(--yellow-light); color: var(--yellow); }
-  @keyframes spin-border { 0%,100%{box-shadow:0 0 0 2px var(--blue)} 50%{box-shadow:0 0 0 2px rgba(37,99,235,0.3)} }
-  .step-info { flex: 1; min-width: 0; }
-  .step-name { font-size: 13px; font-weight: 500; color: var(--text); }
-  .step-msg  { font-size: 12px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .step-cost { font-size: 12px; font-weight: 600; color: var(--green); white-space: nowrap; }
+/* ─── LAYOUT ─── */
+main { max-width: 1060px; margin: 0 auto; padding: 44px 40px 60px; }
 
-  /* ── PROGRESS ── */
-  .progress-wrap { margin: 16px 0 4px; }
-  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
-  .progress-fill { height: 100%; background: var(--black); border-radius: 2px; transition: width 0.4s ease; }
-  .progress-pct { font-size: 11px; color: var(--muted); text-align: right; margin-top: 4px; }
+.page { display: none; }
+.page.active { display: block; }
 
-  /* ── COST CHIP ── */
-  .cost-chip {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: var(--accent-light); border: 1px solid #e8d48a;
-    border-radius: 20px; padding: 4px 14px; font-size: 12px;
-  }
-  .cost-chip-val { font-family: 'Playfair Display', serif; font-weight: 600; color: var(--accent); font-size: 16px; }
+h1 {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
 
-  /* ── CHANNEL CARDS ── */
-  .channel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
-  .channel-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
-  .channel-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--bg2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 18px; margin-bottom: 12px; }
-  .channel-name { font-size: 14px; font-weight: 600; }
-  .channel-niche { font-size: 12px; color: var(--muted); margin-top: 2px; margin-bottom: 14px; }
-  .channel-stats { display: flex; flex-direction: column; gap: 8px; }
-  .channel-stat-row { display: flex; justify-content: space-between; font-size: 12px; }
-  .channel-stat-row .lbl { color: var(--muted); }
-  .channel-stat-row .val { font-weight: 600; }
-  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
-  .badge-green { background: var(--green-light); color: var(--green); }
-  .badge-red   { background: var(--accent-light); color: var(--accent); }
-  .badge-gray  { background: var(--bg2); color: var(--muted); border: 1px solid var(--border); }
+.eyebrow {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--smoke);
+  margin-bottom: 6px;
+}
 
-  /* ── TABLE / ROWS ── */
-  .table-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
-  .table-row:last-child { border: none; }
-  .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-  .status-dot.done    { background: var(--green); }
-  .status-dot.running { background: var(--blue); animation: blink 1s infinite; }
-  .status-dot.error   { background: var(--accent); }
-  .status-dot.pending { background: var(--muted2); }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.sub {
+  font-size: 12px;
+  color: var(--smoke);
+  margin-top: 5px;
+}
 
-  /* ── FINANCE BARS ── */
-  .finance-service-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
-  .finance-service-row:last-child { border: none; }
-  .finance-bar-wrap { flex: 1; background: var(--bg2); border-radius: 3px; height: 6px; overflow: hidden; }
-  .finance-bar { height: 100%; background: var(--black); border-radius: 3px; }
+.page-head { margin-bottom: 36px; }
+.page-head-row { display: flex; align-items: flex-end; justify-content: space-between; }
 
-  /* ── MODAL ── */
-  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 200; backdrop-filter: blur(4px); }
-  .overlay.open { display: flex; }
-  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px; width: 100%; max-width: 440px; box-shadow: var(--shadow-md); }
-  .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 20px; }
+/* ─── DIVIDER ─── */
+hr { border: none; border-top: 1px solid var(--rule); margin: 24px 0; }
 
-  /* ── EMPTY STATE ── */
-  .empty { text-align: center; padding: 52px 24px; color: var(--muted); }
-  .empty-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.4; }
-  .empty-text { font-size: 14px; }
-  .empty-sub { font-size: 12px; margin-top: 6px; }
+/* ─── FORM ─── */
+.field { margin-bottom: 20px; }
 
-  /* ── UTILS ── */
-  .mt-8  { margin-top: 8px; }
-  .mt-16 { margin-top: 16px; }
-  .mt-24 { margin-top: 24px; }
-  .flex-between { display: flex; align-items: center; justify-content: space-between; }
-  .flex-center  { display: flex; align-items: center; gap: 8px; }
-  .text-muted { color: var(--muted); }
-  .text-green { color: var(--green); }
-  .text-red   { color: var(--accent); }
-  .fw-600 { font-weight: 600; }
-  .fs-12 { font-size: 12px; }
-  .fs-13 { font-size: 13px; }
-  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+.field label {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--smoke);
+  margin-bottom: 7px;
+}
 
-  /* ── TONE SELECTOR ── */
-  .tone-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .tone-btn {
-    padding: 10px 8px; border: 1px solid var(--border); border-radius: 8px;
-    font-size: 11px; font-weight: 500; text-align: center; cursor: pointer;
-    transition: all 0.12s; background: var(--bg); color: var(--muted);
-    letter-spacing: 0.03em;
-  }
-  .tone-btn:hover { border-color: var(--accent); color: var(--text2); }
-  .tone-btn.selected { border-color: var(--text); background: var(--text); color: #fff; }
-  .tone-emoji { display: block; font-size: 18px; margin-bottom: 4px; }
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  background: var(--white);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  border-radius: 5px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.1s, box-shadow 0.1s;
+  -webkit-appearance: none;
+}
 
-  /* ── RESULT BOX ── */
-  .result-box { border: 1px solid var(--green); background: var(--green-light); border-radius: var(--radius); padding: 16px 20px; text-align: center; }
-  .result-box .result-title { font-weight: 600; font-size: 15px; color: var(--green); }
-  .result-box .result-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(184,146,42,0.12);
+}
+
+.field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238a837a'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+
+/* ─── TONE SELECTOR ─── */
+.tone-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tone-opt {
+  padding: 5px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  color: var(--smoke);
+  cursor: pointer;
+  transition: all 0.1s;
+  background: var(--white);
+  text-transform: uppercase;
+  user-select: none;
+}
+.tone-opt:hover { color: var(--ink2); border-color: var(--smoke2); }
+.tone-opt.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--white);
+}
+
+/* ─── BUTTONS ─── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 20px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.1s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btn-ink { background: var(--ink); color: var(--white); border-color: var(--ink); }
+.btn-ink:hover { background: var(--ink2); }
+.btn-ink:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn-gold { background: var(--gold); color: var(--white); border-color: var(--gold); }
+.btn-gold:hover { filter: brightness(0.93); }
+.btn-outline { background: transparent; color: var(--ink2); border-color: var(--rule); }
+.btn-outline:hover { border-color: var(--smoke2); background: var(--paper2); }
+.btn-ghost { background: transparent; color: var(--smoke); border-color: transparent; font-size: 13px; padding: 6px 10px; }
+.btn-ghost:hover { color: var(--ink); background: var(--paper2); }
+.btn-green { background: var(--green); color: var(--white); border-color: var(--green); }
+.btn-sm { padding: 5px 12px; font-size: 11px; }
+.btn-full { width: 100%; }
+.btn-lg { padding: 11px 24px; font-size: 13px; }
+
+/* ─── TWO-COL LAYOUT ─── */
+.two-col {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+/* ─── SECTION ─── */
+.section-title {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--smoke);
+  margin-bottom: 16px;
+}
+
+/* ─── SURFACE ─── */
+.surface {
+  background: var(--white);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+}
+
+.surface-head {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.surface-body { padding: 20px; }
+.surface-body-tight { padding: 12px 20px; }
+
+/* ─── PIPELINE ─── */
+.progress-track {
+  height: 2px;
+  background: var(--rule);
+  border-radius: 1px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--gold);
+  border-radius: 1px;
+  transition: width 0.4s ease;
+}
+.progress-label {
+  font-size: 11px;
+  color: var(--smoke);
+  text-align: right;
+  margin-bottom: 20px;
+}
+
+.steps { display: flex; flex-direction: column; }
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.step:last-child { border-bottom: none; }
+
+.step-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: all 0.2s;
+  color: var(--smoke2);
+}
+.step-icon.pending { }
+.step-icon.running {
+  border-color: var(--blue);
+  background: rgba(45,95,166,0.06);
+  animation: pulse-ring 1.6s ease-in-out infinite;
+}
+.step-icon.done {
+  border-color: var(--green);
+  background: var(--green-pale);
+}
+.step-icon.error {
+  border-color: var(--red);
+  background: var(--red-pale);
+}
+
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(45,95,166,0.3); }
+  50% { box-shadow: 0 0 0 4px rgba(45,95,166,0.08); }
+}
+
+.step-body { flex: 1; min-width: 0; }
+.step-name { font-size: 12px; font-weight: 500; color: var(--ink2); }
+.step-msg { font-size: 11px; color: var(--smoke); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.step-cost { font-size: 11px; font-weight: 600; color: var(--green); flex-shrink: 0; padding-top: 2px; }
+
+/* ─── COST PILL ─── */
+.cost-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  background: var(--gold-pale);
+  border: 1px solid rgba(184,146,42,0.25);
+  border-radius: 20px;
+  padding: 3px 12px;
+}
+.cost-num {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--gold);
+}
+.cost-unit { font-size: 10px; color: var(--smoke); font-weight: 500; letter-spacing: 0.04em; }
+
+/* ─── JOBS LIST ─── */
+.job-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.job-row:last-child { border-bottom: none; }
+
+.job-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.job-dot.done { background: var(--green); }
+.job-dot.running { background: var(--blue); animation: blink 1s infinite; }
+.job-dot.error { background: var(--red); }
+.job-dot.pending { background: var(--smoke2); }
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+.job-title { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job-meta { font-size: 11px; color: var(--smoke); margin-top: 1px; }
+.job-cost { font-size: 12px; font-weight: 600; color: var(--green); flex-shrink: 0; text-align: right; }
+
+/* ─── STAT CARDS ─── */
+.stats-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; margin-bottom: 28px; }
+
+.stat {
+  background: var(--white);
+  padding: 22px 24px;
+}
+.stat-lbl { font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--smoke); margin-bottom: 10px; }
+.stat-val {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 34px;
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.stat-note { font-size: 11px; color: var(--smoke); margin-top: 6px; }
+
+/* ─── CHANNEL GRID ─── */
+.ch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+
+.ch-card {
+  background: var(--white);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 18px;
+}
+
+.ch-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--paper2);
+  border: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.ch-name { font-size: 13px; font-weight: 600; }
+.ch-niche { font-size: 11px; color: var(--smoke); margin-top: 2px; margin-bottom: 14px; }
+
+.ch-row { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; }
+.ch-row .k { color: var(--smoke); }
+.ch-row .v { font-weight: 600; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+.pill-green { background: var(--green-pale); color: var(--green); }
+.pill-red { background: var(--red-pale); color: var(--red); }
+.pill-gray { background: var(--paper2); color: var(--smoke); border: 1px solid var(--rule); }
+
+/* ─── FINANCE BARS ─── */
+.fin-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.fin-row:last-child { border-bottom: none; }
+.fin-svc { width: 190px; flex-shrink: 0; font-size: 12px; color: var(--ink2); }
+.fin-bar-wrap { flex: 1; background: var(--paper2); border-radius: 2px; height: 4px; overflow: hidden; }
+.fin-bar { height: 100%; background: var(--gold); border-radius: 2px; }
+.fin-amt { width: 60px; text-align: right; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+
+/* ─── RESULT ─── */
+.result-ok {
+  background: var(--green-pale);
+  border: 1px solid rgba(42,107,66,0.2);
+  border-radius: 5px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.result-err {
+  background: var(--red-pale);
+  border: 1px solid rgba(184,48,48,0.2);
+  border-radius: 5px;
+  padding: 14px 18px;
+}
+
+/* ─── EMPTY ─── */
+.empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--smoke);
+}
+.empty-big { font-size: 32px; opacity: 0.3; margin-bottom: 12px; }
+.empty-title { font-size: 14px; font-weight: 500; color: var(--ink2); margin-bottom: 4px; }
+.empty-note { font-size: 12px; }
+
+/* ─── MODAL ─── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(28,25,20,0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  backdrop-filter: blur(3px);
+}
+.overlay.open { display: flex; }
+.modal {
+  background: var(--white);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 28px 28px 24px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.14);
+}
+.modal h2 {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 20px;
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+
+/* ─── UTILS ─── */
+.mt-4  { margin-top: 4px; }
+.mt-8  { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; }
+.mt-24 { margin-top: 24px; }
+.mt-32 { margin-top: 32px; }
+.flex { display: flex; align-items: center; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.gap-8  { gap: 8px; }
+.gap-10 { gap: 10px; }
+.gap-16 { gap: 16px; }
+.flex-1 { flex: 1; }
+.text-smoke { color: var(--smoke); }
+.text-green { color: var(--green); }
+.text-red { color: var(--red); }
+.fw-6 { font-weight: 600; }
+.fs-11 { font-size: 11px; }
+.fs-12 { font-size: 12px; }
+.fs-13 { font-size: 13px; }
+.italic { font-style: italic; }
+.min-0 { min-width: 0; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 </head>
 <body>
 
-<!-- NAV -->
 <nav>
-  <div class="nav-left">
-    <div class="logo">
-      <div class="logo-icon">
-        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <polygon points="4,2 13,8 4,14" fill="white"/>
-        </svg>
-      </div>
-      Auto<span>Tube</span>100k
-    </div>
-    <div class="nav-tabs">
-      <button class="nav-tab active" onclick="showPage('crear',this)">Crear</button>
-      <button class="nav-tab" onclick="showPage('dashboard',this)">Canales</button>
-      <button class="nav-tab" onclick="showPage('finanzas',this)">Finanzas</button>
-    </div>
+  <div class="logo">Auto<em>Tube</em> 100k</div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('crear',this)">Crear</button>
+    <button class="nav-tab" onclick="showPage('canales',this)">Canales</button>
+    <button class="nav-tab" onclick="showPage('finanzas',this)">Finanzas</button>
   </div>
-  <div class="nav-right">
-    <span class="nav-badge" id="nav-cost-badge">0.00€ este mes</span>
-  </div>
+  <div class="nav-end">Mes actual &nbsp;·&nbsp; <strong id="nav-cost">0.00€</strong></div>
 </nav>
 
 <main>
 
-<!-- ════════════════ CREAR ════════════════ -->
+<!-- ══════════ CREAR ══════════ -->
 <div id="page-crear" class="page active">
-  <div class="page-header">
-    <div class="page-title">Nuevo vídeo</div>
-    <div class="page-sub">Escribe el nicho y título, AutoTube100k hace el resto</div>
+
+  <div class="page-head">
+    <div class="eyebrow">Producción</div>
+    <h1>Nuevo vídeo</h1>
+    <p class="sub">Introduce nicho y título — el sistema genera el vídeo completo de forma automática</p>
   </div>
 
-  <div class="grid-2 gap-24" style="align-items:start;">
+  <div class="two-col">
 
-    <!-- Formulario -->
+    <!-- Col izquierda: formulario -->
     <div>
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title-sm">Configuración</span>
-        </div>
-        <div class="card-body">
-          <div class="form-group">
-            <label>Nicho</label>
-            <input id="inp-niche" type="text" placeholder="Ej: Historia, Crímenes reales, Motivación...">
-          </div>
-          <div class="form-group">
-            <label>Título del vídeo</label>
-            <input id="inp-title" type="text" placeholder="Ej: El secreto que nadie te contó sobre...">
-          </div>
-          <div class="form-group">
-            <label>Tono del narrador</label>
-            <div class="tone-grid">
-              <div class="tone-btn selected" data-tone="neutro" onclick="selectTone(this)"><span class="tone-emoji">🎙️</span>Neutro</div>
-              <div class="tone-btn" data-tone="misterio" onclick="selectTone(this)"><span class="tone-emoji">🔮</span>Misterio</div>
-              <div class="tone-btn" data-tone="motivacional" onclick="selectTone(this)"><span class="tone-emoji">🔥</span>Motivacional</div>
-              <div class="tone-btn" data-tone="documental" onclick="selectTone(this)"><span class="tone-emoji">🎬</span>Documental</div>
-              <div class="tone-btn" data-tone="drama" onclick="selectTone(this)"><span class="tone-emoji">🎭</span>Drama</div>
-              <div class="tone-btn" data-tone="humor" onclick="selectTone(this)"><span class="tone-emoji">😄</span>Humor</div>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Canal de destino</label>
-            <select id="inp-channel">
-              <option value="">Sin canal — guardar en local</option>
-            </select>
-          </div>
-          <button class="btn btn-primary btn-full" id="btn-generate" onclick="startGeneration()" style="margin-top:8px;padding:10px 16px;">
-            ▶ &nbsp;Generar vídeo automáticamente
-          </button>
+      <div class="field">
+        <label>Nicho</label>
+        <input id="inp-niche" type="text" placeholder="Historia, Crímenes, Motivación, Ciencia…">
+      </div>
+
+      <div class="field">
+        <label>Título del vídeo</label>
+        <input id="inp-title" type="text" placeholder="El secreto que nadie te contó sobre…">
+      </div>
+
+      <div class="field">
+        <label>Tono del narrador</label>
+        <div class="tone-row">
+          <div class="tone-opt on" data-tone="neutro" onclick="selectTone(this)">Neutro</div>
+          <div class="tone-opt" data-tone="misterio" onclick="selectTone(this)">Misterio</div>
+          <div class="tone-opt" data-tone="motivacional" onclick="selectTone(this)">Motivacional</div>
+          <div class="tone-opt" data-tone="documental" onclick="selectTone(this)">Documental</div>
+          <div class="tone-opt" data-tone="drama" onclick="selectTone(this)">Drama</div>
+          <div class="tone-opt" data-tone="humor" onclick="selectTone(this)">Humor</div>
         </div>
       </div>
 
+      <div class="field">
+        <label>Canal de destino</label>
+        <select id="inp-channel">
+          <option value="">Sin canal — guardar en local</option>
+        </select>
+      </div>
+
+      <button class="btn btn-ink btn-full btn-lg" id="btn-generate" onclick="startGeneration()" style="margin-top:4px;">
+        Generar vídeo
+      </button>
+
       <!-- Historial -->
-      <div class="card mt-16">
-        <div class="card-header">
-          <span class="card-title-sm">Últimos vídeos</span>
-          <button class="btn btn-ghost btn-sm btn-icon" onclick="loadJobs()" title="Actualizar">↻</button>
+      <div class="mt-32">
+        <div class="flex-between" style="margin-bottom:12px;">
+          <span class="section-title" style="margin-bottom:0;">Historial</span>
+          <button class="btn btn-ghost btn-sm" onclick="loadJobs()" style="padding:3px 8px;font-size:11px;">↻ actualizar</button>
         </div>
-        <div class="card-body" style="padding-top:4px;padding-bottom:4px;">
-          <div id="jobs-list">
-            <div class="empty"><div class="empty-icon">🎬</div><div class="empty-text">Sin vídeos aún</div></div>
+        <div id="jobs-list">
+          <div class="empty" style="padding:28px 0;">
+            <div class="empty-title">Sin vídeos aún</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Pipeline -->
+    <!-- Col derecha: pipeline -->
     <div>
+
       <!-- Estado vacío -->
-      <div class="card" id="welcome-card">
-        <div class="card-body">
-          <div class="empty" style="padding:40px 0;">
-            <div class="empty-icon" style="font-size:48px;opacity:0.3;">⚡</div>
-            <div class="empty-text" style="font-size:15px;font-weight:600;color:var(--text);">Listo para generar</div>
-            <div class="empty-sub" style="margin-top:8px;line-height:1.6;">
-              Configura el vídeo y pulsa<br><strong>Generar</strong> para iniciar el proceso
-            </div>
-            <div style="margin-top:20px;display:flex;flex-wrap:wrap;justify-content:center;gap:6px;">
-              <span class="badge badge-gray">✍️ Guión Claude</span>
-              <span class="badge badge-gray">🎙️ Voz Kokoro</span>
-              <span class="badge badge-gray">🖼️ Flux Schnell</span>
-              <span class="badge badge-gray">🎬 Kling AI</span>
-              <span class="badge badge-gray">⚙️ FFmpeg</span>
-            </div>
+      <div id="welcome-card">
+        <div class="empty" style="padding:60px 0;">
+          <div class="empty-big">⚡</div>
+          <div class="empty-title">Listo para producir</div>
+          <div class="empty-note" style="margin-top:6px;line-height:1.7;">
+            Configura el vídeo y pulsa <strong>Generar</strong>
+          </div>
+          <div class="mt-16 flex" style="justify-content:center;gap:6px;flex-wrap:wrap;">
+            <span class="pill pill-gray">Guión Claude</span>
+            <span class="pill pill-gray">Voz Kokoro</span>
+            <span class="pill pill-gray">Flux Schnell</span>
+            <span class="pill pill-gray">Kling AI</span>
+            <span class="pill pill-gray">FFmpeg</span>
           </div>
         </div>
       </div>
 
       <!-- Pipeline activo -->
-      <div class="card" id="pipeline-card" style="display:none;">
-        <div class="card-header">
-          <span class="card-title-sm">Progreso</span>
-          <div class="cost-chip">
-            <span>💰</span>
-            <span class="cost-chip-val" id="cost-display">0.000€</span>
+      <div id="pipeline-card" style="display:none;">
+
+        <div class="flex-between" style="margin-bottom:10px;">
+          <span class="section-title" style="margin-bottom:0;">Progreso</span>
+          <div class="cost-pill">
+            <span class="cost-num" id="cost-display">0.000</span>
+            <span class="cost-unit">EUR</span>
           </div>
         </div>
-        <div class="card-body">
-          <div class="progress-wrap">
-            <div class="progress-bar">
-              <div class="progress-fill" id="progress-fill" style="width:0%"></div>
-            </div>
-            <div class="progress-pct" id="progress-pct">0%</div>
-          </div>
-          <div class="step-list" id="step-list"></div>
-          <div id="final-result" style="margin-top:16px;display:none;"></div>
+
+        <div class="progress-track">
+          <div class="progress-fill" id="progress-fill" style="width:0%"></div>
         </div>
+        <div class="progress-label" id="progress-pct">0%</div>
+
+        <div class="steps" id="step-list"></div>
+
+        <div id="final-result" style="margin-top:16px;display:none;"></div>
       </div>
-    </div>
 
-  </div>
-</div>
-
-<!-- ════════════════ DASHBOARD ════════════════ -->
-<div id="page-dashboard" class="page">
-  <div class="page-header flex-between">
-    <div>
-      <div class="page-title">Canales</div>
-      <div class="page-sub">Gestiona tu granja de canales de YouTube</div>
-    </div>
-    <button class="btn btn-primary" onclick="openAddChannel()">+ Añadir canal</button>
-  </div>
-  <div class="channel-grid" id="channels-grid">
-    <div class="empty" style="grid-column:1/-1;">
-      <div class="empty-icon">📺</div>
-      <div class="empty-text">Sin canales</div>
-      <div class="empty-sub">Añade tu primer canal de YouTube</div>
     </div>
   </div>
 </div>
 
-<!-- ════════════════ FINANZAS ════════════════ -->
+<!-- ══════════ CANALES ══════════ -->
+<div id="page-canales" class="page">
+  <div class="page-head">
+    <div class="page-head-row">
+      <div>
+        <div class="eyebrow">Granja</div>
+        <h1>Canales</h1>
+        <p class="sub">Gestiona y conecta tus canales de YouTube</p>
+      </div>
+      <button class="btn btn-ink" onclick="openAddChannel()">+ Añadir canal</button>
+    </div>
+  </div>
+
+  <div class="ch-grid" id="channels-grid">
+    <div class="empty" style="grid-column:1/-1;padding:48px 0;">
+      <div class="empty-big">📺</div>
+      <div class="empty-title">Sin canales</div>
+      <div class="empty-note">Añade tu primer canal de YouTube</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ FINANZAS ══════════ -->
 <div id="page-finanzas" class="page">
-  <div class="page-header">
-    <div class="page-title">Finanzas</div>
-    <div class="page-sub" id="finance-month">Cargando...</div>
+  <div class="page-head">
+    <div class="eyebrow" id="finance-month">Cargando…</div>
+    <h1>Finanzas</h1>
+    <p class="sub">Costes reales de producción por API</p>
   </div>
 
-  <div class="grid-4" style="margin-bottom:20px;">
-    <div class="stat-card">
-      <div class="stat-label">Gasto del mes</div>
-      <div class="stat-value" id="f-total-cost">—</div>
-      <div class="stat-sub">En APIs de producción</div>
+  <div class="stats-strip">
+    <div class="stat">
+      <div class="stat-lbl">Gasto del mes</div>
+      <div class="stat-val" id="f-total">—</div>
+      <div class="stat-note">en APIs de producción</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-label">Vídeos generados</div>
-      <div class="stat-value" id="f-videos">—</div>
-      <div class="stat-sub">Este mes</div>
+    <div class="stat">
+      <div class="stat-lbl">Vídeos generados</div>
+      <div class="stat-val" id="f-videos">—</div>
+      <div class="stat-note">este mes</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-label">Coste medio</div>
-      <div class="stat-value" id="f-avg">—</div>
-      <div class="stat-sub">Por vídeo</div>
+    <div class="stat">
+      <div class="stat-lbl">Coste medio</div>
+      <div class="stat-val" id="f-avg">—</div>
+      <div class="stat-note">por vídeo</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-label">Proyección anual</div>
-      <div class="stat-value" id="f-annual">—</div>
-      <div class="stat-sub">A ritmo actual</div>
+    <div class="stat">
+      <div class="stat-lbl">Proyección anual</div>
+      <div class="stat-val" id="f-annual">—</div>
+      <div class="stat-note">a ritmo actual</div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-header">
-      <span class="card-title-sm">Gasto por servicio</span>
+  <div class="surface">
+    <div class="surface-head">
+      <span class="section-title" style="margin-bottom:0;">Desglose por servicio</span>
     </div>
-    <div class="card-body">
+    <div class="surface-body">
       <div id="finance-breakdown">
-        <div class="empty"><div class="empty-icon">📊</div><div class="empty-text">Sin datos este mes</div></div>
+        <div class="empty" style="padding:28px 0;">
+          <div class="empty-title">Sin datos este mes</div>
+        </div>
       </div>
     </div>
   </div>
@@ -439,58 +735,54 @@
 <!-- MODAL: Añadir canal -->
 <div class="overlay" id="modal-channel">
   <div class="modal">
-    <div class="modal-title">Añadir canal</div>
-    <div class="form-group">
+    <h2>Añadir canal</h2>
+    <div class="field">
       <label>Nombre del canal</label>
       <input id="ch-name" type="text" placeholder="Ej: MisterioTV">
     </div>
-    <div class="form-group">
+    <div class="field">
       <label>Nicho principal</label>
       <input id="ch-niche" type="text" placeholder="Ej: Misterio y crímenes">
     </div>
-    <div style="display:flex;gap:10px;margin-top:16px;">
-      <button class="btn btn-primary" onclick="saveChannel()">Guardar canal</button>
+    <div class="flex gap-8 mt-16">
+      <button class="btn btn-ink" onclick="saveChannel()">Guardar</button>
       <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
     </div>
   </div>
 </div>
 
 <script>
-// ── Config ───────────────────────────────────────────────────────
 const API = window.location.hostname === 'localhost' ? '' : (window.BACKEND_URL || '');
 
 const STEPS_META = {
-  script:      { emoji: '✍️', label: 'Guión' },
-  tts:         { emoji: '🎙️', label: 'Voz' },
-  images:      { emoji: '🖼️', label: 'Imágenes' },
-  thumbnail:   { emoji: '🎨', label: 'Miniatura' },
-  hook_videos: { emoji: '🎬', label: 'Vídeos hook' },
-  render:      { emoji: '⚙️', label: 'Montaje FFmpeg' },
-  upload:      { emoji: '📤', label: 'YouTube' },
+  script:      { icon: '✦', label: 'Guión' },
+  tts:         { icon: '◎', label: 'Voz' },
+  images:      { icon: '▣', label: 'Imágenes' },
+  thumbnail:   { icon: '◈', label: 'Miniatura' },
+  hook_videos: { icon: '▷', label: 'Vídeos hook' },
+  render:      { icon: '⚙', label: 'Montaje' },
+  upload:      { icon: '↑', label: 'YouTube' },
 };
 
 let totalCost = 0;
 let eventSource = null;
 let selectedTone = 'neutro';
 
-// ── Nav ──────────────────────────────────────────────────────────
 function showPage(name, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   if (btn) btn.classList.add('active');
-  if (name === 'dashboard') loadChannels();
+  if (name === 'canales') loadChannels();
   if (name === 'finanzas') loadFinance();
 }
 
-// ── Tone selector ────────────────────────────────────────────────
 function selectTone(el) {
-  document.querySelectorAll('.tone-btn').forEach(b => b.classList.remove('selected'));
-  el.classList.add('selected');
+  document.querySelectorAll('.tone-opt').forEach(b => b.classList.remove('on'));
+  el.classList.add('on');
   selectedTone = el.dataset.tone;
 }
 
-// ── Generación ───────────────────────────────────────────────────
 async function startGeneration() {
   const niche = document.getElementById('inp-niche').value.trim();
   const title = document.getElementById('inp-title').value.trim();
@@ -504,16 +796,16 @@ async function startGeneration() {
   document.getElementById('step-list').innerHTML = '';
   document.getElementById('progress-fill').style.width = '0%';
   document.getElementById('progress-pct').textContent = '0%';
-  document.getElementById('cost-display').textContent = '0.000€';
+  document.getElementById('cost-display').textContent = '0.000';
   totalCost = 0;
 
   Object.entries(STEPS_META).forEach(([key, meta]) => {
     document.getElementById('step-list').insertAdjacentHTML('beforeend', `
-      <div class="step-item" id="step-${key}">
-        <div class="step-dot pending" id="dot-${key}">${meta.emoji}</div>
-        <div class="step-info">
+      <div class="step" id="step-${key}">
+        <div class="step-icon pending" id="dot-${key}">${meta.icon}</div>
+        <div class="step-body">
           <div class="step-name">${meta.label}</div>
-          <div class="step-msg text-muted" id="msg-${key}">Esperando...</div>
+          <div class="step-msg text-smoke" id="msg-${key}">Esperando…</div>
         </div>
         <div class="step-cost" id="scost-${key}"></div>
       </div>`);
@@ -540,12 +832,12 @@ function onStep({step, status, message, progress, cost}) {
   const msg = document.getElementById('msg-' + step);
   const sc  = document.getElementById('scost-' + step);
   if (!dot) return;
-  dot.className = 'step-dot ' + status;
+  dot.className = 'step-icon ' + status;
   if (msg) msg.textContent = message;
   if (cost > 0 && sc) {
     totalCost += cost;
     sc.textContent = cost.toFixed(4) + '€';
-    document.getElementById('cost-display').textContent = totalCost.toFixed(4) + '€';
+    document.getElementById('cost-display').textContent = totalCost.toFixed(3);
   }
   document.getElementById('progress-fill').style.width = progress + '%';
   document.getElementById('progress-pct').textContent = progress + '%';
@@ -557,9 +849,9 @@ function onEnd({job}) {
   const el = document.getElementById('final-result');
   el.style.display = 'block';
   if (job.youtube_url) {
-    el.innerHTML = `<a href="${job.youtube_url}" target="_blank" class="btn btn-green btn-full" style="padding:12px;">▶ Ver en YouTube ↗</a>`;
+    el.innerHTML = `<a href="${job.youtube_url}" target="_blank" class="btn btn-green btn-full btn-lg">Ver en YouTube ↗</a>`;
   } else {
-    el.innerHTML = `<div class="result-box"><div class="result-title">✅ Vídeo listo</div><div class="result-sub">Conecta un canal de YouTube para subida automática</div></div>`;
+    el.innerHTML = `<div class="result-ok"><span style="font-size:18px;">✓</span><div><div class="fw-6 fs-13 text-green">Vídeo generado</div><div class="fs-11 text-smoke mt-4">Conecta un canal para subida automática</div></div></div>`;
   }
   loadJobs();
   loadNavCost();
@@ -570,61 +862,54 @@ function onError({message}) {
   eventSource.close();
   const el = document.getElementById('final-result');
   el.style.display = 'block';
-  el.innerHTML = `<div style="border:1px solid var(--accent);background:var(--accent-light);border-radius:var(--radius);padding:14px 18px;"><span class="fw-600 text-red">Error:</span> ${message}</div>`;
+  el.innerHTML = `<div class="result-err"><span class="fw-6 text-red fs-12">Error: </span><span class="fs-12">${message}</span></div>`;
 }
 
-// ── Jobs ─────────────────────────────────────────────────────────
 async function loadJobs() {
   const jobs = await fetch(`${API}/api/jobs`).then(r => r.json()).catch(()=>[]);
   const el = document.getElementById('jobs-list');
   if (!jobs.length) {
-    el.innerHTML = '<div class="empty" style="padding:24px 0;"><div class="empty-icon" style="font-size:24px;">🎬</div><div class="empty-text">Sin vídeos aún</div></div>';
+    el.innerHTML = '<div class="empty" style="padding:24px 0;"><div class="empty-title">Sin vídeos aún</div></div>';
     return;
   }
   el.innerHTML = jobs.slice(0,10).map(j => `
-    <div class="table-row">
-      <div class="status-dot ${j.status}"></div>
-      <div style="flex:1;min-width:0;">
-        <div class="fw-600 fs-13" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${j.title}</div>
-        <div class="fs-12 text-muted">${j.niche} · ${(j.created_at||'').substring(0,16)}</div>
+    <div class="job-row">
+      <div class="job-dot ${j.status}"></div>
+      <div class="flex-1 min-0">
+        <div class="job-title">${j.title}</div>
+        <div class="job-meta">${j.niche} · ${(j.created_at||'').substring(0,16)}</div>
       </div>
-      <div style="text-align:right;flex-shrink:0;">
-        <div class="fw-600 text-green fs-13">${(j.cost_total||0).toFixed(3)}€</div>
-        ${j.youtube_url ? `<a href="${j.youtube_url}" target="_blank" class="fs-12 text-red">Ver ↗</a>` : ''}
+      <div class="job-cost">
+        ${(j.cost_total||0).toFixed(3)}€
+        ${j.youtube_url ? `<br><a href="${j.youtube_url}" target="_blank" class="fs-11 text-red italic">ver ↗</a>` : ''}
       </div>
     </div>`).join('');
 }
 
-// ── Canales ──────────────────────────────────────────────────────
 async function loadChannels() {
   const chs = await fetch(`${API}/api/channels`).then(r => r.json()).catch(()=>[]);
   fillChannelSelect(chs);
   const grid = document.getElementById('channels-grid');
   if (!chs.length) {
-    grid.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="empty-icon">📺</div><div class="empty-text">Sin canales</div><div class="empty-sub">Añade tu primer canal</div></div>`;
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1;padding:48px 0;"><div class="empty-big">📺</div><div class="empty-title">Sin canales</div><div class="empty-note">Añade tu primer canal</div></div>`;
     return;
   }
   grid.innerHTML = chs.map(c => `
-    <div class="channel-card">
-      <div class="channel-avatar">📺</div>
-      <div class="channel-name">${c.name}</div>
-      <div class="channel-niche">${c.niche || 'Sin nicho'}</div>
-      <div class="channel-stats">
-        <div class="channel-stat-row">
-          <span class="lbl">Estado</span>
-          <span class="badge ${c.connected ? 'badge-green' : 'badge-red'}">${c.connected ? '● Conectado' : '○ Sin conectar'}</span>
-        </div>
-        <div class="channel-stat-row"><span class="lbl">Subs</span><span class="val">—</span></div>
-        <div class="channel-stat-row"><span class="lbl">Vídeos subidos</span><span class="val">—</span></div>
-      </div>
-      ${!c.connected ? `<button class="btn btn-outline btn-full btn-sm mt-16" onclick="connectYT('${c.id}')">Conectar YouTube →</button>` : ''}
+    <div class="ch-card">
+      <div class="ch-icon">📺</div>
+      <div class="ch-name">${c.name}</div>
+      <div class="ch-niche">${c.niche || 'Sin nicho'}</div>
+      <div class="ch-row"><span class="k">Estado</span><span class="pill ${c.connected ? 'pill-green' : 'pill-red'}">${c.connected ? '● Conectado' : '○ Sin conectar'}</span></div>
+      <div class="ch-row"><span class="k">Subs</span><span class="v">—</span></div>
+      <div class="ch-row"><span class="k">Vídeos</span><span class="v">—</span></div>
+      ${!c.connected ? `<button class="btn btn-outline btn-full btn-sm mt-12" onclick="connectYT('${c.id}')">Conectar YouTube →</button>` : ''}
     </div>`).join('');
 }
 
 function fillChannelSelect(chs) {
   const sel = document.getElementById('inp-channel');
   sel.innerHTML = '<option value="">Sin canal — guardar en local</option>' +
-    chs.map(c => `<option value="${c.id}">${c.name}${!c.connected ? ' ⚠️' : ''}</option>`).join('');
+    chs.map(c => `<option value="${c.id}">${c.name}${!c.connected ? ' ⚠' : ''}</option>`).join('');
 }
 
 async function connectYT(id) {
@@ -649,41 +934,39 @@ async function saveChannel() {
   loadChannels();
 }
 
-// ── Finanzas ─────────────────────────────────────────────────────
 async function loadFinance() {
-  const f = await fetch(`${API}/api/finance`).then(r => r.json()).catch(()=>({total_cost:0,total_videos:0,avg_cost_per_video:0,by_service:[]}));
-  document.getElementById('finance-month').textContent = `Mes: ${f.month}`;
-  document.getElementById('f-total-cost').textContent = f.total_cost.toFixed(2) + '€';
+  const f = await fetch(`${API}/api/finance`).then(r => r.json()).catch(()=>({total_cost:0,total_videos:0,avg_cost_per_video:0,by_service:[],month:''}));
+  document.getElementById('finance-month').textContent = f.month || '—';
+  document.getElementById('f-total').textContent = f.total_cost.toFixed(2) + '€';
   document.getElementById('f-videos').textContent = f.total_videos;
   document.getElementById('f-avg').textContent = f.avg_cost_per_video.toFixed(2) + '€';
   document.getElementById('f-annual').textContent = (f.total_cost * 12).toFixed(0) + '€';
 
   const el = document.getElementById('finance-breakdown');
-  if (!f.by_service.length) {
-    el.innerHTML = '<div class="empty" style="padding:24px 0;"><div class="empty-icon" style="font-size:24px;">📊</div><div class="empty-text">Sin datos este mes</div></div>';
+  if (!f.by_service?.length) {
+    el.innerHTML = '<div class="empty" style="padding:24px 0;"><div class="empty-title">Sin datos este mes</div></div>';
     return;
   }
-  const max = Math.max(...f.by_service.map(s => s.total));
   const labels = {
-    claude_sonnet:'Claude Sonnet (guión)', claude_haiku:'Claude Haiku (prompts)',
-    kokoro_tts:'Kokoro TTS (voz)', azure_tts:'Azure TTS (voz fallback)',
-    flux_schnell:'Flux Schnell (imágenes)', flux_schnell_thumb:'Flux Schnell (miniatura)',
-    kling_standard:'Kling Standard (hook vídeos)'
+    claude_sonnet:'Claude Sonnet', claude_haiku:'Claude Haiku',
+    kokoro_tts:'Kokoro TTS', azure_tts:'Azure TTS',
+    flux_schnell:'Flux Schnell', flux_schnell_thumb:'Flux Schnell (miniatura)',
+    kling_standard:'Kling Standard'
   };
+  const max = Math.max(...f.by_service.map(s => s.total));
   el.innerHTML = f.by_service.map(s => `
-    <div class="finance-service-row">
-      <span class="fs-13 text-muted" style="width:200px;flex-shrink:0;">${labels[s.service]||s.service}</span>
-      <div class="finance-bar-wrap"><div class="finance-bar" style="width:${(s.total/max*100).toFixed(0)}%"></div></div>
-      <span class="fs-13 fw-600" style="width:64px;text-align:right;">${s.total.toFixed(4)}€</span>
+    <div class="fin-row">
+      <span class="fin-svc">${labels[s.service]||s.service}</span>
+      <div class="fin-bar-wrap"><div class="fin-bar" style="width:${(s.total/max*100).toFixed(0)}%"></div></div>
+      <span class="fin-amt">${s.total.toFixed(4)}€</span>
     </div>`).join('');
 }
 
 async function loadNavCost() {
   const f = await fetch(`${API}/api/finance`).then(r=>r.json()).catch(()=>({total_cost:0}));
-  document.getElementById('nav-cost-badge').textContent = f.total_cost.toFixed(2) + '€ este mes';
+  document.getElementById('nav-cost').textContent = f.total_cost.toFixed(2) + '€';
 }
 
-// ── Init ─────────────────────────────────────────────────────────
 loadJobs();
 loadChannels();
 loadNavCost();
