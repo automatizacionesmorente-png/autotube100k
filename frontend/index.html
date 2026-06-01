@@ -5,146 +5,193 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AutoTube 100k</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-:root {
-  --paper: #f7f4ef;
-  --paper2: #eeebe4;
-  --white: #ffffff;
-  --ink: #1c1914;
-  --ink2: #3a352e;
-  --smoke: #8a837a;
-  --smoke2: #b8b0a6;
-  --rule: #ddd8d0;
-  --gold: #b8922a;
-  --gold-pale: #f9f3e4;
-  --green: #2a6b42;
-  --green-pale: #edf5f0;
-  --red: #b83030;
-  --red-pale: #fdf0f0;
-  --blue: #2d5fa6;
-}
-
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+:root {
+  --bg: #f5f5f3;
+  --surface: #ffffff;
+  --border: #e5e5e3;
+  --border2: #d0d0ce;
+  --ink: #0a0a0a;
+  --ink2: #1a1a1a;
+  --muted: #737373;
+  --muted2: #a3a3a3;
+  --gold: #d4880a;
+  --gold2: #f0a020;
+  --gold-bg: #fffbf0;
+  --green: #15803d;
+  --green-bg: #f0fdf4;
+  --red: #dc2626;
+  --red-bg: #fef2f2;
+  --blue: #2563eb;
+  --blue-bg: #eff6ff;
+  --purple: #7c3aed;
+  --orange: #ea580c;
+  --teal: #0d9488;
+  --rose: #e11d48;
+}
+
 body {
-  background: var(--paper);
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: var(--bg);
   color: var(--ink);
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.55;
   min-height: 100vh;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ─── NAV ─── */
 nav {
-  background: var(--white);
-  border-bottom: 1px solid var(--rule);
-  height: 52px;
+  background: #0a0a0a;
+  height: 54px;
   display: flex;
   align-items: center;
-  padding: 0 40px;
-  gap: 48px;
+  padding: 0 32px;
+  gap: 40px;
   position: sticky;
   top: 0;
   z-index: 100;
+  border-bottom: 1px solid #1f1f1f;
 }
 
 .logo {
-  font-family: 'DM Serif Display', Georgia, serif;
-  font-size: 19px;
-  font-weight: 500;
-  color: var(--ink);
-  letter-spacing: 0.01em;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.04em;
   white-space: nowrap;
   flex-shrink: 0;
 }
-.logo em {
-  font-style: italic;
-  color: var(--gold);
+.logo .tube {
+  background: linear-gradient(135deg, #f0a020 0%, #d4880a 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
+.logo .hun { color: #3f3f3f; }
 
-.nav-tabs {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  flex: 1;
-}
+.nav-tabs { display: flex; flex: 1; }
 
 .nav-tab {
-  padding: 0 16px;
-  height: 52px;
+  height: 54px;
+  padding: 0 18px;
   font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--smoke);
+  color: #525252;
   cursor: pointer;
   border: none;
   background: none;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
-  transition: color 0.1s, border-color 0.1s;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
 }
-.nav-tab:hover { color: var(--ink2); }
-.nav-tab.active { color: var(--ink); border-bottom-color: var(--gold); }
+.nav-tab:hover { color: #a3a3a3; }
+.nav-tab.active {
+  color: #fff;
+  border-bottom-color: var(--gold2);
+}
 
 .nav-end {
   font-size: 11px;
   font-weight: 500;
-  color: var(--smoke);
-  letter-spacing: 0.04em;
+  color: #525252;
+  letter-spacing: 0.03em;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-.nav-end strong { color: var(--gold); font-weight: 600; }
+#nav-cost {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold2);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
 
-/* ─── LAYOUT ─── */
-main { max-width: 1060px; margin: 0 auto; padding: 44px 40px 60px; }
+/* ─── MAIN ─── */
+main { max-width: 1100px; margin: 0 auto; padding: 40px 32px 80px; }
 
 .page { display: none; }
 .page.active { display: block; }
 
-h1 {
-  font-family: 'DM Serif Display', Georgia, serif;
-  font-size: 26px;
-  font-weight: 400;
-  color: var(--ink);
-  line-height: 1.2;
-  letter-spacing: 0em;
-}
-
-.eyebrow {
+/* ─── PAGE HEADER ─── */
+.page-kicker {
   font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--smoke);
+  color: var(--gold);
   margin-bottom: 6px;
 }
 
-.sub {
-  font-size: 12px;
-  color: var(--smoke);
-  margin-top: 5px;
+.page-h {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+.page-sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 6px;
+  font-weight: 400;
 }
 
 .page-head { margin-bottom: 36px; }
-.page-head-row { display: flex; align-items: flex-end; justify-content: space-between; }
 
-/* ─── DIVIDER ─── */
-hr { border: none; border-top: 1px solid var(--rule); margin: 24px 0; }
+/* ─── GRID ─── */
+.two-col {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+/* ─── CARD ─── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+}
+
+.card-head {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.card-body { padding: 20px; }
 
 /* ─── FORM ─── */
-.field { margin-bottom: 20px; }
+.field { margin-bottom: 18px; }
 
 .field label {
   display: block;
   font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  font-weight: 700;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--smoke);
+  color: var(--muted);
   margin-bottom: 7px;
 }
 
@@ -152,378 +199,498 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 24px 0; }
 .field select,
 .field textarea {
   width: 100%;
-  background: var(--white);
-  border: 1px solid var(--rule);
+  background: var(--bg);
+  border: 1.5px solid var(--border);
   color: var(--ink);
-  border-radius: 5px;
-  padding: 9px 12px;
+  border-radius: 8px;
+  padding: 10px 13px;
   font-size: 13px;
   font-family: inherit;
+  font-weight: 500;
   outline: none;
-  transition: border-color 0.1s, box-shadow 0.1s;
+  transition: border-color 0.15s, box-shadow 0.15s;
   -webkit-appearance: none;
 }
-
+.field input::placeholder,
+.field textarea::placeholder { color: var(--muted2); font-weight: 400; }
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
   border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(184,146,42,0.12);
+  box-shadow: 0 0 0 3px rgba(212,136,10,0.12);
+  background: #fff;
 }
 
 .field select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238a837a'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23737373'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 32px;
+  background-position: right 13px center;
+  background-color: var(--bg);
+  padding-right: 34px;
   cursor: pointer;
 }
 
-/* ─── TONE SELECTOR ─── */
-.tone-row {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+/* ─── TONE PILLS ─── */
+.tone-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
 }
 
 .tone-opt {
-  padding: 5px 14px;
-  border: 1px solid var(--rule);
-  border-radius: 3px;
+  padding: 9px 8px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
   font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  color: var(--smoke);
+  font-weight: 700;
+  text-align: center;
   cursor: pointer;
-  transition: all 0.1s;
-  background: var(--white);
-  text-transform: uppercase;
+  transition: all 0.15s;
+  background: var(--bg);
+  color: var(--muted);
+  letter-spacing: 0.04em;
   user-select: none;
+  text-transform: uppercase;
 }
-.tone-opt:hover { color: var(--ink2); border-color: var(--smoke2); }
-.tone-opt.on {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--white);
+.tone-opt .emoji { display: block; font-size: 16px; margin-bottom: 3px; }
+.tone-opt:hover { border-color: var(--border2); color: var(--ink2); transform: translateY(-1px); }
+
+.tone-opt[data-tone="neutro"].on     { background: #0a0a0a; border-color: #0a0a0a; color: #fff; }
+.tone-opt[data-tone="misterio"].on   { background: var(--purple); border-color: var(--purple); color: #fff; }
+.tone-opt[data-tone="motivacional"].on { background: var(--gold); border-color: var(--gold); color: #fff; }
+.tone-opt[data-tone="documental"].on { background: var(--blue); border-color: var(--blue); color: #fff; }
+.tone-opt[data-tone="drama"].on      { background: var(--rose); border-color: var(--rose); color: #fff; }
+.tone-opt[data-tone="humor"].on      { background: var(--teal); border-color: var(--teal); color: #fff; }
+
+/* ─── GENERATE BUTTON ─── */
+.btn-generate {
+  width: 100%;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #f0a020 0%, #d4880a 60%, #b87010 100%);
+  border: none;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(212,136,10,0.35), 0 1px 3px rgba(0,0,0,0.1);
+  position: relative;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.btn-generate::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+  transition: opacity 0.2s;
+}
+.btn-generate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(212,136,10,0.5), 0 2px 6px rgba(0,0,0,0.15);
+}
+.btn-generate:active { transform: translateY(0); }
+.btn-generate:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* ─── BUTTONS ─── */
 .btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 8px 20px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: all 0.1s;
-  font-family: inherit;
-  white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 600;
+  letter-spacing: -0.01em; cursor: pointer; border: 1.5px solid transparent;
+  transition: all 0.15s; font-family: inherit; white-space: nowrap;
 }
-.btn-ink { background: var(--ink); color: var(--white); border-color: var(--ink); }
-.btn-ink:hover { background: var(--ink2); }
-.btn-ink:disabled { opacity: 0.3; cursor: not-allowed; }
-.btn-gold { background: var(--gold); color: var(--white); border-color: var(--gold); }
-.btn-gold:hover { filter: brightness(0.93); }
-.btn-outline { background: transparent; color: var(--ink2); border-color: var(--rule); }
-.btn-outline:hover { border-color: var(--smoke2); background: var(--paper2); }
-.btn-ghost { background: transparent; color: var(--smoke); border-color: transparent; font-size: 13px; padding: 6px 10px; }
-.btn-ghost:hover { color: var(--ink); background: var(--paper2); }
-.btn-green { background: var(--green); color: var(--white); border-color: var(--green); }
+.btn-dark { background: var(--ink); color: #fff; border-color: var(--ink); }
+.btn-dark:hover { background: #1f1f1f; }
+.btn-outline { background: transparent; color: var(--ink2); border-color: var(--border2); }
+.btn-outline:hover { border-color: var(--muted2); background: var(--bg); }
+.btn-ghost { background: transparent; color: var(--muted); border-color: transparent; padding: 6px 10px; }
+.btn-ghost:hover { color: var(--ink); background: var(--bg); }
+.btn-green { background: var(--green); color: #fff; border-color: var(--green); }
 .btn-sm { padding: 5px 12px; font-size: 11px; }
-.btn-full { width: 100%; }
-.btn-lg { padding: 11px 24px; font-size: 13px; }
 
-/* ─── TWO-COL LAYOUT ─── */
-.two-col {
-  display: grid;
-  grid-template-columns: 380px 1fr;
-  gap: 32px;
-  align-items: start;
-}
-
-/* ─── SECTION ─── */
-.section-title {
+/* ─── HISTORIAL ─── */
+.section-label {
   font-size: 10px;
-  font-weight: 500;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--smoke);
-  margin-bottom: 16px;
-}
-
-/* ─── SURFACE ─── */
-.surface {
-  background: var(--white);
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-}
-
-.surface-head {
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--rule);
+  color: var(--muted);
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.surface-body { padding: 20px; }
-.surface-body-tight { padding: 12px 20px; }
-
-/* ─── PIPELINE ─── */
-.progress-track {
-  height: 2px;
-  background: var(--rule);
-  border-radius: 1px;
-  overflow: hidden;
-  margin-bottom: 4px;
-}
-.progress-fill {
-  height: 100%;
-  background: var(--gold);
-  border-radius: 1px;
-  transition: width 0.4s ease;
-}
-.progress-label {
-  font-size: 11px;
-  color: var(--smoke);
-  text-align: right;
-  margin-bottom: 20px;
-}
-
-.steps { display: flex; flex-direction: column; }
-
-.step {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 11px 0;
-  border-bottom: 1px solid var(--rule);
-}
-.step:last-child { border-bottom: none; }
-
-.step-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 1px solid var(--rule);
-  background: var(--paper);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  flex-shrink: 0;
-  margin-top: 1px;
-  transition: all 0.2s;
-  color: var(--smoke2);
-}
-.step-icon.pending { }
-.step-icon.running {
-  border-color: var(--blue);
-  background: rgba(45,95,166,0.06);
-  animation: pulse-ring 1.6s ease-in-out infinite;
-}
-.step-icon.done {
-  border-color: var(--green);
-  background: var(--green-pale);
-}
-.step-icon.error {
-  border-color: var(--red);
-  background: var(--red-pale);
-}
-
-@keyframes pulse-ring {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(45,95,166,0.3); }
-  50% { box-shadow: 0 0 0 4px rgba(45,95,166,0.08); }
-}
-
-.step-body { flex: 1; min-width: 0; }
-.step-name { font-size: 12px; font-weight: 500; color: var(--ink2); }
-.step-msg { font-size: 11px; color: var(--smoke); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.step-cost { font-size: 11px; font-weight: 600; color: var(--green); flex-shrink: 0; padding-top: 2px; }
-
-/* ─── COST PILL ─── */
-.cost-pill {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  background: var(--gold-pale);
-  border: 1px solid rgba(184,146,42,0.25);
-  border-radius: 20px;
-  padding: 3px 12px;
-}
-.cost-num {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--gold);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
-}
-.cost-unit { font-size: 10px; color: var(--smoke); font-weight: 500; letter-spacing: 0.04em; }
-
-/* ─── JOBS LIST ─── */
 .job-row {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--border);
 }
 .job-row:last-child { border-bottom: none; }
-
-.job-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
-.job-dot.done { background: var(--green); }
+.job-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.job-dot.done    { background: var(--green); }
 .job-dot.running { background: var(--blue); animation: blink 1s infinite; }
-.job-dot.error { background: var(--red); }
-.job-dot.pending { background: var(--smoke2); }
+.job-dot.error   { background: var(--red); }
+.job-dot.pending { background: var(--muted2); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+.job-title { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.01em; }
+.job-meta { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.job-cost { font-size: 12px; font-weight: 700; color: var(--green); flex-shrink: 0; font-variant-numeric: tabular-nums; }
 
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
-
-.job-title { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.job-meta { font-size: 11px; color: var(--smoke); margin-top: 1px; }
-.job-cost { font-size: 12px; font-weight: 600; color: var(--green); flex-shrink: 0; text-align: right; }
-
-/* ─── STAT CARDS ─── */
-.stats-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; margin-bottom: 28px; }
-
-.stat {
-  background: var(--white);
-  padding: 22px 24px;
+/* ─── WELCOME CARD ─── */
+.welcome-visual {
+  background: #0a0a0a;
+  border-radius: 12px;
+  padding: 40px 28px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
 }
-.stat-lbl { font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--smoke); margin-bottom: 10px; }
-.stat-val {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 30px;
-  font-weight: 300;
-  color: var(--ink);
-  line-height: 1;
+.welcome-visual::before {
+  content: '';
+  position: absolute;
+  top: -60px; left: 50%;
+  transform: translateX(-50%);
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(212,136,10,0.25) 0%, transparent 70%);
+  pointer-events: none;
+}
+.welcome-icon {
+  font-size: 52px;
+  margin-bottom: 16px;
+  position: relative;
+  display: block;
+  animation: float 3s ease-in-out infinite;
+}
+@keyframes float {
+  0%,100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+.welcome-title {
+  font-size: 18px;
+  font-weight: 800;
   letter-spacing: -0.03em;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.welcome-sub {
+  font-size: 12px;
+  color: #737373;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.tech-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.tech-pill {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid #2a2a2a;
+  color: #737373;
+  background: #111;
+}
+
+/* ─── PIPELINE ─── */
+.pipeline-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  overflow: hidden;
+}
+
+.pipeline-header {
+  background: #0a0a0a;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.pipeline-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #525252;
+}
+
+.cost-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  background: rgba(212,136,10,0.15);
+  border: 1px solid rgba(212,136,10,0.3);
+  border-radius: 20px;
+  padding: 3px 12px;
+}
+#cost-display {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--gold2);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.cost-unit {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--gold);
+  letter-spacing: 0.04em;
+}
+
+/* PROGRESS */
+.progress-wrap { padding: 14px 20px 0; }
+.progress-track {
+  height: 3px;
+  background: #f0f0f0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold) 0%, var(--gold2) 100%);
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+#progress-pct {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted2);
+  text-align: right;
+  margin-top: 4px;
   font-variant-numeric: tabular-nums;
 }
-.stat-note { font-size: 11px; color: var(--smoke); margin-top: 6px; }
 
-/* ─── CHANNEL GRID ─── */
-.ch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+/* STEPS */
+.steps { padding: 8px 0; }
 
-.ch-card {
-  background: var(--white);
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  padding: 18px;
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 11px 20px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
 }
+.step:last-child { border-bottom: none; }
+.step.running-step { background: #fafafa; }
 
-.ch-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--paper2);
-  border: 1px solid var(--rule);
+.step-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  margin-bottom: 12px;
+  font-size: 13px;
+  flex-shrink: 0;
+  font-weight: 700;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--muted2);
+  transition: all 0.25s;
+}
+.step-icon.running {
+  background: var(--blue-bg);
+  border-color: var(--blue);
+  color: var(--blue);
+  animation: step-pulse 1.5s ease-in-out infinite;
+}
+.step-icon.done {
+  background: var(--green-bg);
+  border-color: var(--green);
+  color: var(--green);
+}
+.step-icon.error {
+  background: var(--red-bg);
+  border-color: var(--red);
+  color: var(--red);
+}
+@keyframes step-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); }
+  50% { box-shadow: 0 0 0 4px rgba(37,99,235,0.15); }
 }
 
-.ch-name { font-size: 13px; font-weight: 600; }
-.ch-niche { font-size: 11px; color: var(--smoke); margin-top: 2px; margin-bottom: 14px; }
+.step-body { flex: 1; min-width: 0; }
+.step-name { font-size: 12px; font-weight: 700; color: var(--ink2); letter-spacing: -0.01em; }
+.step-msg { font-size: 11px; color: var(--muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.step-cost { font-size: 11px; font-weight: 700; color: var(--green); flex-shrink: 0; padding-top: 3px; font-variant-numeric: tabular-nums; }
 
-.ch-row { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; }
-.ch-row .k { color: var(--smoke); }
-.ch-row .v { font-weight: 600; }
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 8px;
-  border-radius: 20px;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-}
-.pill-green { background: var(--green-pale); color: var(--green); }
-.pill-red { background: var(--red-pale); color: var(--red); }
-.pill-gray { background: var(--paper2); color: var(--smoke); border: 1px solid var(--rule); }
-
-/* ─── FINANCE BARS ─── */
-.fin-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 9px 0;
-  border-bottom: 1px solid var(--rule);
-}
-.fin-row:last-child { border-bottom: none; }
-.fin-svc { width: 190px; flex-shrink: 0; font-size: 12px; color: var(--ink2); }
-.fin-bar-wrap { flex: 1; background: var(--paper2); border-radius: 2px; height: 4px; overflow: hidden; }
-.fin-bar { height: 100%; background: var(--gold); border-radius: 2px; }
-.fin-amt { width: 60px; text-align: right; font-size: 12px; font-weight: 600; flex-shrink: 0; }
-
-/* ─── RESULT ─── */
+/* RESULT */
 .result-ok {
-  background: var(--green-pale);
-  border: 1px solid rgba(42,107,66,0.2);
-  border-radius: 5px;
-  padding: 14px 18px;
+  margin: 0 20px 16px;
+  background: var(--green-bg);
+  border: 1.5px solid var(--green);
+  border-radius: 9px;
+  padding: 13px 16px;
   display: flex;
   align-items: center;
   gap: 10px;
 }
-
 .result-err {
-  background: var(--red-pale);
-  border: 1px solid rgba(184,48,48,0.2);
-  border-radius: 5px;
-  padding: 14px 18px;
+  margin: 0 20px 16px;
+  background: var(--red-bg);
+  border: 1.5px solid var(--red);
+  border-radius: 9px;
+  padding: 13px 16px;
 }
 
-/* ─── EMPTY ─── */
-.empty {
-  text-align: center;
-  padding: 48px 24px;
-  color: var(--smoke);
+/* ─── STATS ─── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
 }
-.empty-big { font-size: 32px; opacity: 0.3; margin-bottom: 12px; }
-.empty-title { font-size: 14px; font-weight: 500; color: var(--ink2); margin-bottom: 4px; }
-.empty-note { font-size: 12px; }
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--gold) 0%, var(--gold2) 100%);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.stat-card:hover::after { opacity: 1; }
+
+.stat-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.stat-num {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  color: var(--ink);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-note {
+  font-size: 11px;
+  color: var(--muted2);
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+/* ─── FINANCE BREAKDOWN ─── */
+.fin-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.fin-row:last-child { border-bottom: none; }
+.fin-svc { width: 180px; flex-shrink: 0; font-size: 12px; font-weight: 500; color: var(--ink2); }
+.fin-bar-wrap { flex: 1; background: var(--bg); border-radius: 3px; height: 5px; overflow: hidden; }
+.fin-bar { height: 100%; background: linear-gradient(90deg, var(--gold) 0%, var(--gold2) 100%); border-radius: 3px; }
+.fin-amt { width: 64px; text-align: right; font-size: 12px; font-weight: 700; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+
+/* ─── CHANNELS ─── */
+.ch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+
+.ch-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: box-shadow 0.2s, transform 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.ch-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(135deg, rgba(212,136,10,0.04) 0%, transparent 60%);
+  pointer-events: none;
+}
+.ch-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.1); transform: translateY(-2px); }
+
+.ch-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  background: #0a0a0a;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+.ch-name { font-size: 13px; font-weight: 700; letter-spacing: -0.02em; }
+.ch-niche { font-size: 11px; color: var(--muted); margin-top: 2px; margin-bottom: 14px; }
+.ch-row { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; }
+.ch-row .k { color: var(--muted); font-weight: 500; }
+.ch-row .v { font-weight: 700; }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 8px; border-radius: 20px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.03em;
+}
+.pill-green { background: var(--green-bg); color: var(--green); }
+.pill-red   { background: var(--red-bg); color: var(--red); }
+.pill-gray  { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
 
 /* ─── MODAL ─── */
 .overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(28,25,20,0.45);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-  backdrop-filter: blur(3px);
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: none; align-items: center; justify-content: center;
+  z-index: 200; backdrop-filter: blur(4px);
 }
 .overlay.open { display: flex; }
 .modal {
-  background: var(--white);
-  border: 1px solid var(--rule);
-  border-radius: 8px;
-  padding: 28px 28px 24px;
-  width: 100%;
-  max-width: 420px;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.14);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px;
+  width: 100%; max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
 }
-.modal h2 {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  margin-bottom: 20px;
+.modal-title {
+  font-size: 17px; font-weight: 800; letter-spacing: -0.03em;
+  color: var(--ink); margin-bottom: 20px;
 }
 
+/* ─── EMPTY ─── */
+.empty { text-align: center; padding: 48px 24px; color: var(--muted); }
+.empty-icon { font-size: 36px; opacity: 0.35; margin-bottom: 10px; }
+.empty-title { font-size: 14px; font-weight: 700; color: var(--ink2); margin-bottom: 4px; letter-spacing: -0.01em; }
+.empty-note { font-size: 12px; }
+
 /* ─── UTILS ─── */
-.mt-4  { margin-top: 4px; }
 .mt-8  { margin-top: 8px; }
 .mt-12 { margin-top: 12px; }
 .mt-16 { margin-top: 16px; }
@@ -533,200 +700,221 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 24px 0; }
 .flex-between { display: flex; align-items: center; justify-content: space-between; }
 .gap-8  { gap: 8px; }
 .gap-10 { gap: 10px; }
-.gap-16 { gap: 16px; }
 .flex-1 { flex: 1; }
-.text-smoke { color: var(--smoke); }
+.min-0  { min-width: 0; }
+.fw-7   { font-weight: 700; }
+.fw-6   { font-weight: 600; }
+.fs-11  { font-size: 11px; }
+.fs-12  { font-size: 12px; }
+.fs-13  { font-size: 13px; }
+.text-muted { color: var(--muted); }
 .text-green { color: var(--green); }
-.text-red { color: var(--red); }
-.fw-6 { font-weight: 600; }
-.fs-11 { font-size: 11px; }
-.fs-12 { font-size: 12px; }
-.fs-13 { font-size: 13px; }
-.italic { font-style: italic; }
-.min-0 { min-width: 0; }
-.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.text-red   { color: var(--red); }
+.tracking   { letter-spacing: -0.01em; }
+.truncate   { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 </head>
 <body>
 
 <nav>
-  <div class="logo">Auto<em>Tube</em> 100k</div>
+  <div class="logo">Auto<span class="tube">Tube</span><span class="hun"> 100k</span></div>
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="showPage('crear',this)">Crear</button>
     <button class="nav-tab" onclick="showPage('canales',this)">Canales</button>
     <button class="nav-tab" onclick="showPage('finanzas',this)">Finanzas</button>
   </div>
-  <div class="nav-end">Mes actual &nbsp;·&nbsp; <strong id="nav-cost">0.00€</strong></div>
+  <div class="nav-end">
+    <span>Este mes</span>
+    <span id="nav-cost">0.00€</span>
+  </div>
 </nav>
 
 <main>
 
-<!-- ══════════ CREAR ══════════ -->
+<!-- ══ CREAR ══ -->
 <div id="page-crear" class="page active">
-
   <div class="page-head">
-    <div class="eyebrow">Producción</div>
-    <h1>Nuevo vídeo</h1>
-    <p class="sub">Introduce nicho y título — el sistema genera el vídeo completo de forma automática</p>
+    <div class="page-kicker">Producción automática</div>
+    <div class="page-h">Nuevo vídeo</div>
+    <div class="page-sub">Nicho + título → vídeo completo de 30 min en piloto automático</div>
   </div>
 
   <div class="two-col">
 
-    <!-- Col izquierda: formulario -->
+    <!-- Formulario -->
     <div>
-      <div class="field">
-        <label>Nicho</label>
-        <input id="inp-niche" type="text" placeholder="Historia, Crímenes, Motivación, Ciencia…">
-      </div>
-
-      <div class="field">
-        <label>Título del vídeo</label>
-        <input id="inp-title" type="text" placeholder="El secreto que nadie te contó sobre…">
-      </div>
-
-      <div class="field">
-        <label>Tono del narrador</label>
-        <div class="tone-row">
-          <div class="tone-opt on" data-tone="neutro" onclick="selectTone(this)">Neutro</div>
-          <div class="tone-opt" data-tone="misterio" onclick="selectTone(this)">Misterio</div>
-          <div class="tone-opt" data-tone="motivacional" onclick="selectTone(this)">Motivacional</div>
-          <div class="tone-opt" data-tone="documental" onclick="selectTone(this)">Documental</div>
-          <div class="tone-opt" data-tone="drama" onclick="selectTone(this)">Drama</div>
-          <div class="tone-opt" data-tone="humor" onclick="selectTone(this)">Humor</div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">Configuración</span>
+        </div>
+        <div class="card-body">
+          <div class="field">
+            <label>Nicho</label>
+            <input id="inp-niche" type="text" placeholder="Historia, Crímenes, Motivación…">
+          </div>
+          <div class="field">
+            <label>Título del vídeo</label>
+            <input id="inp-title" type="text" placeholder="El secreto que nadie te contó sobre…">
+          </div>
+          <div class="field">
+            <label>Tono del narrador</label>
+            <div class="tone-grid">
+              <div class="tone-opt on" data-tone="neutro" onclick="selectTone(this)">
+                <span class="emoji">🎙️</span>Neutro
+              </div>
+              <div class="tone-opt" data-tone="misterio" onclick="selectTone(this)">
+                <span class="emoji">🔮</span>Misterio
+              </div>
+              <div class="tone-opt" data-tone="motivacional" onclick="selectTone(this)">
+                <span class="emoji">🔥</span>Motivacional
+              </div>
+              <div class="tone-opt" data-tone="documental" onclick="selectTone(this)">
+                <span class="emoji">🎬</span>Documental
+              </div>
+              <div class="tone-opt" data-tone="drama" onclick="selectTone(this)">
+                <span class="emoji">🎭</span>Drama
+              </div>
+              <div class="tone-opt" data-tone="humor" onclick="selectTone(this)">
+                <span class="emoji">😄</span>Humor
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label>Canal de destino</label>
+            <select id="inp-channel">
+              <option value="">Sin canal — guardar en local</option>
+            </select>
+          </div>
+          <button class="btn-generate" id="btn-generate" onclick="startGeneration()">
+            ▶&ensp;Generar vídeo automáticamente
+          </button>
         </div>
       </div>
-
-      <div class="field">
-        <label>Canal de destino</label>
-        <select id="inp-channel">
-          <option value="">Sin canal — guardar en local</option>
-        </select>
-      </div>
-
-      <button class="btn btn-ink btn-full btn-lg" id="btn-generate" onclick="startGeneration()" style="margin-top:4px;">
-        Generar vídeo
-      </button>
 
       <!-- Historial -->
-      <div class="mt-32">
-        <div class="flex-between" style="margin-bottom:12px;">
-          <span class="section-title" style="margin-bottom:0;">Historial</span>
-          <button class="btn btn-ghost btn-sm" onclick="loadJobs()" style="padding:3px 8px;font-size:11px;">↻ actualizar</button>
+      <div class="mt-24">
+        <div class="section-label">
+          Historial
+          <button class="btn btn-ghost btn-sm" onclick="loadJobs()">↻</button>
         </div>
-        <div id="jobs-list">
-          <div class="empty" style="padding:28px 0;">
-            <div class="empty-title">Sin vídeos aún</div>
+        <div class="card">
+          <div class="card-body" style="padding-top:8px;padding-bottom:8px;">
+            <div id="jobs-list">
+              <div class="empty" style="padding:28px 0;">
+                <div class="empty-icon">🎬</div>
+                <div class="empty-title">Sin vídeos aún</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Col derecha: pipeline -->
+    <!-- Pipeline -->
     <div>
-
-      <!-- Estado vacío -->
+      <!-- Welcome -->
       <div id="welcome-card">
-        <div class="empty" style="padding:60px 0;">
-          <div class="empty-big">⚡</div>
-          <div class="empty-title">Listo para producir</div>
-          <div class="empty-note" style="margin-top:6px;line-height:1.7;">
-            Configura el vídeo y pulsa <strong>Generar</strong>
+        <div class="welcome-visual">
+          <span class="welcome-icon">⚡</span>
+          <div class="welcome-title">Listo para producir</div>
+          <div class="welcome-sub">
+            Configura el vídeo y pulsa <strong style="color:#fff;">Generar</strong>.<br>
+            El pipeline hace todo el trabajo.
           </div>
-          <div class="mt-16 flex" style="justify-content:center;gap:6px;flex-wrap:wrap;">
-            <span class="pill pill-gray">Guión Claude</span>
-            <span class="pill pill-gray">Voz Kokoro</span>
-            <span class="pill pill-gray">Flux Schnell</span>
-            <span class="pill pill-gray">Kling AI</span>
-            <span class="pill pill-gray">FFmpeg</span>
+          <div class="tech-pills">
+            <span class="tech-pill">Claude AI</span>
+            <span class="tech-pill">Kokoro TTS</span>
+            <span class="tech-pill">Flux Schnell</span>
+            <span class="tech-pill">Kling AI</span>
+            <span class="tech-pill">FFmpeg</span>
+            <span class="tech-pill">YouTube API</span>
           </div>
         </div>
       </div>
 
       <!-- Pipeline activo -->
-      <div id="pipeline-card" style="display:none;">
-
-        <div class="flex-between" style="margin-bottom:10px;">
-          <span class="section-title" style="margin-bottom:0;">Progreso</span>
+      <div id="pipeline-card" class="pipeline-card" style="display:none;">
+        <div class="pipeline-header">
+          <span class="pipeline-title">Pipeline en curso</span>
           <div class="cost-pill">
-            <span class="cost-num" id="cost-display">0.000</span>
+            <span id="cost-display">0.000</span>
             <span class="cost-unit">EUR</span>
           </div>
         </div>
-
-        <div class="progress-track">
-          <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+        <div class="progress-wrap">
+          <div class="progress-track">
+            <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+          </div>
+          <div id="progress-pct">0%</div>
         </div>
-        <div class="progress-label" id="progress-pct">0%</div>
-
         <div class="steps" id="step-list"></div>
-
-        <div id="final-result" style="margin-top:16px;display:none;"></div>
+        <div id="final-result"></div>
       </div>
-
     </div>
+
   </div>
 </div>
 
-<!-- ══════════ CANALES ══════════ -->
+<!-- ══ CANALES ══ -->
 <div id="page-canales" class="page">
   <div class="page-head">
-    <div class="page-head-row">
+    <div class="flex-between">
       <div>
-        <div class="eyebrow">Granja</div>
-        <h1>Canales</h1>
-        <p class="sub">Gestiona y conecta tus canales de YouTube</p>
+        <div class="page-kicker">Granja YouTube</div>
+        <div class="page-h">Canales</div>
+        <div class="page-sub">Conecta y gestiona hasta 10 canales</div>
       </div>
-      <button class="btn btn-ink" onclick="openAddChannel()">+ Añadir canal</button>
+      <button class="btn btn-dark" onclick="openAddChannel()">+ Añadir canal</button>
     </div>
   </div>
-
   <div class="ch-grid" id="channels-grid">
-    <div class="empty" style="grid-column:1/-1;padding:48px 0;">
-      <div class="empty-big">📺</div>
+    <div class="empty" style="grid-column:1/-1;">
+      <div class="empty-icon">📺</div>
       <div class="empty-title">Sin canales</div>
       <div class="empty-note">Añade tu primer canal de YouTube</div>
     </div>
   </div>
 </div>
 
-<!-- ══════════ FINANZAS ══════════ -->
+<!-- ══ FINANZAS ══ -->
 <div id="page-finanzas" class="page">
   <div class="page-head">
-    <div class="eyebrow" id="finance-month">Cargando…</div>
-    <h1>Finanzas</h1>
-    <p class="sub">Costes reales de producción por API</p>
+    <div class="page-kicker" id="finance-month">Cargando…</div>
+    <div class="page-h">Finanzas</div>
+    <div class="page-sub">Costes reales de producción por API</div>
   </div>
 
-  <div class="stats-strip">
-    <div class="stat">
+  <div class="stats-row">
+    <div class="stat-card">
       <div class="stat-lbl">Gasto del mes</div>
-      <div class="stat-val" id="f-total">—</div>
+      <div class="stat-num" id="f-total">—</div>
       <div class="stat-note">en APIs de producción</div>
     </div>
-    <div class="stat">
+    <div class="stat-card">
       <div class="stat-lbl">Vídeos generados</div>
-      <div class="stat-val" id="f-videos">—</div>
+      <div class="stat-num" id="f-videos">—</div>
       <div class="stat-note">este mes</div>
     </div>
-    <div class="stat">
+    <div class="stat-card">
       <div class="stat-lbl">Coste medio</div>
-      <div class="stat-val" id="f-avg">—</div>
+      <div class="stat-num" id="f-avg">—</div>
       <div class="stat-note">por vídeo</div>
     </div>
-    <div class="stat">
+    <div class="stat-card">
       <div class="stat-lbl">Proyección anual</div>
-      <div class="stat-val" id="f-annual">—</div>
+      <div class="stat-num" id="f-annual">—</div>
       <div class="stat-note">a ritmo actual</div>
     </div>
   </div>
 
-  <div class="surface">
-    <div class="surface-head">
-      <span class="section-title" style="margin-bottom:0;">Desglose por servicio</span>
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Desglose por servicio</span>
     </div>
-    <div class="surface-body">
+    <div class="card-body">
       <div id="finance-breakdown">
         <div class="empty" style="padding:28px 0;">
+          <div class="empty-icon">📊</div>
           <div class="empty-title">Sin datos este mes</div>
         </div>
       </div>
@@ -736,10 +924,10 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 24px 0; }
 
 </main>
 
-<!-- MODAL: Añadir canal -->
+<!-- MODAL: canal -->
 <div class="overlay" id="modal-channel">
   <div class="modal">
-    <h2>Añadir canal</h2>
+    <div class="modal-title">Añadir canal</div>
     <div class="field">
       <label>Nombre del canal</label>
       <input id="ch-name" type="text" placeholder="Ej: MisterioTV">
@@ -749,7 +937,7 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 24px 0; }
       <input id="ch-niche" type="text" placeholder="Ej: Misterio y crímenes">
     </div>
     <div class="flex gap-8 mt-16">
-      <button class="btn btn-ink" onclick="saveChannel()">Guardar</button>
+      <button class="btn btn-dark" onclick="saveChannel()">Guardar canal</button>
       <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
     </div>
   </div>
@@ -759,13 +947,13 @@ hr { border: none; border-top: 1px solid var(--rule); margin: 24px 0; }
 const API = window.location.hostname === 'localhost' ? '' : (window.BACKEND_URL || '');
 
 const STEPS_META = {
-  script:      { icon: '✦', label: 'Guión' },
-  tts:         { icon: '◎', label: 'Voz' },
-  images:      { icon: '▣', label: 'Imágenes' },
-  thumbnail:   { icon: '◈', label: 'Miniatura' },
-  hook_videos: { icon: '▷', label: 'Vídeos hook' },
-  render:      { icon: '⚙', label: 'Montaje' },
-  upload:      { icon: '↑', label: 'YouTube' },
+  script:      { icon: '✦', label: 'Guión Claude' },
+  tts:         { icon: '◎', label: 'Voz Kokoro' },
+  images:      { icon: '◈', label: 'Imágenes Flux' },
+  thumbnail:   { icon: '⬡', label: 'Miniatura' },
+  hook_videos: { icon: '▷', label: 'Hook Kling AI' },
+  render:      { icon: '⚙', label: 'Render FFmpeg' },
+  upload:      { icon: '↑', label: 'YouTube Upload' },
 };
 
 let totalCost = 0;
@@ -795,8 +983,9 @@ async function startGeneration() {
 
   document.getElementById('btn-generate').disabled = true;
   document.getElementById('welcome-card').style.display = 'none';
-  document.getElementById('pipeline-card').style.display = 'block';
-  document.getElementById('final-result').style.display = 'none';
+  const pc = document.getElementById('pipeline-card');
+  pc.style.display = 'block';
+  document.getElementById('final-result').innerHTML = '';
   document.getElementById('step-list').innerHTML = '';
   document.getElementById('progress-fill').style.width = '0%';
   document.getElementById('progress-pct').textContent = '0%';
@@ -809,7 +998,7 @@ async function startGeneration() {
         <div class="step-icon pending" id="dot-${key}">${meta.icon}</div>
         <div class="step-body">
           <div class="step-name">${meta.label}</div>
-          <div class="step-msg text-smoke" id="msg-${key}">Esperando…</div>
+          <div class="step-msg text-muted" id="msg-${key}">Esperando…</div>
         </div>
         <div class="step-cost" id="scost-${key}"></div>
       </div>`);
@@ -837,6 +1026,11 @@ function onStep({step, status, message, progress, cost}) {
   const sc  = document.getElementById('scost-' + step);
   if (!dot) return;
   dot.className = 'step-icon ' + status;
+  if (status === 'running') {
+    document.getElementById('step-' + step)?.classList.add('running-step');
+  } else {
+    document.getElementById('step-' + step)?.classList.remove('running-step');
+  }
   if (msg) msg.textContent = message;
   if (cost > 0 && sc) {
     totalCost += cost;
@@ -851,11 +1045,10 @@ function onEnd({job}) {
   document.getElementById('btn-generate').disabled = false;
   eventSource.close();
   const el = document.getElementById('final-result');
-  el.style.display = 'block';
   if (job.youtube_url) {
-    el.innerHTML = `<a href="${job.youtube_url}" target="_blank" class="btn btn-green btn-full btn-lg">Ver en YouTube ↗</a>`;
+    el.innerHTML = `<div style="padding:0 20px 16px;"><a href="${job.youtube_url}" target="_blank" class="btn btn-green" style="width:100%;padding:12px;font-size:13px;font-weight:800;letter-spacing:-0.01em;border-radius:9px;">▶&ensp;Ver en YouTube ↗</a></div>`;
   } else {
-    el.innerHTML = `<div class="result-ok"><span style="font-size:18px;">✓</span><div><div class="fw-6 fs-13 text-green">Vídeo generado</div><div class="fs-11 text-smoke mt-4">Conecta un canal para subida automática</div></div></div>`;
+    el.innerHTML = `<div class="result-ok"><span style="font-size:22px;">✅</span><div><div class="fw-7 fs-13 text-green">Vídeo listo</div><div class="fs-11 text-muted mt-8">Conecta un canal para subida automática</div></div></div>`;
   }
   loadJobs();
   loadNavCost();
@@ -865,27 +1058,26 @@ function onError({message}) {
   document.getElementById('btn-generate').disabled = false;
   eventSource.close();
   const el = document.getElementById('final-result');
-  el.style.display = 'block';
-  el.innerHTML = `<div class="result-err"><span class="fw-6 text-red fs-12">Error: </span><span class="fs-12">${message}</span></div>`;
+  el.innerHTML = `<div class="result-err"><span class="fw-7 text-red fs-12">Error: </span><span class="fs-12">${message}</span></div>`;
 }
 
 async function loadJobs() {
   const jobs = await fetch(`${API}/api/jobs`).then(r => r.json()).catch(()=>[]);
   const el = document.getElementById('jobs-list');
   if (!jobs.length) {
-    el.innerHTML = '<div class="empty" style="padding:24px 0;"><div class="empty-title">Sin vídeos aún</div></div>';
+    el.innerHTML = '<div class="empty" style="padding:24px 0;"><div class="empty-icon" style="font-size:24px;">🎬</div><div class="empty-title">Sin vídeos aún</div></div>';
     return;
   }
   el.innerHTML = jobs.slice(0,10).map(j => `
     <div class="job-row">
       <div class="job-dot ${j.status}"></div>
       <div class="flex-1 min-0">
-        <div class="job-title">${j.title}</div>
+        <div class="job-title tracking">${j.title}</div>
         <div class="job-meta">${j.niche} · ${(j.created_at||'').substring(0,16)}</div>
       </div>
       <div class="job-cost">
         ${(j.cost_total||0).toFixed(3)}€
-        ${j.youtube_url ? `<br><a href="${j.youtube_url}" target="_blank" class="fs-11 text-red italic">ver ↗</a>` : ''}
+        ${j.youtube_url ? `<br><a href="${j.youtube_url}" target="_blank" class="fs-11 text-red">ver ↗</a>` : ''}
       </div>
     </div>`).join('');
 }
@@ -895,7 +1087,7 @@ async function loadChannels() {
   fillChannelSelect(chs);
   const grid = document.getElementById('channels-grid');
   if (!chs.length) {
-    grid.innerHTML = `<div class="empty" style="grid-column:1/-1;padding:48px 0;"><div class="empty-big">📺</div><div class="empty-title">Sin canales</div><div class="empty-note">Añade tu primer canal</div></div>`;
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="empty-icon">📺</div><div class="empty-title">Sin canales</div><div class="empty-note">Añade tu primer canal</div></div>`;
     return;
   }
   grid.innerHTML = chs.map(c => `
@@ -906,7 +1098,7 @@ async function loadChannels() {
       <div class="ch-row"><span class="k">Estado</span><span class="pill ${c.connected ? 'pill-green' : 'pill-red'}">${c.connected ? '● Conectado' : '○ Sin conectar'}</span></div>
       <div class="ch-row"><span class="k">Subs</span><span class="v">—</span></div>
       <div class="ch-row"><span class="k">Vídeos</span><span class="v">—</span></div>
-      ${!c.connected ? `<button class="btn btn-outline btn-full btn-sm mt-12" onclick="connectYT('${c.id}')">Conectar YouTube →</button>` : ''}
+      ${!c.connected ? `<button class="btn btn-outline" style="width:100%;margin-top:12px;font-size:11px;padding:6px;" onclick="connectYT('${c.id}')">Conectar YouTube →</button>` : ''}
     </div>`).join('');
 }
 
@@ -948,12 +1140,12 @@ async function loadFinance() {
 
   const el = document.getElementById('finance-breakdown');
   if (!f.by_service?.length) {
-    el.innerHTML = '<div class="empty" style="padding:24px 0;"><div class="empty-title">Sin datos este mes</div></div>';
+    el.innerHTML = '<div class="empty" style="padding:28px 0;"><div class="empty-icon" style="font-size:24px;">📊</div><div class="empty-title">Sin datos este mes</div></div>';
     return;
   }
   const labels = {
     claude_sonnet:'Claude Sonnet', claude_haiku:'Claude Haiku',
-    kokoro_tts:'Kokoro TTS', azure_tts:'Azure TTS',
+    kokoro_tts:'Kokoro TTS', azure_tts:'Azure TTS (fallback)',
     flux_schnell:'Flux Schnell', flux_schnell_thumb:'Flux Schnell (miniatura)',
     kling_standard:'Kling Standard'
   };
