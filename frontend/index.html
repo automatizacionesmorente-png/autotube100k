@@ -928,22 +928,8 @@ async function saveChannel() {
 
 async function connectNewChannel() {
   const r = await fetch(`${API}/api/youtube/connect`).then(r => r.json());
-  const popup = window.open(r.auth_url, 'yt_auth', 'width=520,height=640,left=400,top=100');
-  // Escucha el mensaje de vuelta cuando Google completa el OAuth
-  window.addEventListener('message', function handler(e) {
-    if (e.data === 'yt_connected') {
-      window.removeEventListener('message', handler);
-      popup?.close();
-      setTimeout(loadChannels, 800);
-    }
-  });
-  // Fallback: polling por si el popup cierra sin mensaje
-  const poll = setInterval(() => {
-    if (popup?.closed) {
-      clearInterval(poll);
-      setTimeout(loadChannels, 800);
-    }
-  }, 1000);
+  // Redirige directamente — sin popup, funciona en todos los navegadores
+  window.location.href = r.auth_url;
 }
 
 async function loadFinance() {
