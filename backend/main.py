@@ -104,31 +104,15 @@ async def add_channel(req: ChannelRequest):
     upsert_channel(channel_id, req.name, req.niche)
     return {"id": channel_id, "name": req.name}
 
-@app.get("/api/youtube/auth/{channel_id}")
-async def youtube_auth(channel_id: str):
-    """Inicia el flujo OAuth2 de YouTube para un canal."""
-    from google_auth_oauthlib.flow import Flow
-    flow = Flow.from_client_config(
-        {
-            "web": {
-                "client_id": os.environ.get("YOUTUBE_CLIENT_ID", ""),
-                "client_secret": os.environ.get("YOUTUBE_CLIENT_SECRET", ""),
-                "redirect_uris": [os.environ.get("YOUTUBE_REDIRECT_URI", "http://localhost:8000/api/youtube/callback")],
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-            }
-        },
-        scopes=["https://www.googleapis.com/auth/youtube.upload"],
-    )
-    flow.redirect_uri = os.environ.get("YOUTUBE_REDIRECT_URI")
-    auth_url, _ = flow.authorization_url(state=channel_id, access_type="offline", prompt="consent")
-    return {"auth_url": auth_url}
+YT_SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube.readonly",
+    "https://www.googleapis.com/auth/yt-analytics.readonly",
+]
 
-@app.get("/api/youtube/callback")
-async def youtube_callback(code: str, state: str):
+def _yt_flow():
     from google_auth_oauthlib.flow import Flow
-    from .database import get_conn
-    flow = Flow.from_client_config(
+    return Flow.from_client_config(
         {
             "web": {
                 "client_id": os.environ.get("YOUTUBE_CLIENT_ID", ""),
@@ -138,19 +122,76 @@ async def youtube_callback(code: str, state: str):
                 "token_uri": "https://oauth2.googleapis.com/token",
             }
         },
-        scopes=["https://www.googleapis.com/auth/youtube.upload"],
+        scopes=YT_SCOPES,
     )
+
+@app.get("/api/youtube/connect")
+async def youtube_connect():
+    """Crea canal temporal e inicia OAuth — el nombre se detecta automáticamente."""
+    from .database import get_conn
+    temp_id = str(uuid.uuid4())[:8]
+    conn = get_conn()
+    conn.execute("INSERT INTO channels (id, name, connected) VALUES (?, ?, 0)", (temp_id, "Conectando…"))
+    conn.commit()
+    conn.close()
+    flow = _yt_flow()
+    flow.redirect_uri = os.environ.get("YOUTUBE_REDIRECT_URI")
+    auth_url, _ = flow.authorization_url(state=temp_id, access_type="offline", prompt="consent")
+    return {"auth_url": auth_url}
+
+@app.get("/api/youtube/auth/{channel_id}")
+async def youtube_auth(channel_id: str):
+    """Reconecta un canal existente."""
+    flow = _yt_flow()
+    flow.redirect_uri = os.environ.get("YOUTUBE_REDIRECT_URI")
+    auth_url, _ = flow.authorization_url(state=channel_id, access_type="offline", prompt="consent")
+    return {"auth_url": auth_url}
+
+@app.get("/api/youtube/callback")
+async def youtube_callback(code: str, state: str):
+    from .database import get_conn
+    from googleapiclient.discovery import build
+    from google.oauth2.credentials import Credentials
+
+    flow = _yt_flow()
     flow.redirect_uri = os.environ.get("YOUTUBE_REDIRECT_URI")
     flow.fetch_token(code=code)
     creds = flow.credentials
+
+    # Detectar nombre real del canal desde YouTube API
+    channel_name = "Mi Canal"
+    yt_channel_id = None
+    try:
+        yt = build("youtube", "v3", credentials=creds)
+        resp = yt.channels().list(part="snippet", mine=True).execute()
+        if resp.get("items"):
+            channel_name = resp["items"][0]["snippet"]["title"]
+            yt_channel_id = resp["items"][0]["id"]
+    except Exception:
+        pass
+
     conn = get_conn()
     conn.execute(
-        "UPDATE channels SET access_token=?, refresh_token=?, connected=1 WHERE id=?",
-        (creds.token, creds.refresh_token, state)
+        """UPDATE channels
+           SET name=?, youtube_channel_id=?, access_token=?, refresh_token=?, connected=1
+           WHERE id=?""",
+        (channel_name, yt_channel_id, creds.token, creds.refresh_token, state)
     )
     conn.commit()
     conn.close()
-    return FileResponse(FRONTEND_DIR / "index.html")
+
+    # Redirige al dashboard con el canal ya conectado
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse("""
+    <html><head>
+    <meta http-equiv="refresh" content="0;url=https://autotube100k.vercel.app/#canales">
+    </head><body>
+    <script>
+      if (window.opener) { window.opener.postMessage('yt_connected','*'); window.close(); }
+      else { window.location.href='https://autotube100k.vercel.app/#canales'; }
+    </script>
+    </body></html>
+    """)
 
 # ── Pipeline principal ────────────────────────────────────────────
 async def run_pipeline(job_id: str, req: GenerateRequest):

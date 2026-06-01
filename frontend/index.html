@@ -673,7 +673,7 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
         <div class="page-title">Canales</div>
         <div class="page-sub">Conecta y gestiona hasta 10 canales de YouTube</div>
       </div>
-      <button class="btn btn-dark" onclick="openAddChannel()">+ Añadir canal</button>
+      <button class="btn btn-dark" onclick="connectNewChannel()">+ Añadir canal</button>
     </div>
   </div>
   <div class="ch-grid" id="channels-grid">
@@ -924,6 +924,26 @@ async function saveChannel() {
   document.getElementById('ch-name').value  = '';
   document.getElementById('ch-niche').value = '';
   closeModal(); loadChannels();
+}
+
+async function connectNewChannel() {
+  const r = await fetch(`${API}/api/youtube/connect`).then(r => r.json());
+  const popup = window.open(r.auth_url, 'yt_auth', 'width=520,height=640,left=400,top=100');
+  // Escucha el mensaje de vuelta cuando Google completa el OAuth
+  window.addEventListener('message', function handler(e) {
+    if (e.data === 'yt_connected') {
+      window.removeEventListener('message', handler);
+      popup?.close();
+      setTimeout(loadChannels, 800);
+    }
+  });
+  // Fallback: polling por si el popup cierra sin mensaje
+  const poll = setInterval(() => {
+    if (popup?.closed) {
+      clearInterval(poll);
+      setTimeout(loadChannels, 800);
+    }
+  }, 1000);
 }
 
 async function loadFinance() {
