@@ -1,6 +1,6 @@
 {
   "outputDirectory": "frontend",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "$BACKEND_URL/api/$1" }
+    { "source": "/api/(.*)", "destination": "http://178.105.30.215:8000/api/$1" }
   ]
 }
