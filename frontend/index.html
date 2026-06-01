@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoTube100k</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg2: #f9fafb;
+    --surface: #ffffff;
+    --border: #e5e7eb;
+    --border2: #d1d5db;
+    --text: #111827;
+    --text2: #374151;
+    --muted: #6b7280;
+    --muted2: #9ca3af;
+    --accent: #dc2626;
+    --accent-hover: #b91c1c;
+    --accent-light: #fef2f2;
+    --green: #16a34a;
+    --green-light: #f0fdf4;
+    --blue: #2563eb;
+    --blue-light: #eff6ff;
+    --yellow: #d97706;
+    --yellow-light: #fffbeb;
+    --black: #111827;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg2); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; min-height: 100vh; font-size: 14px; line-height: 1.5; }
+  a { color: inherit; text-decoration: none; }
+
+  /* ── NAV ── */
+  nav {
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    padding: 0 24px; height: 56px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 100;
+  }
+  .nav-left { display: flex; align-items: center; gap: 32px; }
+  .logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: var(--text); }
+  .logo-icon { width: 28px; height: 28px; background: var(--accent); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+  .logo-icon svg { width: 16px; height: 16px; }
+  .nav-tabs { display: flex; gap: 2px; }
+  .nav-tab {
+    padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500;
+    color: var(--muted); cursor: pointer; border: none; background: none;
+    transition: all 0.12s;
+  }
+  .nav-tab:hover { background: var(--bg2); color: var(--text2); }
+  .nav-tab.active { background: var(--bg2); color: var(--text); }
+  .nav-right { display: flex; align-items: center; gap: 8px; }
+  .nav-badge { font-size: 11px; font-weight: 600; background: var(--accent-light); color: var(--accent); padding: 2px 8px; border-radius: 20px; }
+
+  /* ── LAYOUT ── */
+  main { max-width: 1080px; margin: 0 auto; padding: 32px 24px; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-header { margin-bottom: 28px; }
+  .page-title { font-size: 22px; font-weight: 700; color: var(--text); }
+  .page-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+  }
+  .card-body { padding: 20px 24px; }
+  .card-header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .card-title-sm { font-size: 13px; font-weight: 600; color: var(--text); }
+
+  /* ── STAT CARDS ── */
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; box-shadow: var(--shadow); }
+  .stat-label { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; }
+  .stat-value { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; }
+  .stat-sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .stat-up { color: var(--green); }
+  .stat-down { color: var(--accent); }
+
+  /* ── GRID ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .gap-24 { gap: 24px; }
+
+  /* ── FORM ── */
+  .form-group { margin-bottom: 16px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+  input, select, textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--border2);
+    color: var(--text); border-radius: 8px; padding: 9px 12px; font-size: 13px;
+    font-family: inherit; outline: none; transition: border-color 0.12s, box-shadow 0.12s;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--black); box-shadow: 0 0 0 3px rgba(17,24,39,0.06);
+  }
+  textarea { resize: vertical; min-height: 80px; }
+  select { cursor: pointer; }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    cursor: pointer; border: 1px solid transparent; transition: all 0.12s; font-family: inherit;
+  }
+  .btn-primary { background: var(--black); color: #fff; border-color: var(--black); }
+  .btn-primary:hover { background: #1f2937; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-danger { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-danger:hover { background: var(--accent-hover); }
+  .btn-outline { background: transparent; color: var(--text); border-color: var(--border2); }
+  .btn-outline:hover { background: var(--bg2); border-color: var(--border2); }
+  .btn-ghost { background: transparent; color: var(--muted); border-color: transparent; }
+  .btn-ghost:hover { background: var(--bg2); color: var(--text); }
+  .btn-green { background: var(--green); color: #fff; border-color: var(--green); }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+  .btn-full { width: 100%; }
+  .btn-icon { width: 32px; height: 32px; padding: 0; }
+
+  /* ── PIPELINE ── */
+  .step-list { display: flex; flex-direction: column; }
+  .step-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+  }
+  .step-item:last-child { border-bottom: none; }
+  .step-dot {
+    width: 32px; height: 32px; border-radius: 50%; display: flex; align-items:center;
+    justify-content: center; font-size: 14px; flex-shrink: 0; border: 1.5px solid var(--border2);
+    background: var(--bg2); color: var(--muted);
+  }
+  .step-dot.pending  { border-color: var(--border2); background: var(--bg2); }
+  .step-dot.running  { border-color: var(--blue); background: var(--blue-light); animation: spin-border 1.5s linear infinite; }
+  .step-dot.done     { border-color: var(--green); background: var(--green-light); color: var(--green); }
+  .step-dot.error    { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+  .step-dot.warning  { border-color: var(--yellow); background: var(--yellow-light); color: var(--yellow); }
+  @keyframes spin-border { 0%,100%{box-shadow:0 0 0 2px var(--blue)} 50%{box-shadow:0 0 0 2px rgba(37,99,235,0.3)} }
+  .step-info { flex: 1; min-width: 0; }
+  .step-name { font-size: 13px; font-weight: 500; color: var(--text); }
+  .step-msg  { font-size: 12px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .step-cost { font-size: 12px; font-weight: 600; color: var(--green); white-space: nowrap; }
+
+  /* ── PROGRESS ── */
+  .progress-wrap { margin: 16px 0 4px; }
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--black); border-radius: 2px; transition: width 0.4s ease; }
+  .progress-pct { font-size: 11px; color: var(--muted); text-align: right; margin-top: 4px; }
+
+  /* ── COST CHIP ── */
+  .cost-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--green-light); border: 1px solid #bbf7d0;
+    border-radius: 20px; padding: 4px 12px; font-size: 13px;
+  }
+  .cost-chip-val { font-weight: 700; color: var(--green); font-size: 15px; }
+
+  /* ── CHANNEL CARDS ── */
+  .channel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .channel-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+  .channel-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--bg2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 18px; margin-bottom: 12px; }
+  .channel-name { font-size: 14px; font-weight: 600; }
+  .channel-niche { font-size: 12px; color: var(--muted); margin-top: 2px; margin-bottom: 14px; }
+  .channel-stats { display: flex; flex-direction: column; gap: 8px; }
+  .channel-stat-row { display: flex; justify-content: space-between; font-size: 12px; }
+  .channel-stat-row .lbl { color: var(--muted); }
+  .channel-stat-row .val { font-weight: 600; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .badge-green { background: var(--green-light); color: var(--green); }
+  .badge-red   { background: var(--accent-light); color: var(--accent); }
+  .badge-gray  { background: var(--bg2); color: var(--muted); border: 1px solid var(--border); }
+
+  /* ── TABLE / ROWS ── */
+  .table-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .table-row:last-child { border: none; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.done    { background: var(--green); }
+  .status-dot.running { background: var(--blue); animation: blink 1s infinite; }
+  .status-dot.error   { background: var(--accent); }
+  .status-dot.pending { background: var(--muted2); }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── FINANCE BARS ── */
+  .finance-service-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .finance-service-row:last-child { border: none; }
+  .finance-bar-wrap { flex: 1; background: var(--bg2); border-radius: 3px; height: 6px; overflow: hidden; }
+  .finance-bar { height: 100%; background: var(--black); border-radius: 3px; }
+
+  /* ── MODAL ── */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 200; backdrop-filter: blur(4px); }
+  .overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px; width: 100%; max-width: 440px; box-shadow: var(--shadow-md); }
+  .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 20px; }
+
+  /* ── EMPTY STATE ── */
+  .empty { text-align: center; padding: 52px 24px; color: var(--muted); }
+  .empty-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.4; }
+  .empty-text { font-size: 14px; }
+  .empty-sub { font-size: 12px; margin-top: 6px; }
+
+  /* ── UTILS ── */
+  .mt-8  { margin-top: 8px; }
+  .mt-16 { margin-top: 16px; }
+  .mt-24 { margin-top: 24px; }
+  .flex-between { display: flex; align-items: center; justify-content: space-between; }
+  .flex-center  { display: flex; align-items: center; gap: 8px; }
+  .text-muted { color: var(--muted); }
+  .text-green { color: var(--green); }
+  .text-red   { color: var(--accent); }
+  .fw-600 { font-weight: 600; }
+  .fs-12 { font-size: 12px; }
+  .fs-13 { font-size: 13px; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  /* ── TONE SELECTOR ── */
+  .tone-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tone-btn {
+    padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 8px;
+    font-size: 12px; font-weight: 500; text-align: center; cursor: pointer;
+    transition: all 0.12s; background: var(--bg2); color: var(--text2);
+  }
+  .tone-btn:hover { border-color: var(--black); background: var(--bg); }
+  .tone-btn.selected { border-color: var(--black); background: var(--black); color: #fff; }
+  .tone-emoji { display: block; font-size: 18px; margin-bottom: 2px; }
+
+  /* ── RESULT BOX ── */
+  .result-box { border: 1px solid var(--green); background: var(--green-light); border-radius: var(--radius); padding: 16px 20px; text-align: center; }
+  .result-box .result-title { font-weight: 600; font-size: 15px; color: var(--green); }
+  .result-box .result-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-left">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="4,2 13,8 4,14" fill="white"/>
+        </svg>
+      </div>
+      AutoTube100k
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="showPage('crear',this)">Crear</button>
+      <button class="nav-tab" onclick="showPage('dashboard',this)">Canales</button>
+      <button class="nav-tab" onclick="showPage('finanzas',this)">Finanzas</button>
+    </div>
+  </div>
+  <div class="nav-right">
+    <span class="nav-badge" id="nav-cost-badge">0.00€ este mes</span>
+  </div>
+</nav>
+
+<main>
+
+<!-- ════════════════ CREAR ════════════════ -->
+<div id="page-crear" class="page active">
+  <div class="page-header">
+    <div class="page-title">Nuevo vídeo</div>
+    <div class="page-sub">Escribe el nicho y título, AutoTube100k hace el resto</div>
+  </div>
+
+  <div class="grid-2 gap-24" style="align-items:start;">
+
+    <!-- Formulario -->
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title-sm">Configuración</span>
+        </div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>Nicho</label>
+            <input id="inp-niche" type="text" placeholder="Ej: Historia, Crímenes reales, Motivación...">
+          </div>
+          <div class="form-group">
+            <label>Título del vídeo</label>
+            <input id="inp-title" type="text" placeholder="Ej: El secreto que nadie te contó sobre...">
+          </div>
+          <div class="form-group">
+            <label>Tono del narrador</label>
+            <div class="tone-grid">
+              <div class="tone-btn selected" data-tone="neutro" onclick="selectTone(this)"><span class="tone-emoji">🎙️</span>Neutro</div>
+              <div class="tone-btn" data-tone="misterio" onclick="selectTone(this)"><span class="tone-emoji">🔮</span>Misterio</div>
+              <div class="tone-btn" data-tone="motivacional" onclick="selectTone(this)"><span class="tone-emoji">🔥</span>Motivacional</div>
+              <div class="tone-btn" data-tone="documental" onclick="selectTone(this)"><span class="tone-emoji">🎬</span>Documental</div>
+              <div class="tone-btn" data-tone="drama" onclick="selectTone(this)"><span class="tone-emoji">🎭</span>Drama</div>
+              <div class="tone-btn" data-tone="humor" onclick="selectTone(this)"><span class="tone-emoji">😄</span>Humor</div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Canal de destino</label>
+            <select id="inp-channel">
+              <option value="">Sin canal — guardar en local</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-full" id="btn-generate" onclick="startGeneration()" style="margin-top:8px;padding:10px 16px;">
+            ▶ &nbsp;Generar vídeo automáticamente
+          </button>
+        </div>
+      </div>
+
+      <!-- Historial -->
+      <div class="card mt-16">
+        <div class="card-header">
+          <span class="card-title-sm">Últimos vídeos</span>
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="loadJobs()" title="Actualizar">↻</button>
+        </div>
+        <div class="card-body" style="padding-top:4px;padding-bottom:4px;">
+          <div id="jobs-list">
+            <div class="empty"><div class="empty-icon">🎬</div><div class="empty-text">Sin vídeos aún</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pipeline -->
+    <div>
+      <!-- Estado vacío -->
+      <div class="card" id="welcome-card">
+        <div class="card-body">
+          <div class="empty" style="padding:40px 0;">
+            <div class="empty-icon" style="font-size:48px;opacity:0.3;">⚡</div>
+            <div class="empty-text" style="font-size:15px;font-weight:600;color:var(--text);">Listo para generar</div>
+            <div class="empty-sub" style="margin-top:8px;line-height:1.6;">
+              Configura el vídeo y pulsa<br><strong>Generar</strong> para iniciar el proceso
+            </div>
+            <div style="margin-top:20px;display:flex;flex-wrap:wrap;justify-content:center;gap:6px;">
+              <span class="badge badge-gray">✍️ Guión Claude</span>
+              <span class="badge badge-gray">🎙️ Voz Kokoro</span>
+              <span class="badge badge-gray">🖼️ Flux Schnell</span>
+              <span class="badge badge-gray">🎬 Kling AI</span>
+              <span class="badge badge-gray">⚙️ FFmpeg</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pipeline activo -->
+      <div class="card" id="pipeline-card" style="display:none;">
+        <div class="card-header">
+          <span class="card-title-sm">Progreso</span>
+          <div class="cost-chip">
+            <span>💰</span>
+            <span class="cost-chip-val" id="cost-display">0.000€</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="progress-wrap">
+            <div class="progress-bar">
+              <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+            </div>
+            <div class="progress-pct" id="progress-pct">0%</div>
+          </div>
+          <div class="step-list" id="step-list"></div>
+          <div id="final-result" style="margin-top:16px;display:none;"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════ DASHBOARD ════════════════ -->
+<div id="page-dashboard" class="page">
+  <div class="page-header flex-between">
+    <div>
+      <div class="page-title">Canales</div>
+      <div class="page-sub">Gestiona tu granja de canales de YouTube</div>
+    </div>
+    <button class="btn btn-primary" onclick="openAddChannel()">+ Añadir canal</button>
+  </div>
+  <div class="channel-grid" id="channels-grid">
+    <div class="empty" style="grid-column:1/-1;">
+      <div class="empty-icon">📺</div>
+      <div class="empty-text">Sin canales</div>
+      <div class="empty-sub">Añade tu primer canal de YouTube</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ FINANZAS ════════════════ -->
+<div id="page-finanzas" class="page">
+  <div class="page-header">
+    <div class="page-title">Finanzas</div>
+    <div class="page-sub" id="finance-month">Cargando...</div>
+  </div>
+
+  <div class="grid-4" style="margin-bottom:20px;">
+    <div class="stat-card">
+      <div class="stat-label">Gasto del mes</div>
+      <div class="stat-value" id="f-total-cost">—</div>
+      <div class="stat-sub">En APIs de producción</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Vídeos generados</div>
+      <div class="stat-value" id="f-videos">—</div>
+      <div class="stat-sub">Este mes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Coste medio</div>
+      <div class="stat-value" id="f-avg">—</div>
+      <div class="stat-sub">Por vídeo</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Proyección anual</div>
+      <div class="stat-value" id="f-annual">—</div>
+      <div class="stat-sub">A ritmo actual</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title-sm">Gasto por servicio</span>
+    </div>
+    <div class="card-body">
+      <div id="finance-breakdown">
+        <div class="empty"><div class="empty-icon">📊</div><div class="empty-text">Sin datos este mes</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- MODAL: Añadir canal -->
+<div class="overlay" id="modal-channel">
+  <div class="modal">
+    <div class="modal-title">Añadir canal</div>
+    <div class="form-group">
+      <label>Nombre del canal</label>
+      <input id="ch-name" type="text" placeholder="Ej: MisterioTV">
+    </div>
+    <div class="form-group">
+      <label>Nicho principal</label>
+      <input id="ch-niche" type="text" placeholder="Ej: Misterio y crímenes">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn btn-primary" onclick="saveChannel()">Guardar canal</button>
+      <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config ───────────────────────────────────────────────────────
+const API = window.location.hostname === 'localhost' ? '' : (window.BACKEND_URL || '');
+
+const STEPS_META = {
+  script:      { emoji: '✍️', label: 'Guión' },
+  tts:         { emoji: '🎙️', label: 'Voz' },
+  images:      { emoji: '🖼️', label: 'Imágenes' },
+  thumbnail:   { emoji: '🎨', label: 'Miniatura' },
+  hook_videos: { emoji: '🎬', label: 'Vídeos hook' },
+  render:      { emoji: '⚙️', label: 'Montaje FFmpeg' },
+  upload:      { emoji: '📤', label: 'YouTube' },
+};
+
+let totalCost = 0;
+let eventSource = null;
+let selectedTone = 'neutro';
+
+// ── Nav ──────────────────────────────────────────────────────────
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (name === 'dashboard') loadChannels();
+  if (name === 'finanzas') loadFinance();
+}
+
+// ── Tone selector ────────────────────────────────────────────────
+function selectTone(el) {
+  document.querySelectorAll('.tone-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedTone = el.dataset.tone;
+}
+
+// ── Generación ───────────────────────────────────────────────────
+async function startGeneration() {
+  const niche = document.getElementById('inp-niche').value.trim();
+  const title = document.getElementById('inp-title').value.trim();
+  const channel_id = document.getElementById('inp-channel').value || null;
+  if (!niche || !title) { alert('Escribe el nicho y el título del vídeo.'); return; }
+
+  document.getElementById('btn-generate').disabled = true;
+  document.getElementById('welcome-card').style.display = 'none';
+  document.getElementById('pipeline-card').style.display = 'block';
+  document.getElementById('final-result').style.display = 'none';
+  document.getElementById('step-list').innerHTML = '';
+  document.getElementById('progress-fill').style.width = '0%';
+  document.getElementById('progress-pct').textContent = '0%';
+  document.getElementById('cost-display').textContent = '0.000€';
+  totalCost = 0;
+
+  Object.entries(STEPS_META).forEach(([key, meta]) => {
+    document.getElementById('step-list').insertAdjacentHTML('beforeend', `
+      <div class="step-item" id="step-${key}">
+        <div class="step-dot pending" id="dot-${key}">${meta.emoji}</div>
+        <div class="step-info">
+          <div class="step-name">${meta.label}</div>
+          <div class="step-msg text-muted" id="msg-${key}">Esperando...</div>
+        </div>
+        <div class="step-cost" id="scost-${key}"></div>
+      </div>`);
+  });
+
+  const res = await fetch(`${API}/api/generate`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ niche, title, tone: selectedTone, channel_id })
+  });
+  const { job_id } = await res.json();
+
+  if (eventSource) eventSource.close();
+  eventSource = new EventSource(`${API}/api/jobs/${job_id}/stream`);
+  eventSource.onmessage = e => {
+    const d = JSON.parse(e.data);
+    if (d.type === 'step') onStep(d);
+    if (d.type === 'end')  onEnd(d);
+    if (d.type === 'error') onError(d);
+  };
+}
+
+function onStep({step, status, message, progress, cost}) {
+  const dot = document.getElementById('dot-' + step);
+  const msg = document.getElementById('msg-' + step);
+  const sc  = document.getElementById('scost-' + step);
+  if (!dot) return;
+  dot.className = 'step-dot ' + status;
+  if (msg) msg.textContent = message;
+  if (cost > 0 && sc) {
+    totalCost += cost;
+    sc.textContent = cost.toFixed(4) + '€';
+    document.getElementById('cost-display').textContent = totalCost.toFixed(4) + '€';
+  }
+  document.getElementById('progress-fill').style.width = progress + '%';
+  document.getElementById('progress-pct').textContent = progress + '%';
+}
+
+function onEnd({job}) {
+  document.getElementById('btn-generate').disabled = false;
+  eventSource.close();
+  const el = document.getElementById('final-result');
+  el.style.display = 'block';
+  if (job.youtube_url) {
+    el.innerHTML = `<a href="${job.youtube_url}" target="_blank" class="btn btn-green btn-full" style="padding:12px;">▶ Ver en YouTube ↗</a>`;
+  } else {
+    el.innerHTML = `<div class="result-box"><div class="result-title">✅ Vídeo listo</div><div class="result-sub">Conecta un canal de YouTube para subida automática</div></div>`;
+  }
+  loadJobs();
+  loadNavCost();
+}
+
+function onError({message}) {
+  document.getElementById('btn-generate').disabled = false;
+  eventSource.close();
+  const el = document.getElementById('final-result');
+  el.style.display = 'block';
+  el.innerHTML = `<div style="border:1px solid var(--accent);background:var(--accent-light);border-radius:var(--radius);padding:14px 18px;"><span class="fw-600 text-red">Error:</span> ${message}</div>`;
+}
+
+// ── Jobs ─────────────────────────────────────────────────────────
+async function loadJobs() {
+  const jobs = await fetch(`${API}/api/jobs`).then(r => r.json()).catch(()=>[]);
+  const el = document.getElementById('jobs-list');
+  if (!jobs.length) {
+    el.innerHTML = '<div class="empty" style="padding:24px 0;"><div class="empty-icon" style="font-size:24px;">🎬</div><div class="empty-text">Sin vídeos aún</div></div>';
+    return;
+  }
+  el.innerHTML = jobs.slice(0,10).map(j => `
+    <div class="table-row">
+      <div class="status-dot ${j.status}"></div>
+      <div style="flex:1;min-width:0;">
+        <div class="fw-600 fs-13" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${j.title}</div>
+        <div class="fs-12 text-muted">${j.niche} · ${(j.created_at||'').substring(0,16)}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div class="fw-600 text-green fs-13">${(j.cost_total||0).toFixed(3)}€</div>
+        ${j.youtube_url ? `<a href="${j.youtube_url}" target="_blank" class="fs-12 text-red">Ver ↗</a>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+// ── Canales ──────────────────────────────────────────────────────
+async function loadChannels() {
+  const chs = await fetch(`${API}/api/channels`).then(r => r.json()).catch(()=>[]);
+  fillChannelSelect(chs);
+  const grid = document.getElementById('channels-grid');
+  if (!chs.length) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="empty-icon">📺</div><div class="empty-text">Sin canales</div><div class="empty-sub">Añade tu primer canal</div></div>`;
+    return;
+  }
+  grid.innerHTML = chs.map(c => `
+    <div class="channel-card">
+      <div class="channel-avatar">📺</div>
+      <div class="channel-name">${c.name}</div>
+      <div class="channel-niche">${c.niche || 'Sin nicho'}</div>
+      <div class="channel-stats">
+        <div class="channel-stat-row">
+          <span class="lbl">Estado</span>
+          <span class="badge ${c.connected ? 'badge-green' : 'badge-red'}">${c.connected ? '● Conectado' : '○ Sin conectar'}</span>
+        </div>
+        <div class="channel-stat-row"><span class="lbl">Subs</span><span class="val">—</span></div>
+        <div class="channel-stat-row"><span class="lbl">Vídeos subidos</span><span class="val">—</span></div>
+      </div>
+      ${!c.connected ? `<button class="btn btn-outline btn-full btn-sm mt-16" onclick="connectYT('${c.id}')">Conectar YouTube →</button>` : ''}
+    </div>`).join('');
+}
+
+function fillChannelSelect(chs) {
+  const sel = document.getElementById('inp-channel');
+  sel.innerHTML = '<option value="">Sin canal — guardar en local</option>' +
+    chs.map(c => `<option value="${c.id}">${c.name}${!c.connected ? ' ⚠️' : ''}</option>`).join('');
+}
+
+async function connectYT(id) {
+  const r = await fetch(`${API}/api/youtube/auth/${id}`).then(r => r.json());
+  window.open(r.auth_url, '_blank', 'width=520,height=640');
+}
+
+function openAddChannel() { document.getElementById('modal-channel').classList.add('open'); }
+function closeModal() { document.getElementById('modal-channel').classList.remove('open'); }
+
+async function saveChannel() {
+  const name = document.getElementById('ch-name').value.trim();
+  const niche = document.getElementById('ch-niche').value.trim();
+  if (!name) return;
+  await fetch(`${API}/api/channels`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, niche})
+  });
+  document.getElementById('ch-name').value = '';
+  document.getElementById('ch-niche').value = '';
+  closeModal();
+  loadChannels();
+}
+
+// ── Finanzas ─────────────────────────────────────────────────────
+async function loadFinance() {
+  const f = await fetch(`${API}/api/finance`).then(r => r.json()).catch(()=>({total_cost:0,total_videos:0,avg_cost_per_video:0,by_service:[]}));
+  document.getElementById('finance-month').textContent = `Mes: ${f.month}`;
+  document.getElementById('f-total-cost').textContent = f.total_cost.toFixed(2) + '€';
+  document.getElementById('f-videos').textContent = f.total_videos;
+  document.getElementById('f-avg').textContent = f.avg_cost_per_video.toFixed(2) + '€';
+  document.getElementById('f-annual').textContent = (f.total_cost * 12).toFixed(0) + '€';
+
+  const el = document.getElementById('finance-breakdown');
+  if (!f.by_service.length) {
+    el.innerHTML = '<div class="empty" style="padding:24px 0;"><div class="empty-icon" style="font-size:24px;">📊</div><div class="empty-text">Sin datos este mes</div></div>';
+    return;
+  }
+  const max = Math.max(...f.by_service.map(s => s.total));
+  const labels = {
+    claude_sonnet:'Claude Sonnet (guión)', claude_haiku:'Claude Haiku (prompts)',
+    kokoro_tts:'Kokoro TTS (voz)', azure_tts:'Azure TTS (voz fallback)',
+    flux_schnell:'Flux Schnell (imágenes)', flux_schnell_thumb:'Flux Schnell (miniatura)',
+    kling_standard:'Kling Standard (hook vídeos)'
+  };
+  el.innerHTML = f.by_service.map(s => `
+    <div class="finance-service-row">
+      <span class="fs-13 text-muted" style="width:200px;flex-shrink:0;">${labels[s.service]||s.service}</span>
+      <div class="finance-bar-wrap"><div class="finance-bar" style="width:${(s.total/max*100).toFixed(0)}%"></div></div>
+      <span class="fs-13 fw-600" style="width:64px;text-align:right;">${s.total.toFixed(4)}€</span>
+    </div>`).join('');
+}
+
+async function loadNavCost() {
+  const f = await fetch(`${API}/api/finance`).then(r=>r.json()).catch(()=>({total_cost:0}));
+  document.getElementById('nav-cost-badge').textContent = f.total_cost.toFixed(2) + '€ este mes';
+}
+
+// ── Init ─────────────────────────────────────────────────────────
+loadJobs();
+loadChannels();
+loadNavCost();
+</script>
+</body>
+</html>
