@@ -20,7 +20,7 @@ def generate_audio(job_id: str, script: str, tone: str, output_path: Path) -> Pa
         import soundfile as sf
 
         voice = VOICE_MAP.get(tone, "af_heart")
-        kokoro = Kokoro("kokoro-v0_19.onnx", "voices-v1.0.bin")
+        kokoro = Kokoro("kokoro-v1.0.int8.onnx", "voices-v1.0.bin")
 
         # Dividir en fragmentos de 500 chars para evitar límites
         chunks = _split_text(script, max_chars=500)
