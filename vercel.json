@@ -1,6 +1,8 @@
 {
   "outputDirectory": "frontend",
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "http://178.105.30.215:8000/api/$1" }
-  ]
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 300
+    }
+  }
 }

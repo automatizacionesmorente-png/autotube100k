@@ -927,9 +927,21 @@ async function saveChannel() {
 }
 
 async function connectNewChannel() {
-  const r = await fetch(`${API}/api/youtube/connect`).then(r => r.json());
-  // Redirige directamente — sin popup, funciona en todos los navegadores
-  window.location.href = r.auth_url;
+  const btn = document.querySelector('[onclick="connectNewChannel()"]');
+  const orig = btn.textContent;
+  btn.textContent = 'Conectando…';
+  btn.disabled = true;
+  try {
+    const resp = await fetch(`${API}/api/youtube/connect`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+    const r = await resp.json();
+    if (!r.auth_url) throw new Error('No se recibió auth_url del servidor');
+    window.location.href = r.auth_url;
+  } catch(e) {
+    alert('Error al conectar: ' + e.message);
+    btn.textContent = orig;
+    btn.disabled = false;
+  }
 }
 
 async function loadFinance() {
