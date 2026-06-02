@@ -751,7 +751,11 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
 </div>
 
 <script>
-const API = window.location.hostname === 'localhost' ? '' : (window.BACKEND_URL || '');
+// API backend URL configuration
+// For local development: relative paths work when dev server is running
+// For production: use direct backend URL (HTTPS redirect required to handle mixed content)
+const BACKEND_BASE_URL = 'http://178.105.30.215:8000';
+const API = window.location.hostname === 'localhost' ? '' : BACKEND_BASE_URL;
 
 const STEPS_META = {
   script:      { icon: '✦', label: 'Guión Claude' },
