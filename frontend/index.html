@@ -645,10 +645,13 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
       <!-- Pipeline activo -->
       <div id="pipeline-card" class="pipeline-card" style="display:none;">
         <div class="pipeline-head">
-          <span class="pipeline-lbl">Pipeline en curso</span>
-          <div class="cost-chip">
-            <span id="cost-display">0.000</span>
-            <span class="cost-eur">EUR</span>
+          <span class="pipeline-lbl" id="pipeline-lbl">Pipeline en curso</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button id="btn-cancel" onclick="cancelJob()" style="display:none;background:none;border:1px solid var(--border2);color:var(--muted);font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">⏹ Cancelar</button>
+            <div class="cost-chip">
+              <span id="cost-display">0.000</span>
+              <span class="cost-eur">EUR</span>
+            </div>
           </div>
         </div>
         <div class="progress-wrap">
@@ -659,6 +662,18 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
         </div>
         <div class="steps" id="step-list"></div>
         <div id="final-result"></div>
+        <!-- Preview + Upload (aparece cuando el vídeo está listo) -->
+        <div id="video-review" style="display:none;padding:16px 20px;border-top:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px;">📽 Revisión del vídeo</div>
+          <video id="video-preview" controls style="width:100%;border-radius:8px;background:#000;max-height:240px;margin-bottom:12px;"></video>
+          <div style="display:flex;gap:8px;">
+            <button id="btn-upload-yt" onclick="uploadToYoutube()" class="btn btn-dark" style="flex:1;padding:11px;font-size:12px;border-radius:8px;">
+              ▶ Subir a YouTube
+            </button>
+            <a id="btn-download" href="#" download style="border:1px solid var(--border2);color:var(--muted);font-size:11px;padding:11px 14px;border-radius:8px;text-decoration:none;white-space:nowrap;">⬇ Descargar</a>
+          </div>
+          <div id="upload-status" style="margin-top:8px;font-size:11px;color:var(--muted);text-align:center;"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -823,15 +838,79 @@ function selectTone(el) {
   selectedTone = el.dataset.tone;
 }
 
+let currentJobId = null;
+let currentChannelId = null;
+
+async function cancelJob() {
+  if (!currentJobId) return;
+  if (!confirm('¿Cancelar la producción? El progreso actual se perderá.')) return;
+  await fetch(`${API}/api/jobs/${currentJobId}/cancel`, { method: 'POST' });
+  document.getElementById('btn-cancel').style.display = 'none';
+  document.getElementById('btn-generate').disabled = false;
+  document.getElementById('pipeline-lbl').textContent = 'Producción cancelada';
+}
+
+async function uploadToYoutube() {
+  if (!currentJobId) return;
+  const channelId = currentChannelId || document.getElementById('inp-channel').value;
+  if (!channelId) { alert('Selecciona un canal de destino primero.'); return; }
+
+  const btn = document.getElementById('btn-upload-yt');
+  btn.disabled = true;
+  btn.textContent = 'Subiendo…';
+  document.getElementById('upload-status').textContent = 'Generando descripción y subiendo a YouTube…';
+
+  const r = await fetch(`${API}/api/jobs/${currentJobId}/upload`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ channel_id: channelId })
+  }).then(r=>r.json()).catch(e=>({error:e.toString()}));
+
+  if (r.youtube_url) {
+    document.getElementById('upload-status').innerHTML =
+      `✅ Subido: <a href="${r.youtube_url}" target="_blank" style="color:var(--red);">Ver en YouTube ↗</a>`;
+    btn.style.display = 'none';
+    loadJobs(); loadNavCost();
+  } else if (r.ok) {
+    // Polling hasta que aparezca la URL
+    document.getElementById('upload-status').textContent = 'Subiendo… puede tardar 1-2 minutos.';
+    _pollUpload(currentJobId);
+  } else {
+    document.getElementById('upload-status').textContent = 'Error: ' + (r.error || 'desconocido');
+    btn.disabled = false; btn.textContent = '▶ Reintentar subida';
+  }
+}
+
+async function _pollUpload(jobId) {
+  for (let i = 0; i < 60; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    const job = await fetch(`${API}/api/jobs/${jobId}`).then(r=>r.json()).catch(()=>null);
+    if (job?.youtube_url) {
+      document.getElementById('upload-status').innerHTML =
+        `✅ <a href="${job.youtube_url}" target="_blank" style="color:var(--red);font-weight:600;">Ver en YouTube ↗</a>`;
+      document.getElementById('btn-upload-yt').style.display = 'none';
+      loadJobs(); loadNavCost();
+      return;
+    }
+    if (job?.error && job.error.includes('Upload failed')) {
+      document.getElementById('upload-status').textContent = 'Error en la subida: ' + job.error;
+      return;
+    }
+  }
+}
+
 async function startGeneration() {
   const niche      = document.getElementById('inp-niche').value.trim();
   const title      = document.getElementById('inp-title').value.trim();
   const channel_id = document.getElementById('inp-channel').value || null;
   if (!niche || !title) { alert('Escribe el nicho y el título del vídeo.'); return; }
 
+  currentChannelId = channel_id;
   document.getElementById('btn-generate').disabled = true;
+  document.getElementById('btn-cancel').style.display = 'inline-block';
+  document.getElementById('video-review').style.display = 'none';
   document.getElementById('welcome-card').style.display = 'none';
   document.getElementById('pipeline-card').style.display = 'block';
+  document.getElementById('pipeline-lbl').textContent = 'Pipeline en curso';
   document.getElementById('final-result').innerHTML = '';
   document.getElementById('step-list').innerHTML = '';
   document.getElementById('progress-fill').style.width = '0%';
@@ -856,6 +935,7 @@ async function startGeneration() {
     body: JSON.stringify({ niche, title, tone: selectedTone, channel_id })
   });
   const { job_id } = await res.json();
+  currentJobId = job_id;
 
   if (eventSource) eventSource.close();
   eventSource = new EventSource(`${API}/api/jobs/${job_id}/stream`);
@@ -885,12 +965,27 @@ function onStep({step, status, message, progress, cost}) {
 
 function onEnd({job}) {
   document.getElementById('btn-generate').disabled = false;
+  document.getElementById('btn-cancel').style.display = 'none';
+  document.getElementById('pipeline-lbl').textContent = '✅ Vídeo listo para revisión';
   eventSource.close();
-  const el = document.getElementById('final-result');
+
   if (job.youtube_url) {
-    el.innerHTML = `<div style="padding:0 20px 16px;"><a href="${job.youtube_url}" target="_blank" class="btn btn-green" style="width:100%;padding:11px;font-size:12px;border-radius:6px;">▶ Ver en YouTube ↗</a></div>`;
-  } else {
-    el.innerHTML = `<div class="result-ok"><span style="font-size:18px">✓</span><div><div class="fw-6 fs-13 text-green">Vídeo generado correctamente</div><div class="fs-11 text-muted mt-8">Conecta un canal para subida automática</div></div></div>`;
+    // Ya subido (raro, pero por si acaso)
+    document.getElementById('final-result').innerHTML =
+      `<div style="padding:0 20px 16px;"><a href="${job.youtube_url}" target="_blank" class="btn btn-green" style="width:100%;padding:11px;font-size:12px;border-radius:6px;">▶ Ver en YouTube ↗</a></div>`;
+  } else if (job.video_path) {
+    // Mostrar preview del vídeo + botón subir
+    const review = document.getElementById('video-review');
+    const vid    = document.getElementById('video-preview');
+    const dl     = document.getElementById('btn-download');
+    const videoUrl = `${API}/api/jobs/${job.id}/video`;
+    vid.src = videoUrl;
+    dl.href = videoUrl;
+    dl.download = job.title + '.mp4';
+    review.style.display = 'block';
+    document.getElementById('upload-status').textContent = '';
+    document.getElementById('btn-upload-yt').disabled = false;
+    document.getElementById('btn-upload-yt').textContent = '▶ Subir a YouTube';
   }
   loadJobs(); loadNavCost();
 }
@@ -973,16 +1068,25 @@ async function openJobDetail(jobId) {
       if (d.type === 'error') onError(d);
     };
   } else if (job.status === 'done') {
-    // Mostrar resultado final
     Object.keys(STEPS_META).forEach(key => {
       const dot = document.getElementById('dot-' + key);
       if (dot) dot.className = 'step-icon done';
     });
-    const el = document.getElementById('final-result');
+    document.getElementById('pipeline-lbl').textContent = '✅ Vídeo listo para revisión';
+    document.getElementById('btn-cancel').style.display = 'none';
     if (job.youtube_url) {
-      el.innerHTML = `<div style="padding:0 20px 16px;"><a href="${job.youtube_url}" target="_blank" class="btn btn-green" style="width:100%;padding:11px;font-size:12px;border-radius:6px;">▶ Ver en YouTube ↗</a></div>`;
-    } else {
-      el.innerHTML = `<div class="result-ok"><span style="font-size:18px">✓</span><div><div class="fw-6 fs-13 text-green">Vídeo generado correctamente</div><div class="fs-11 text-muted mt-8">Sube a YouTube desde Canales</div></div></div>`;
+      document.getElementById('final-result').innerHTML =
+        `<div style="padding:0 20px 16px;"><a href="${job.youtube_url}" target="_blank" class="btn btn-green" style="width:100%;padding:11px;font-size:12px;border-radius:6px;">▶ Ver en YouTube ↗</a></div>`;
+    } else if (job.video_path) {
+      const videoUrl = `${API}/api/jobs/${job.id}/video`;
+      document.getElementById('video-preview').src = videoUrl;
+      document.getElementById('btn-download').href = videoUrl;
+      document.getElementById('btn-upload-yt').disabled = false;
+      document.getElementById('btn-upload-yt').textContent = '▶ Subir a YouTube';
+      document.getElementById('upload-status').textContent = '';
+      document.getElementById('video-review').style.display = 'block';
+      currentJobId = job.id;
+      currentChannelId = job.channel_id;
     }
   } else if (job.status === 'error') {
     document.getElementById('final-result').innerHTML = `

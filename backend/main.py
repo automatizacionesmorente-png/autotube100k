@@ -28,6 +28,8 @@ FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
 # Progreso en memoria para SSE
 _job_events: dict[str, list] = {}
+# Jobs cancelados (para que el pipeline los detecte y pare)
+_cancelled_jobs: set[str] = set()
 
 @app.on_event("startup")
 async def startup():
@@ -87,6 +89,66 @@ async def job_detail(job_id: str):
     if not job:
         raise HTTPException(404, "Job no encontrado")
     return job
+
+@app.post("/api/jobs/{job_id}/cancel")
+async def cancel_job(job_id: str):
+    _cancelled_jobs.add(job_id)
+    update_job(job_id, status="cancelled", error="Cancelado por el usuario")
+    _job_events.setdefault(job_id, []).append(
+        {"type": "error", "message": "Producción cancelada por el usuario"}
+    )
+    return {"ok": True}
+
+@app.get("/api/jobs/{job_id}/video")
+async def stream_video(job_id: str):
+    """Sirve el vídeo final para preview en el navegador."""
+    job = get_job(job_id)
+    if not job or not job.get("video_path"):
+        raise HTTPException(404, "Vídeo no disponible aún")
+    video_path = Path(job["video_path"])
+    if not video_path.exists():
+        raise HTTPException(404, "Archivo de vídeo no encontrado")
+    return FileResponse(video_path, media_type="video/mp4",
+                        headers={"Accept-Ranges": "bytes"})
+
+class UploadRequest(BaseModel):
+    channel_id: str
+
+@app.post("/api/jobs/{job_id}/upload")
+async def upload_job_to_youtube(job_id: str, req: UploadRequest, background_tasks: BackgroundTasks):
+    """Sube manualmente el vídeo a YouTube tras revisión."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job no encontrado")
+    if not job.get("video_path"):
+        raise HTTPException(400, "El vídeo aún no está listo")
+    if job.get("youtube_url"):
+        return {"youtube_url": job["youtube_url"], "already_uploaded": True}
+
+    background_tasks.add_task(_do_upload, job_id, req.channel_id)
+    return {"ok": True, "message": "Subiendo a YouTube…"}
+
+async def _do_upload(job_id: str, channel_id: str):
+    job = get_job(job_id)
+    try:
+        from .pipeline.upload import generate_metadata, upload_to_youtube
+        from .pipeline.script_gen import generate_script
+        script = job.get("script", "")
+        title  = job.get("title", "")
+        niche  = job.get("niche", "")
+        metadata = await asyncio.to_thread(generate_metadata, job_id, script, title, niche)
+        youtube_url = await asyncio.to_thread(
+            upload_to_youtube, job_id, Path(job["video_path"]),
+            Path(job["video_path"]).parent / "thumbnail.jpg",
+            title, metadata, channel_id
+        )
+        from datetime import datetime
+        update_job(job_id, youtube_url=youtube_url, finished_at=datetime.utcnow().isoformat())
+        _job_events.setdefault(job_id, []).append(
+            {"type": "uploaded", "youtube_url": youtube_url}
+        )
+    except Exception as e:
+        update_job(job_id, error=f"Upload failed: {e}")
 
 @app.delete("/api/jobs/{job_id}")
 async def delete_job(job_id: str):
@@ -365,6 +427,10 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
     job_dir = OUTPUT_DIR / job_id
     job_dir.mkdir(exist_ok=True)
 
+    def check_cancelled():
+        if job_id in _cancelled_jobs:
+            raise RuntimeError("Cancelado por el usuario")
+
     try:
         update_job(job_id, status="running")
 
@@ -374,6 +440,7 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
         script = await asyncio.to_thread(generate_script, job_id, req.niche, req.title, req.tone)
         update_job(job_id, script=script[:500])
         emit("script", "done", f"Guión listo: {len(script.split())} palabras", 20, 0.07)
+        check_cancelled()
 
         # ── Paso 2: Voz ───────────────────────────────────────────
         emit("tts", "running", "Convirtiendo a voz con Kokoro TTS...", 25)
@@ -381,6 +448,7 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
         audio_path = job_dir / "narration.mp3"
         await asyncio.to_thread(generate_audio, job_id, script, req.tone, audio_path)
         emit("tts", "done", "Audio generado", 40, 0.0)
+        check_cancelled()
 
         # ── Paso 3: Prompts de imágenes ────────────────────────────
         emit("images", "running", "Analizando guión para prompts de imagen...", 42)
@@ -392,11 +460,13 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
         images_dir = job_dir / "images"
         body_images = await asyncio.to_thread(generate_images, job_id, img_prompts, images_dir)
         emit("images", "done", f"{len(body_images)} imágenes generadas", 60, len(body_images) * 0.003 * 0.92)
+        check_cancelled()
 
         # ── Paso 5: Thumbnail ──────────────────────────────────────
         emit("thumbnail", "running", "Generando miniatura...", 62)
         thumbnail_path = await asyncio.to_thread(generate_thumbnail, job_id, req.title, req.niche, job_dir)
         emit("thumbnail", "done", "Miniatura lista", 65, 0.003 * 0.92)
+        check_cancelled()
 
         # ── Paso 6: Vídeos hook Kling ──────────────────────────────
         emit("hook_videos", "running", "Generando 5 vídeos hook con Kling Standard...", 65)
@@ -405,6 +475,7 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
         videos_dir = job_dir / "hook_videos"
         hook_videos = await asyncio.to_thread(generate_hook_videos, job_id, hook_prompts, videos_dir)
         emit("hook_videos", "done", f"{len(hook_videos)} vídeos hook listos", 80, len(hook_videos) * 0.14 * 0.92)
+        check_cancelled()
 
         # ── Paso 7: Render FFmpeg ──────────────────────────────────
         emit("render", "running", "Montando vídeo con FFmpeg...", 82)
@@ -413,25 +484,26 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
         await asyncio.to_thread(render_video, job_id, hook_videos, body_images, audio_path, final_path, req.title)
         emit("render", "done", "Vídeo montado", 90, 0)
 
-        # ── Paso 8: Metadata + subida YouTube ─────────────────────
-        emit("upload", "running", "Generando descripción y subiendo a YouTube...", 92)
-        from .pipeline.upload import generate_metadata, upload_to_youtube
+        # ── Paso 8: Metadata (sin subir aún — espera revisión manual) ──
+        emit("upload", "running", "Generando descripción y metadatos...", 92)
+        from .pipeline.upload import generate_metadata
         metadata = await asyncio.to_thread(generate_metadata, job_id, script, req.title, req.niche)
 
-        youtube_url = None
-        if req.channel_id:
-            youtube_url = await asyncio.to_thread(
-                upload_to_youtube, job_id, final_path, thumbnail_path,
-                req.title, metadata, req.channel_id
-            )
+        # Guardar metadatos en archivo para la subida manual posterior
+        import json as _json
+        meta_path = job_dir / "metadata.json"
+        meta_path.write_text(_json.dumps({
+            "title": req.title, "niche": req.niche,
+            "channel_id": req.channel_id, **metadata
+        }, ensure_ascii=False))
 
-        emit("upload", "done", youtube_url or "Vídeo listo (sin canal conectado)", 100, 0)
+        emit("upload", "done", "✅ Vídeo listo — revísalo antes de subir a YouTube", 100, 0)
 
         from datetime import datetime
         update_job(
             job_id, status="done", progress=100,
             video_path=str(final_path),
-            youtube_url=youtube_url,
+            youtube_url=None,
             finished_at=datetime.utcnow().isoformat()
         )
 
