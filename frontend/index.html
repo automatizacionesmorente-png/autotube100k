@@ -1024,10 +1024,13 @@ async function loadChannels(sync=false) {
       <div class="ch-row"><span class="k">Subs</span><span class="v fw-6" style="color:var(--ink);">${c.connected ? fmtNum(c.subscribers) : '—'}</span></div>
       <div class="ch-row"><span class="k">Vídeos</span><span class="v">${c.connected ? fmtNum(c.videos_count) : '—'}</span></div>
       <div class="ch-row"><span class="k">Views</span><span class="v">${c.connected ? fmtNum(c.total_views) : '—'}</span></div>
-      ${c.connected
-        ? `<div style="margin-top:12px;font-size:10px;color:var(--muted);text-align:center;">Haz clic para ver detalles →</div>`
-        : `<button class="btn btn-outline" style="width:100%;margin-top:12px;font-size:10px;padding:5px;" onclick="event.stopPropagation();connectYT('${c.id}')">Conectar YouTube →</button>`
-      }
+      <div style="display:flex;gap:6px;margin-top:12px;">
+        ${c.connected
+          ? `<div style="flex:1;font-size:10px;color:var(--muted);display:flex;align-items:center;">Ver detalles →</div>`
+          : `<button class="btn btn-outline" style="flex:1;font-size:10px;padding:5px;" onclick="event.stopPropagation();connectYT('${c.id}')">Conectar YouTube →</button>`
+        }
+        <button onclick="event.stopPropagation();deleteChannel('${c.id}','${c.name}')" style="background:none;border:1px solid var(--border2);border-radius:6px;padding:4px 8px;cursor:pointer;color:var(--muted);font-size:11px;transition:all .15s;" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">🗑</button>
+      </div>
     </div>`).join('');
 }
 
@@ -1040,6 +1043,12 @@ function fillChannelSelect(chs) {
 async function connectYT(id) {
   const r = await fetch(`${API}/api/youtube/auth/${id}`).then(r => r.json());
   window.open(r.auth_url, '_blank', 'width=520,height=640');
+}
+
+async function deleteChannel(id, name) {
+  if (!confirm(`¿Eliminar el canal "${name}"?\nEsto no elimina el canal de YouTube, solo lo desconecta de AutoTube.`)) return;
+  await fetch(`${API}/api/channels/${id}`, { method: 'DELETE' });
+  loadChannels();
 }
 
 function parseDuration(iso) {

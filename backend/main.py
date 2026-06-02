@@ -104,6 +104,15 @@ async def add_channel(req: ChannelRequest):
     upsert_channel(channel_id, req.name, req.niche)
     return {"id": channel_id, "name": req.name}
 
+@app.delete("/api/channels/{channel_id}")
+async def delete_channel(channel_id: str):
+    from .database import get_conn
+    conn = get_conn()
+    conn.execute("DELETE FROM channels WHERE id=?", (channel_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
 @app.get("/api/channels/{channel_id}/detail")
 async def channel_detail_stats(channel_id: str):
     """Devuelve stats completas + últimos vídeos de un canal desde YouTube API."""
