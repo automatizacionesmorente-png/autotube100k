@@ -909,15 +909,87 @@ async function loadJobs() {
     el.innerHTML = '<div class="empty" style="padding:20px 0;"><div class="empty-icon" style="font-size:20px">🎬</div><div class="empty-title">Sin vídeos aún</div></div>';
     return;
   }
+  const statusLabel = { running:'En curso…', done:'Completado', error:'Error', pending:'Pendiente' };
+  const statusColor = { running:'var(--gold)', done:'var(--green)', error:'var(--red)', pending:'var(--muted)' };
   el.innerHTML = jobs.slice(0,10).map(j => `
-    <div class="job-row">
+    <div class="job-row" onclick="openJobDetail('${j.id}')" style="cursor:pointer;" onmouseover="this.style.background='var(--cream)'" onmouseout="this.style.background=''">
       <div class="job-dot ${j.status}"></div>
       <div class="flex-1 min-0">
         <div class="job-title">${j.title}</div>
         <div class="job-meta">${j.niche} · ${(j.created_at||'').substring(0,16)}</div>
       </div>
-      <div class="job-cost">${(j.cost_total||0).toFixed(3)}€${j.youtube_url ? `<br><a href="${j.youtube_url}" target="_blank" class="fs-11 text-red" style="font-family:inherit;font-size:11px;">ver ↗</a>` : ''}</div>
+      <div style="text-align:right;">
+        <div class="job-cost">${(j.cost_total||0).toFixed(3)}€</div>
+        <div style="font-size:10px;color:${statusColor[j.status]||'var(--muted)'};">${statusLabel[j.status]||j.status}</div>
+        ${j.youtube_url ? `<a href="${j.youtube_url}" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;color:var(--red);">ver ↗</a>` : ''}
+      </div>
     </div>`).join('');
+}
+
+async function openJobDetail(jobId) {
+  // Si ya hay un pipeline card visible con ese job, no hacemos nada especial
+  // Mostramos el pipeline-card y reconectamos SSE para seguir el progreso
+  document.getElementById('welcome-card').style.display = 'none';
+  document.getElementById('pipeline-card').style.display = 'block';
+  document.getElementById('final-result').innerHTML = '';
+
+  // Cargar estado actual del job
+  const job = await fetch(`${API}/api/jobs/${jobId}`).then(r=>r.json()).catch(()=>null);
+  if (!job) return;
+
+  // Reiniciar steps visuales
+  document.getElementById('step-list').innerHTML = '';
+  totalCost = job.cost_total || 0;
+  document.getElementById('cost-display').textContent = totalCost.toFixed(3);
+
+  Object.entries(STEPS_META).forEach(([key, meta]) => {
+    const stepDone  = job.status === 'done';
+    const isCurrent = job.current_step === key;
+    const stepStatus = stepDone ? 'done' : isCurrent ? 'running' : 'pending';
+    document.getElementById('step-list').insertAdjacentHTML('beforeend', `
+      <div class="step" id="step-${key}">
+        <div class="step-icon ${stepStatus}" id="dot-${key}">${meta.icon}</div>
+        <div class="step-body">
+          <div class="step-name">${meta.label}</div>
+          <div class="step-msg text-muted" id="msg-${key}">${isCurrent ? 'En curso…' : stepDone ? 'Completado' : 'Esperando…'}</div>
+        </div>
+        <div class="step-cost" id="scost-${key}"></div>
+      </div>`);
+  });
+
+  const progress = job.progress || 0;
+  document.getElementById('progress-fill').style.width = progress + '%';
+  document.getElementById('progress-pct').textContent = progress + '%';
+
+  // Si el job sigue running, reconectar SSE
+  if (job.status === 'running' || job.status === 'pending') {
+    if (eventSource) eventSource.close();
+    eventSource = new EventSource(`${API}/api/jobs/${jobId}/stream`);
+    eventSource.onmessage = e => {
+      const d = JSON.parse(e.data);
+      if (d.type === 'step')  onStep(d);
+      if (d.type === 'end')   onEnd(d);
+      if (d.type === 'error') onError(d);
+    };
+  } else if (job.status === 'done') {
+    // Mostrar resultado final
+    Object.keys(STEPS_META).forEach(key => {
+      const dot = document.getElementById('dot-' + key);
+      if (dot) dot.className = 'step-icon done';
+    });
+    const el = document.getElementById('final-result');
+    if (job.youtube_url) {
+      el.innerHTML = `<div style="padding:0 20px 16px;"><a href="${job.youtube_url}" target="_blank" class="btn btn-green" style="width:100%;padding:11px;font-size:12px;border-radius:6px;">▶ Ver en YouTube ↗</a></div>`;
+    } else {
+      el.innerHTML = `<div class="result-ok"><span style="font-size:18px">✓</span><div><div class="fw-6 fs-13 text-green">Vídeo generado correctamente</div><div class="fs-11 text-muted mt-8">Sube a YouTube desde Canales</div></div></div>`;
+    }
+  } else if (job.status === 'error') {
+    document.getElementById('final-result').innerHTML = `
+      <div style="padding:12px 20px;background:var(--red-bg);border-radius:8px;margin:8px 16px;">
+        <div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:4px;">❌ Error en la generación</div>
+        <div style="font-size:11px;color:var(--ink2);word-break:break-word;">${job.error||'Error desconocido'}</div>
+      </div>`;
+  }
 }
 
 function fmtNum(n) {
