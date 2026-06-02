@@ -88,6 +88,17 @@ async def job_detail(job_id: str):
         raise HTTPException(404, "Job no encontrado")
     return job
 
+@app.delete("/api/jobs/{job_id}")
+async def delete_job(job_id: str):
+    from .database import get_conn
+    conn = get_conn()
+    conn.execute("DELETE FROM jobs WHERE id=?", (job_id,))
+    conn.execute("DELETE FROM job_steps WHERE job_id=?", (job_id,))
+    conn.execute("DELETE FROM cost_events WHERE job_id=?", (job_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
 # ── Finance ────────────────────────────────────────────────────────
 @app.get("/api/finance")
 async def finance():

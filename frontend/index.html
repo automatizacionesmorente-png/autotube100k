@@ -912,17 +912,18 @@ async function loadJobs() {
   const statusLabel = { running:'En curso…', done:'Completado', error:'Error', pending:'Pendiente' };
   const statusColor = { running:'var(--gold)', done:'var(--green)', error:'var(--red)', pending:'var(--muted)' };
   el.innerHTML = jobs.slice(0,10).map(j => `
-    <div class="job-row" onclick="openJobDetail('${j.id}')" style="cursor:pointer;" onmouseover="this.style.background='var(--cream)'" onmouseout="this.style.background=''">
+    <div class="job-row" onclick="openJobDetail('${j.id}')" style="cursor:pointer;position:relative;" onmouseover="this.style.background='var(--cream)';this.querySelector('.job-del').style.opacity='1'" onmouseout="this.style.background='';this.querySelector('.job-del').style.opacity='0'">
       <div class="job-dot ${j.status}"></div>
       <div class="flex-1 min-0">
         <div class="job-title">${j.title}</div>
         <div class="job-meta">${j.niche} · ${(j.created_at||'').substring(0,16)}</div>
       </div>
-      <div style="text-align:right;">
+      <div style="text-align:right;margin-right:6px;">
         <div class="job-cost">${(j.cost_total||0).toFixed(3)}€</div>
         <div style="font-size:10px;color:${statusColor[j.status]||'var(--muted)'};">${statusLabel[j.status]||j.status}</div>
         ${j.youtube_url ? `<a href="${j.youtube_url}" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;color:var(--red);">ver ↗</a>` : ''}
       </div>
+      <button class="job-del" onclick="event.stopPropagation();deleteJob('${j.id}')" style="opacity:0;transition:opacity .15s;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:4px 6px;border-radius:4px;line-height:1;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted)'">✕</button>
     </div>`).join('');
 }
 
@@ -1043,6 +1044,11 @@ function fillChannelSelect(chs) {
 async function connectYT(id) {
   const r = await fetch(`${API}/api/youtube/auth/${id}`).then(r => r.json());
   window.open(r.auth_url, '_blank', 'width=520,height=640');
+}
+
+async function deleteJob(id) {
+  await fetch(`${API}/api/jobs/${id}`, { method: 'DELETE' });
+  loadJobs();
 }
 
 async function deleteChannel(id, name) {
