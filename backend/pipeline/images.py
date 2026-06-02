@@ -10,31 +10,52 @@ FAL_QUEUE_BASE = "https://queue.fal.run"   # asíncrono — polling
 FLUX_SCHNELL = "fal-ai/flux/schnell"
 
 def generate_image_prompts(job_id: str, script: str, niche: str, count: int = 15) -> list[str]:
-    """Usa Claude Haiku (barato) para extraer prompts de imagen del guión."""
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-
-    msg = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=2000,
-        messages=[{
-            "role": "user",
-            "content": f"""Del siguiente guión sobre '{niche}', extrae {count} momentos visuales clave.
+    """Usa Claude Haiku para extraer prompts de imagen. Fallback automático si sin crédito."""
+    try:
+        client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        msg = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=2000,
+            messages=[{
+                "role": "user",
+                "content": f"""Del siguiente guión sobre '{niche}', extrae {count} momentos visuales clave.
 Para cada uno, escribe un prompt en inglés para generar una imagen con IA.
 Los prompts deben ser: cinematográficos, detallados, photorealistic, 16:9.
 Devuelve SOLO los prompts, uno por línea, sin numeración ni explicaciones.
 
 GUIÓN (primeras 3000 palabras):
 {script[:3000]}"""
-        }]
-    )
+            }]
+        )
+        prompts = [p.strip() for p in msg.content[0].text.strip().split("\n") if p.strip()][:count]
+        cost = (msg.usage.input_tokens * 0.8 + msg.usage.output_tokens * 4) / 1_000_000 * 0.92
+        add_cost_event(job_id, "claude_haiku", msg.usage.output_tokens, 4 / 1_000_000, cost)
+        return prompts
+    except Exception:
+        # Fallback: prompts genéricos basados en el nicho — no requiere Claude
+        return _fallback_prompts(niche, count)
 
-    prompts = [p.strip() for p in msg.content[0].text.strip().split("\n") if p.strip()][:count]
 
-    # Coste Haiku: casi gratis
-    cost = (msg.usage.input_tokens * 0.8 + msg.usage.output_tokens * 4) / 1_000_000 * 0.92
-    add_cost_event(job_id, "claude_haiku", msg.usage.output_tokens, 4 / 1_000_000, cost)
-
-    return prompts
+def _fallback_prompts(niche: str, count: int) -> list[str]:
+    """Genera prompts cinematográficos genéricos sin necesitar Claude."""
+    base = [
+        f"cinematic wide shot, dramatic lighting, concept of {niche}, photorealistic, 16:9, 4K",
+        f"close-up dramatic face, deep thinking, {niche} theme, cinematic lighting, photorealistic",
+        f"futuristic city skyline at night, representing {niche}, dramatic colors, 16:9",
+        f"data visualization hologram, blue glow, {niche} concept, dark background, cinematic",
+        f"person at crossroads dramatic landscape, {niche} metaphor, golden hour, photorealistic",
+        f"abstract technological neural network, representing {niche}, dark blue tones, 4K",
+        f"dramatic storm clouds over city, symbolic of {niche}, moody atmosphere, cinematic",
+        f"empty boardroom with city view, power and {niche}, dramatic lighting, photorealistic",
+        f"human silhouette vs robot silhouette, {niche} concept, high contrast, cinematic",
+        f"global map with glowing connections, {niche} worldwide impact, dark background",
+        f"newspaper headlines dramatic blur, {niche} news, moody black and white, cinematic",
+        f"crowd of people from above, drone shot, {niche} society, golden hour, photorealistic",
+        f"close-up of hands on keyboard, {niche} technology, dramatic side lighting, 4K",
+        f"hourglass with digital particles, {niche} time concept, cinematic, photorealistic",
+        f"sunrise over mountain, hope and {niche}, wide angle, dramatic colors, photorealistic",
+    ]
+    return (base * ((count // len(base)) + 1))[:count]
 
 def _fal_generate_image(client: httpx.Client, prompt: str, headers: dict) -> str:
     """Llama a FAL.ai en modo síncrono. Devuelve URL de la imagen."""
