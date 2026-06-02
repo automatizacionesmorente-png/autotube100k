@@ -13,6 +13,19 @@ def get_duration(path: Path) -> float:
     return float(json.loads(result.stdout)["format"]["duration"])
 
 
+def _ffmpeg(*args):
+    """Ejecuta FFmpeg y lanza error con stderr si falla."""
+    result = subprocess.run(
+        ["ffmpeg", "-y"] + list(args),
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        # Incluir las últimas líneas de stderr para diagnóstico claro
+        stderr_tail = "\n".join(result.stderr.strip().splitlines()[-8:])
+        raise RuntimeError(f"FFmpeg error (código {result.returncode}):\n{stderr_tail}")
+    return result
+
+
 def render_video(
     job_id: str,
     hook_videos: list[Path],
@@ -22,6 +35,14 @@ def render_video(
     title: str,
 ) -> Path:
     add_step(job_id, "render", "running", "Montando vídeo con FFmpeg")
+
+    # ── Verificaciones previas ─────────────────────────────────────────────
+    if not audio_path.exists() or audio_path.stat().st_size == 0:
+        raise RuntimeError(f"Audio no encontrado o vacío: {audio_path}")
+    valid_images = [img for img in body_images if img.exists() and img.stat().st_size > 0]
+    if len(valid_images) < 3:
+        raise RuntimeError(f"Imágenes insuficientes para el vídeo: {len(valid_images)} (mínimo 3)")
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_dir = output_path.parent / f"tmp_{job_id}"
     tmp_dir.mkdir(exist_ok=True)
@@ -36,82 +57,86 @@ def render_video(
         hook_duration = min(len(valid_hook_videos) * 5, audio_duration * 0.15)
         hook_list = tmp_dir / "hook_list.txt"
         hook_list.write_text("\n".join(f"file '{v.resolve()}'" for v in valid_hook_videos))
-        subprocess.run([
-            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+        _ffmpeg(
+            "-f", "concat", "-safe", "0",
             "-i", str(hook_list),
             "-vf", "scale=1280:720",
             "-c:v", "libx264", "-preset", "fast", "-an",
             str(hook_concat)
-        ], check=True, capture_output=True)
+        )
     else:
         # Fallback: usa las 3 primeras imágenes con Ken Burns como hook (15 seg)
         add_step(job_id, "render", "running", "Sin vídeos hook — usando imágenes intro como fallback")
-        hook_duration = min(15, audio_duration * 0.1)
-        img_dur_hook = hook_duration / min(3, len(body_images))
+        n_hook_imgs = min(3, len(valid_images))
+        hook_duration = min(15, audio_duration * 0.15)
+        img_dur_hook = hook_duration / n_hook_imgs
         hook_clips = []
-        for i, img in enumerate(body_images[:3]):
+        for i, img in enumerate(valid_images[:n_hook_imgs]):
             out = tmp_dir / f"hook_img_{i}.mp4"
-            zoompan = _ken_burns_filter(i + 10, img_dur_hook)  # efecto diferente
-            subprocess.run([
-                "ffmpeg", "-y", "-loop", "1", "-i", str(img),
+            zoompan = _ken_burns_filter(i + 10, img_dur_hook)
+            _ffmpeg(
+                "-loop", "1", "-i", str(img),
                 "-vf", zoompan, "-t", str(img_dur_hook),
                 "-c:v", "libx264", "-preset", "fast", "-an", "-r", "25",
                 str(out)
-            ], check=True, capture_output=True)
+            )
             hook_clips.append(out)
         hook_list = tmp_dir / "hook_list.txt"
         hook_list.write_text("\n".join(f"file '{v.resolve()}'" for v in hook_clips))
-        subprocess.run([
-            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
-            "-i", str(hook_list), "-c:v", "libx264", "-preset", "fast", "-an",
+        _ffmpeg(
+            "-f", "concat", "-safe", "0",
+            "-i", str(hook_list),
+            "-c:v", "libx264", "-preset", "fast", "-an",
             str(hook_concat)
-        ], check=True, capture_output=True)
+        )
 
     body_duration = audio_duration - hook_duration
-    img_duration = body_duration / len(body_images) if body_images else 5
+    img_duration = body_duration / len(valid_images) if valid_images else 5
 
     # ── 2. Imágenes con Ken Burns ──────────────────────────────────────────
+    add_step(job_id, "render", "running", f"Aplicando Ken Burns a {len(valid_images)} imágenes...")
     img_clips = []
-    for i, img in enumerate(body_images):
+    for i, img in enumerate(valid_images):
         out = tmp_dir / f"img_{i:02d}.mp4"
         zoompan = _ken_burns_filter(i, img_duration)
-        subprocess.run([
-            "ffmpeg", "-y", "-loop", "1", "-i", str(img),
+        _ffmpeg(
+            "-loop", "1", "-i", str(img),
             "-vf", zoompan,
             "-t", str(img_duration),
             "-c:v", "libx264", "-preset", "fast", "-an", "-r", "25",
             str(out)
-        ], check=True, capture_output=True)
+        )
         img_clips.append(out)
 
     # ── 3. Concatenar imágenes ─────────────────────────────────────────────
     body_list = tmp_dir / "body_list.txt"
     body_list.write_text("\n".join(f"file '{v.resolve()}'" for v in img_clips))
     body_concat = tmp_dir / "body.mp4"
-    subprocess.run([
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+    _ffmpeg(
+        "-f", "concat", "-safe", "0",
         "-i", str(body_list),
         "-c:v", "libx264", "-preset", "fast", "-an",
         str(body_concat)
-    ], check=True, capture_output=True)
+    )
 
     # ── 4. Unir hook + body ────────────────────────────────────────────────
     full_list = tmp_dir / "full_list.txt"
     full_list.write_text(f"file '{hook_concat.resolve()}'\nfile '{body_concat.resolve()}'")
     full_video = tmp_dir / "full_video.mp4"
-    subprocess.run([
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+    _ffmpeg(
+        "-f", "concat", "-safe", "0",
         "-i", str(full_list),
         "-c:v", "libx264", "-preset", "fast", "-an",
         str(full_video)
-    ], check=True, capture_output=True)
+    )
 
     # ── 5. Generar subtítulos estilo TikTok con Whisper ───────────────────
     add_step(job_id, "render", "running", "Transcribiendo audio para subtítulos (Whisper)...")
     ass_path = tmp_dir / "subtitles.ass"
     _generate_tiktok_subtitles(audio_path, ass_path)
 
-    # ── 6. CTA overlay ────────────────────────────────────────────────────
+    # ── 6. CTA overlay + audio ────────────────────────────────────────────
+    add_step(job_id, "render", "running", "Añadiendo subtítulos, CTA y audio final...")
     cta_start = audio_duration - 8
     cta_filter = (
         f"subtitles={ass_path},"
@@ -121,8 +146,7 @@ def render_video(
         f":enable='between(t,{cta_start:.1f},{audio_duration:.1f})'"
     )
 
-    subprocess.run([
-        "ffmpeg", "-y",
+    _ffmpeg(
         "-i", str(full_video),
         "-i", str(audio_path),
         "-vf", cta_filter,
@@ -130,7 +154,7 @@ def render_video(
         "-c:a", "aac", "-b:a", "192k",
         "-shortest",
         str(output_path)
-    ], check=True, capture_output=True)
+    )
 
     add_step(job_id, "render", "done", f"Vídeo listo con subtítulos: {output_path.name}", 0)
     return output_path
@@ -140,7 +164,6 @@ def _generate_tiktok_subtitles(audio_path: Path, ass_path: Path):
     """Transcribe audio con Whisper y genera subtítulos estilo TikTok (.ass)."""
     from faster_whisper import WhisperModel
 
-    # Modelo tiny = rápido, suficiente para español
     model = WhisperModel("small", device="cpu", compute_type="int8")
     segments, _ = model.transcribe(
         str(audio_path),
@@ -149,7 +172,6 @@ def _generate_tiktok_subtitles(audio_path: Path, ass_path: Path):
         vad_filter=True,
     )
 
-    # Agrupar en bloques de 4-6 palabras max para estilo TikTok
     words = []
     for seg in segments:
         if seg.words:
@@ -165,7 +187,6 @@ def _generate_tiktok_subtitles(audio_path: Path, ass_path: Path):
             chunk_start = start
         chunk.append(word)
         chunk_end = end
-        # Nuevo grupo cada 5 palabras o pausa larga
         if len(chunk) >= 5:
             groups.append((chunk_start, chunk_end, " ".join(chunk)))
             chunk, chunk_start, chunk_end = [], None, None
@@ -173,7 +194,6 @@ def _generate_tiktok_subtitles(audio_path: Path, ass_path: Path):
     if chunk:
         groups.append((chunk_start, chunk_end, " ".join(chunk)))
 
-    # Escribir .ass con estilo TikTok
     ass_path.write_text(_build_ass(groups), encoding="utf-8")
 
 
@@ -194,13 +214,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     lines = []
     for start, end, text in groups:
-        # Limpiar texto
         text = text.replace("{", "").replace("}", "").replace("\\n", " ").strip()
         if not text:
             continue
         s = _fmt_time(start)
         e = _fmt_time(end + 0.05)
-        # Highlight: texto en mayúsculas con sombra
         styled = f"{{\\an2}}{text.upper()}"
         lines.append(f"Dialogue: 0,{s},{e},TikTok,,0,0,0,,{styled}")
 

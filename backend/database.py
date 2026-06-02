@@ -114,7 +114,7 @@ def add_cost_event(job_id: str, service: str, units: float, unit_cost: float, to
         "INSERT INTO cost_events (job_id, service, units, unit_cost, total_cost) VALUES (?, ?, ?, ?, ?)",
         (job_id, service, units, unit_cost, total)
     )
-    conn.execute("UPDATE jobs SET cost_total = cost_total + ? WHERE id = ?", (total, job_id))
+    conn.execute("UPDATE jobs SET cost_total = COALESCE(cost_total, 0) + ? WHERE id = ?", (total, job_id))
     conn.commit()
     conn.close()
 
