@@ -898,6 +898,51 @@ async function _pollUpload(jobId) {
   }
 }
 
+// Polling fallback — actualiza la UI cada 4s con el estado real del DB
+let _pollTimer = null;
+function startStatusPolling(jobId) {
+  stopStatusPolling();
+  _pollTimer = setInterval(async () => {
+    const job = await fetch(`${API}/api/jobs/${jobId}`).then(r=>r.json()).catch(()=>null);
+    if (!job) return;
+
+    // Actualizar barra de progreso con valor real del DB
+    document.getElementById('progress-fill').style.width = job.progress + '%';
+    document.getElementById('progress-pct').textContent = job.progress + '%';
+
+    // Marcar pasos anteriores al actual como "done"
+    const stepOrder = Object.keys(STEPS_META);
+    const currentIdx = stepOrder.indexOf(job.current_step);
+    stepOrder.forEach((key, i) => {
+      const dot = document.getElementById('dot-' + key);
+      if (!dot) return;
+      if (i < currentIdx) dot.className = 'step-icon done';
+      else if (i === currentIdx && job.status === 'running') dot.className = 'step-icon running';
+    });
+
+    // Si terminó o dio error, parar polling
+    if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') {
+      stopStatusPolling();
+      if (job.status === 'error') showJobError(job.error);
+    }
+  }, 4000);
+}
+function stopStatusPolling() {
+  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+}
+function showJobError(errorMsg) {
+  document.getElementById('btn-generate').disabled = false;
+  document.getElementById('btn-cancel').style.display = 'none';
+  document.getElementById('pipeline-lbl').textContent = '❌ Error en la producción';
+  document.getElementById('final-result').innerHTML = `
+    <div style="margin:12px 20px;padding:14px 16px;background:#fdf1f1;border:1px solid #f5c6c6;border-radius:10px;">
+      <div style="font-size:12px;font-weight:700;color:#b83232;margin-bottom:8px;">❌ Error — motivo exacto:</div>
+      <div style="font-size:11px;color:#36322c;line-height:1.6;word-break:break-word;font-family:monospace;background:#fff;padding:10px;border-radius:6px;border:1px solid #eee;">${errorMsg || 'Error desconocido'}</div>
+      <div style="margin-top:10px;font-size:11px;color:#7a7468;">Corrige el problema y vuelve a generar.</div>
+    </div>`;
+  loadJobs();
+}
+
 async function startGeneration() {
   const niche      = document.getElementById('inp-niche').value.trim();
   const title      = document.getElementById('inp-title').value.trim();
@@ -936,6 +981,7 @@ async function startGeneration() {
   });
   const { job_id } = await res.json();
   currentJobId = job_id;
+  startStatusPolling(job_id);  // fallback visual por si SSE pierde eventos
 
   if (eventSource) eventSource.close();
   eventSource = new EventSource(`${API}/api/jobs/${job_id}/stream`);
@@ -964,6 +1010,7 @@ function onStep({step, status, message, progress, cost}) {
 }
 
 function onEnd({job}) {
+  stopStatusPolling();
   document.getElementById('btn-generate').disabled = false;
   document.getElementById('btn-cancel').style.display = 'none';
   document.getElementById('pipeline-lbl').textContent = '✅ Vídeo listo para revisión';
@@ -991,6 +1038,7 @@ function onEnd({job}) {
 }
 
 function onError({message}) {
+  stopStatusPolling();
   document.getElementById('btn-generate').disabled = false;
   eventSource.close();
   const el = document.getElementById('final-result');
@@ -1057,8 +1105,9 @@ async function openJobDetail(jobId) {
   document.getElementById('progress-fill').style.width = progress + '%';
   document.getElementById('progress-pct').textContent = progress + '%';
 
-  // Si el job sigue running, reconectar SSE
+  // Si el job sigue running, reconectar SSE + polling
   if (job.status === 'running' || job.status === 'pending') {
+    startStatusPolling(jobId);
     if (eventSource) eventSource.close();
     eventSource = new EventSource(`${API}/api/jobs/${jobId}/stream`);
     eventSource.onmessage = e => {
