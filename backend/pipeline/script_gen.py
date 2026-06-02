@@ -73,16 +73,17 @@ SOLO el texto narrado. Sin títulos, sin corchetes, sin markdown."""
             model="claude-sonnet-4-6",
             max_tokens=4000,
             messages=[
-                {"role": "user", "content": prompt},
-                {"role": "assistant", "content": script},
                 {"role": "user", "content": (
-                    f"El guión tiene {word_count} palabras y necesita {TARGET_WORDS}. "
-                    f"Añade aproximadamente {extension_needed} palabras más desarrollando los bloques existentes "
-                    f"con más detalle, ejemplos y anécdotas. Devuelve SOLO el guión completo y ampliado, sin comentarios."
+                    f"El siguiente guión tiene {word_count} palabras pero necesita {TARGET_WORDS}. "
+                    f"Escribe ~{extension_needed} palabras ADICIONALES que continúen y amplíen el guión "
+                    f"con más detalle, ejemplos y anécdotas. Mantén el mismo tono. "
+                    f"IMPORTANTE: Devuelve SOLO el texto adicional, sin repetir lo ya escrito, sin títulos, sin comentarios.\n\n"
+                    f"Fin del guión actual:\n...{script[-800:]}"
                 )}
             ]
         )
-        script = ext_msg.content[0].text
+        # Añadir el texto de extensión al guión original (no reemplazar)
+        script = script + "\n\n" + ext_msg.content[0].text
         word_count = len(script.split())
         # Sumar coste de la extensión
         ext_cost = (ext_msg.usage.input_tokens * 3 + ext_msg.usage.output_tokens * 15) / 1_000_000 * 0.92

@@ -419,8 +419,11 @@ async def youtube_callback(code: str, state: str):
 # ── Pipeline principal ────────────────────────────────────────────
 async def run_pipeline(job_id: str, req: GenerateRequest):
     def emit(step: str, status: str, message: str, progress: int, cost: float = 0):
+        # Leer coste real acumulado de la DB en lugar de usar valor hardcodeado
+        job_data = get_job(job_id)
+        real_cost = job_data["cost_total"] if job_data else cost
         event = {"type": "step", "step": step, "status": status,
-                 "message": message, "progress": progress, "cost": cost}
+                 "message": message, "progress": progress, "cost": real_cost}
         _job_events.setdefault(job_id, []).append(event)
         update_job(job_id, current_step=step, progress=progress)
 
