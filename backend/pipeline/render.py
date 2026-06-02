@@ -27,22 +27,48 @@ def render_video(
     tmp_dir.mkdir(exist_ok=True)
 
     audio_duration = get_duration(audio_path)
-    hook_duration = min(len(hook_videos) * 5, audio_duration * 0.1)  # max 10% del vídeo
+
+    # ── 1. Hook: vídeos Kling SI existen, si no → primeras imágenes como intro ──
+    valid_hook_videos = [v for v in hook_videos if v.exists() and v.stat().st_size > 0]
+    hook_concat = tmp_dir / "hook.mp4"
+
+    if valid_hook_videos:
+        hook_duration = min(len(valid_hook_videos) * 5, audio_duration * 0.15)
+        hook_list = tmp_dir / "hook_list.txt"
+        hook_list.write_text("\n".join(f"file '{v.resolve()}'" for v in valid_hook_videos))
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+            "-i", str(hook_list),
+            "-vf", "scale=1280:720",
+            "-c:v", "libx264", "-preset", "fast", "-an",
+            str(hook_concat)
+        ], check=True, capture_output=True)
+    else:
+        # Fallback: usa las 3 primeras imágenes con Ken Burns como hook (15 seg)
+        add_step(job_id, "render", "running", "Sin vídeos hook — usando imágenes intro como fallback")
+        hook_duration = min(15, audio_duration * 0.1)
+        img_dur_hook = hook_duration / min(3, len(body_images))
+        hook_clips = []
+        for i, img in enumerate(body_images[:3]):
+            out = tmp_dir / f"hook_img_{i}.mp4"
+            zoompan = _ken_burns_filter(i + 10, img_dur_hook)  # efecto diferente
+            subprocess.run([
+                "ffmpeg", "-y", "-loop", "1", "-i", str(img),
+                "-vf", zoompan, "-t", str(img_dur_hook),
+                "-c:v", "libx264", "-preset", "fast", "-an", "-r", "25",
+                str(out)
+            ], check=True, capture_output=True)
+            hook_clips.append(out)
+        hook_list = tmp_dir / "hook_list.txt"
+        hook_list.write_text("\n".join(f"file '{v.resolve()}'" for v in hook_clips))
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+            "-i", str(hook_list), "-c:v", "libx264", "-preset", "fast", "-an",
+            str(hook_concat)
+        ], check=True, capture_output=True)
+
     body_duration = audio_duration - hook_duration
     img_duration = body_duration / len(body_images) if body_images else 5
-
-    # ── 1. Concatenar hook videos ──────────────────────────────────────────
-    hook_list = tmp_dir / "hook_list.txt"
-    hook_list.write_text("\n".join(f"file '{v.resolve()}'" for v in hook_videos))
-
-    hook_concat = tmp_dir / "hook.mp4"
-    subprocess.run([
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0",
-        "-i", str(hook_list),
-        "-vf", "scale=1280:720",
-        "-c:v", "libx264", "-preset", "fast", "-an",
-        str(hook_concat)
-    ], check=True, capture_output=True)
 
     # ── 2. Imágenes con Ken Burns ──────────────────────────────────────────
     img_clips = []
