@@ -753,8 +753,8 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
 <script>
 // API backend URL configuration
 // For local development: relative paths work when dev server is running
-// For production: use direct backend URL (HTTPS redirect required to handle mixed content)
-const BACKEND_BASE_URL = 'http://178.105.30.215:8000';
+// For production: use HTTPS endpoint via nginx reverse proxy on Hetzner
+const BACKEND_BASE_URL = 'https://178.105.30.215:8443';
 const API = window.location.hostname === 'localhost' ? '' : BACKEND_BASE_URL;
 
 const STEPS_META = {
