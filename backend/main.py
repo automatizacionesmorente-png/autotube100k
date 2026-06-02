@@ -419,6 +419,8 @@ async def youtube_callback(code: str, state: str):
 # ── Pipeline principal ────────────────────────────────────────────
 async def run_pipeline(job_id: str, req: GenerateRequest):
     def emit(step: str, status: str, message: str, progress: int, cost: float = 0):
+        # Rastrear paso actual para marcar como error si falla
+        _current_step["name"] = step
         # Leer coste real acumulado de la DB en lugar de usar valor hardcodeado
         job_data = get_job(job_id)
         real_cost = job_data["cost_total"] if job_data else cost
@@ -429,6 +431,7 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
 
     job_dir = OUTPUT_DIR / job_id
     job_dir.mkdir(exist_ok=True)
+    _current_step = {"name": "script"}  # rastrear paso actual para marcar error
 
     def check_cancelled():
         if job_id in _cancelled_jobs:
@@ -513,7 +516,15 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
-        update_job(job_id, status="error", error=str(e))
+        error_msg = str(e)
+        update_job(job_id, status="error", error=error_msg)
+        # Marcar el paso actual como fallido (aparece en rojo en la UI)
+        job_data = get_job(job_id)
+        real_cost = job_data["cost_total"] if job_data else 0
         _job_events.setdefault(job_id, []).append({
-            "type": "error", "message": str(e), "detail": tb
+            "type": "step", "step": _current_step["name"], "status": "error",
+            "message": f"❌ Error: {error_msg[:120]}", "progress": 0, "cost": real_cost
+        })
+        _job_events.setdefault(job_id, []).append({
+            "type": "error", "message": error_msg, "detail": tb
         })

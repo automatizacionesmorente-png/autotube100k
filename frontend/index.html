@@ -820,6 +820,7 @@ const STEPS_META = {
 };
 
 let totalCost = 0;
+let prevStepTotal = 0;  // para calcular coste incremental por paso
 let eventSource = null;
 let selectedTone = 'neutro';
 
@@ -910,19 +911,30 @@ function startStatusPolling(jobId) {
     document.getElementById('progress-fill').style.width = job.progress + '%';
     document.getElementById('progress-pct').textContent = job.progress + '%';
 
-    // Marcar pasos anteriores al actual como "done"
+    // Actualizar coste real del DB
+    if (job.cost_total > 0) {
+      totalCost = job.cost_total;
+      document.getElementById('cost-display').textContent = totalCost.toFixed(3);
+    }
+
+    // Marcar pasos según estado del job
     const stepOrder = Object.keys(STEPS_META);
     const currentIdx = stepOrder.indexOf(job.current_step);
     stepOrder.forEach((key, i) => {
       const dot = document.getElementById('dot-' + key);
       if (!dot) return;
       if (i < currentIdx) dot.className = 'step-icon done';
-      else if (i === currentIdx && job.status === 'running') dot.className = 'step-icon running';
+      else if (i === currentIdx) {
+        if (job.status === 'error') dot.className = 'step-icon error';
+        else if (job.status === 'running') dot.className = 'step-icon running';
+      }
     });
 
     // Si terminó o dio error, parar polling
     if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') {
       stopStatusPolling();
+      document.getElementById('btn-cancel').style.display = 'none';
+      document.getElementById('btn-generate').disabled = false;
       if (job.status === 'error') showJobError(job.error);
     }
   }, 4000);
@@ -962,6 +974,7 @@ async function startGeneration() {
   document.getElementById('progress-pct').textContent = '0%';
   document.getElementById('cost-display').textContent = '0.000';
   totalCost = 0;
+  prevStepTotal = 0;
 
   Object.entries(STEPS_META).forEach(([key, meta]) => {
     document.getElementById('step-list').insertAdjacentHTML('beforeend', `
@@ -1000,13 +1013,22 @@ function onStep({step, status, message, progress, cost}) {
   if (!dot) return;
   dot.className = 'step-icon ' + status;
   if (msg) msg.textContent = message;
-  if (cost > 0 && sc) {
-    totalCost += cost;
-    sc.textContent = cost.toFixed(4) + '€';
+  // cost = total acumulado real desde la BD → calcular coste incremental del paso
+  if (cost > 0) {
+    const stepCost = cost - prevStepTotal;
+    prevStepTotal = cost;
+    totalCost = cost;  // total = valor real de la BD
+    if (sc && stepCost > 0) sc.textContent = stepCost.toFixed(4) + '€';
     document.getElementById('cost-display').textContent = totalCost.toFixed(3);
   }
   document.getElementById('progress-fill').style.width = progress + '%';
   document.getElementById('progress-pct').textContent = progress + '%';
+  // Si el paso falla, parar polling y mostrar error visualmente
+  if (status === 'error') {
+    stopStatusPolling();
+    document.getElementById('btn-cancel').style.display = 'none';
+    document.getElementById('btn-generate').disabled = false;
+  }
 }
 
 function onEnd({job}) {
