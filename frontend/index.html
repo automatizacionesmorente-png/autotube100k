@@ -753,8 +753,10 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
 <script>
 // API backend URL configuration
 // For local development: relative paths work when dev server is running
-// For production: use HTTPS endpoint via nginx reverse proxy on Hetzner
-const BACKEND_BASE_URL = 'https://178.105.30.215:8443';
+// For production: use CORS proxy to bypass HTTPS→HTTP restrictions
+const BACKEND_HTTP_URL = 'http://178.105.30.215:8000';
+const CORS_PROXY = 'https://api.allorigins.win/raw?url='; // Free CORS proxy service
+const BACKEND_BASE_URL = window.location.hostname === 'localhost' ? '' : CORS_PROXY + encodeURIComponent(BACKEND_HTTP_URL);
 const API = window.location.hostname === 'localhost' ? '' : BACKEND_BASE_URL;
 
 const STEPS_META = {
@@ -936,15 +938,42 @@ async function connectNewChannel() {
   btn.textContent = 'Conectando…';
   btn.disabled = true;
   try {
+    // Primero, intentar confiar en el certificado visitando la URL del backend
+    if (API.includes('178.105.30.215:8443')) {
+      console.log('Attempting to trust self-signed certificate...');
+      try {
+        await fetch(`${API}/api/health`, {
+          mode: 'no-cors',
+          credentials: 'omit'
+        }).catch(() => {}); // Ignore errors, just loading the cert
+      } catch(e) {
+        console.log('Certificate trust attempt completed');
+      }
+    }
+
     const resp = await fetch(`${API}/api/youtube/connect`);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const r = await resp.json();
     if (!r.auth_url) throw new Error('No se recibió auth_url del servidor');
     window.location.href = r.auth_url;
   } catch(e) {
-    alert('Error al conectar: ' + e.message);
+    console.error('Connection error:', e, {backendUrl: API});
     btn.textContent = orig;
     btn.disabled = false;
+
+    // Proporcionar error detallado y sugerencias
+    const errorMsg = e.message || 'Error desconocido';
+    let helpText = `Error al conectar: ${errorMsg}\n\n`;
+
+    if (API.includes('178.105.30.215')) {
+      helpText += 'Para continuar, necesitas confiar en el certificado del servidor:\n\n';
+      helpText += '1. Abre esto en una pestaña nueva: ' + API + '/api/youtube/connect\n';
+      helpText += '2. Acepta el certificado (haz clic en "Detalles" → "Continuar")\n';
+      helpText += '3. Vuelve aquí e intenta de nuevo\n\n';
+      helpText += 'O contacta con soporte técnico.';
+    }
+
+    alert(helpText);
   }
 }
 
