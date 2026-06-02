@@ -104,6 +104,98 @@ async def add_channel(req: ChannelRequest):
     upsert_channel(channel_id, req.name, req.niche)
     return {"id": channel_id, "name": req.name}
 
+@app.get("/api/channels/{channel_id}/detail")
+async def channel_detail_stats(channel_id: str):
+    """Devuelve stats completas + últimos vídeos de un canal desde YouTube API."""
+    from .database import get_conn
+    from googleapiclient.discovery import build
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+
+    conn = get_conn()
+    ch = conn.execute(
+        "SELECT * FROM channels WHERE id=?", (channel_id,)
+    ).fetchone()
+    conn.close()
+
+    if not ch:
+        raise HTTPException(404, "Canal no encontrado")
+    ch = dict(ch)
+    if not ch.get("connected"):
+        return {"channel": ch, "stats": None, "videos": []}
+
+    try:
+        creds = Credentials(
+            token=ch["access_token"],
+            refresh_token=ch["refresh_token"],
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=os.environ.get("YOUTUBE_CLIENT_ID"),
+            client_secret=os.environ.get("YOUTUBE_CLIENT_SECRET"),
+        )
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            conn2 = get_conn()
+            conn2.execute("UPDATE channels SET access_token=? WHERE id=?", (creds.token, channel_id))
+            conn2.commit()
+            conn2.close()
+
+        yt = build("youtube", "v3", credentials=creds)
+
+        # Stats del canal
+        ch_resp = yt.channels().list(
+            part="statistics,snippet,brandingSettings", mine=True
+        ).execute()
+        yt_channel_id = None
+        stats = {}
+        snippet = {}
+        if ch_resp.get("items"):
+            item = ch_resp["items"][0]
+            yt_channel_id = item["id"]
+            stats = item.get("statistics", {})
+            snippet = item.get("snippet", {})
+
+        # Últimos 10 vídeos
+        videos = []
+        if yt_channel_id:
+            search_resp = yt.search().list(
+                part="snippet", channelId=yt_channel_id,
+                order="date", maxResults=10, type="video"
+            ).execute()
+            video_ids = [i["id"]["videoId"] for i in search_resp.get("items", [])]
+            if video_ids:
+                vids_resp = yt.videos().list(
+                    part="snippet,statistics,contentDetails",
+                    id=",".join(video_ids)
+                ).execute()
+                for v in vids_resp.get("items", []):
+                    vs = v.get("statistics", {})
+                    videos.append({
+                        "id": v["id"],
+                        "title": v["snippet"]["title"],
+                        "thumbnail": v["snippet"]["thumbnails"].get("medium", {}).get("url"),
+                        "published": v["snippet"]["publishedAt"][:10],
+                        "views": int(vs.get("viewCount", 0)),
+                        "likes": int(vs.get("likeCount", 0)),
+                        "comments": int(vs.get("commentCount", 0)),
+                        "duration": v.get("contentDetails", {}).get("duration", ""),
+                    })
+
+        return {
+            "channel": ch,
+            "stats": {
+                "subscribers": int(stats.get("subscriberCount", 0)),
+                "total_views": int(stats.get("viewCount", 0)),
+                "videos_count": int(stats.get("videoCount", 0)),
+                "description": snippet.get("description", ""),
+                "country": snippet.get("country", ""),
+                "created": snippet.get("publishedAt", "")[:10] if snippet.get("publishedAt") else "",
+            },
+            "videos": videos,
+        }
+    except Exception as e:
+        import traceback
+        return {"channel": ch, "stats": None, "videos": [], "error": str(e), "trace": traceback.format_exc()}
+
 @app.get("/api/channels/sync")
 async def sync_channels_stats():
     """Sincroniza subs y vídeos de todos los canales conectados desde YouTube API."""

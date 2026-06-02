@@ -685,6 +685,43 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
   </div>
 </div>
 
+<!-- ══ MODAL DETALLE CANAL ══ -->
+<div id="modal-ch-detail" class="modal-overlay" onclick="if(event.target===this)closeChDetail()" style="display:none;position:fixed;inset:0;background:rgba(28,25,20,.55);z-index:200;display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:720px;box-shadow:0 24px 80px rgba(0,0,0,.18);overflow:hidden;">
+    <!-- Header -->
+    <div style="background:var(--ink);padding:28px 32px;position:relative;">
+      <button onclick="closeChDetail()" style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,.12);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;">✕</button>
+      <div id="chd-kicker" style="font-size:10px;color:rgba(255,255,255,.5);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;">Canal YouTube</div>
+      <div id="chd-name" style="font-family:'Playfair Display',serif;font-size:22px;color:#fff;margin-bottom:4px;">—</div>
+      <div id="chd-meta" style="font-size:11px;color:rgba(255,255,255,.45);">Cargando…</div>
+    </div>
+    <!-- Big stats -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border);">
+      <div style="padding:20px 24px;border-right:1px solid var(--border);text-align:center;">
+        <div id="chd-subs" style="font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);">—</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;">Suscriptores</div>
+      </div>
+      <div style="padding:20px 24px;border-right:1px solid var(--border);text-align:center;">
+        <div id="chd-views" style="font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);">—</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;">Visualizaciones</div>
+      </div>
+      <div style="padding:20px 24px;text-align:center;">
+        <div id="chd-vcount" style="font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);">—</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;">Vídeos</div>
+      </div>
+    </div>
+    <!-- Canal info -->
+    <div id="chd-info" style="padding:16px 24px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;gap:24px;flex-wrap:wrap;"></div>
+    <!-- Últimos vídeos -->
+    <div style="padding:24px 28px;">
+      <div style="font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.06em;text-transform:uppercase;margin-bottom:16px;">Últimos vídeos publicados</div>
+      <div id="chd-videos" style="display:flex;flex-direction:column;gap:12px;">
+        <div style="color:var(--muted);font-size:12px;">Cargando vídeos…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ FINANZAS ══ -->
 <div id="page-finanzas" class="page">
   <div class="page-head">
@@ -903,15 +940,22 @@ async function loadChannels(sync=false) {
     return;
   }
   grid.innerHTML = chs.map(c => `
-    <div class="ch-card">
-      <div class="ch-icon">📺</div>
-      <div class="ch-name">${c.name}</div>
-      <div class="ch-niche">${c.niche||'Sin nicho'}</div>
+    <div class="ch-card" ${c.connected?`onclick="openChDetail('${c.id}')" style="cursor:pointer;"`:''}style="transition:box-shadow .15s;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <div class="ch-icon" style="margin:0;">📺</div>
+        <div>
+          <div class="ch-name" style="margin:0;">${c.name}</div>
+          <div class="ch-niche">${c.niche||'Sin nicho'}</div>
+        </div>
+      </div>
       <div class="ch-row"><span class="k">Estado</span><span class="pill ${c.connected?'pill-green':'pill-red'}">${c.connected?'● Conectado':'○ Sin conectar'}</span></div>
-      <div class="ch-row"><span class="k">Subs</span><span class="v fw-6">${c.connected ? fmtNum(c.subscribers) : '—'}</span></div>
+      <div class="ch-row"><span class="k">Subs</span><span class="v fw-6" style="color:var(--ink);">${c.connected ? fmtNum(c.subscribers) : '—'}</span></div>
       <div class="ch-row"><span class="k">Vídeos</span><span class="v">${c.connected ? fmtNum(c.videos_count) : '—'}</span></div>
       <div class="ch-row"><span class="k">Views</span><span class="v">${c.connected ? fmtNum(c.total_views) : '—'}</span></div>
-      ${!c.connected?`<button class="btn btn-outline" style="width:100%;margin-top:12px;font-size:10px;padding:5px;" onclick="connectYT('${c.id}')">Conectar YouTube →</button>`:`<button class="btn btn-outline" style="width:100%;margin-top:12px;font-size:10px;padding:5px;color:var(--muted);" onclick="loadChannels(true)">↻ Actualizar stats</button>`}
+      ${c.connected
+        ? `<div style="margin-top:12px;font-size:10px;color:var(--muted);text-align:center;">Haz clic para ver detalles →</div>`
+        : `<button class="btn btn-outline" style="width:100%;margin-top:12px;font-size:10px;padding:5px;" onclick="event.stopPropagation();connectYT('${c.id}')">Conectar YouTube →</button>`
+      }
     </div>`).join('');
 }
 
@@ -924,6 +968,82 @@ function fillChannelSelect(chs) {
 async function connectYT(id) {
   const r = await fetch(`${API}/api/youtube/auth/${id}`).then(r => r.json());
   window.open(r.auth_url, '_blank', 'width=520,height=640');
+}
+
+function parseDuration(iso) {
+  if (!iso) return '';
+  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!m) return '';
+  const h = parseInt(m[1]||0), min = parseInt(m[2]||0), s = parseInt(m[3]||0);
+  if (h) return `${h}:${String(min).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${min}:${String(s).padStart(2,'0')}`;
+}
+
+async function openChDetail(channelId) {
+  const modal = document.getElementById('modal-ch-detail');
+  modal.style.display = 'flex';
+  // Reset
+  document.getElementById('chd-name').textContent = 'Cargando…';
+  document.getElementById('chd-meta').textContent = '';
+  document.getElementById('chd-subs').textContent = '—';
+  document.getElementById('chd-views').textContent = '—';
+  document.getElementById('chd-vcount').textContent = '—';
+  document.getElementById('chd-info').innerHTML = '';
+  document.getElementById('chd-videos').innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando vídeos…</div>';
+
+  try {
+    const data = await fetch(`${API}/api/channels/${channelId}/detail`).then(r => r.json());
+    const ch = data.channel;
+    const stats = data.stats;
+    const videos = data.videos || [];
+
+    document.getElementById('chd-name').textContent = ch.name;
+    document.getElementById('chd-subs').textContent  = stats ? fmtNum(stats.subscribers) : '—';
+    document.getElementById('chd-views').textContent = stats ? fmtNum(stats.total_views)  : '—';
+    document.getElementById('chd-vcount').textContent= stats ? fmtNum(stats.videos_count) : '—';
+
+    // Meta info
+    const parts = [];
+    if (stats?.country) parts.push(`🌍 ${stats.country}`);
+    if (stats?.created) parts.push(`📅 Canal desde ${stats.created}`);
+    if (ch.niche) parts.push(`🎯 Nicho: ${ch.niche}`);
+    document.getElementById('chd-meta').textContent = parts.join('  ·  ') || 'Sin datos adicionales';
+
+    // Info row
+    const info = [];
+    if (stats?.description) {
+      const desc = stats.description.length > 180 ? stats.description.slice(0,180)+'…' : stats.description;
+      info.push(`<span style="color:var(--ink2);line-height:1.5;">${desc}</span>`);
+    }
+    document.getElementById('chd-info').innerHTML = info.join('') || '';
+
+    // Vídeos
+    if (!videos.length) {
+      document.getElementById('chd-videos').innerHTML = '<div style="color:var(--muted);font-size:12px;">No hay vídeos publicados aún.</div>';
+    } else {
+      document.getElementById('chd-videos').innerHTML = videos.map(v => `
+        <a href="https://youtube.com/watch?v=${v.id}" target="_blank" style="text-decoration:none;display:flex;gap:14px;align-items:flex-start;padding:12px;border-radius:10px;border:1px solid var(--border);background:#fff;transition:background .15s;" onmouseover="this.style.background='var(--cream)'" onmouseout="this.style.background='#fff'">
+          ${v.thumbnail ? `<img src="${v.thumbnail}" style="width:100px;height:56px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : '<div style="width:100px;height:56px;background:var(--cream2);border-radius:6px;flex-shrink:0;"></div>'}
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:600;color:var(--ink);line-height:1.4;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${v.title}</div>
+            <div style="display:flex;gap:16px;font-size:10px;color:var(--muted);flex-wrap:wrap;">
+              <span>👁 ${fmtNum(v.views)} views</span>
+              <span>👍 ${fmtNum(v.likes)}</span>
+              <span>💬 ${fmtNum(v.comments)}</span>
+              ${parseDuration(v.duration) ? `<span>⏱ ${parseDuration(v.duration)}</span>` : ''}
+              <span style="margin-left:auto;">📅 ${v.published}</span>
+            </div>
+          </div>
+        </a>`).join('');
+    }
+  } catch(e) {
+    document.getElementById('chd-name').textContent = 'Error cargando datos';
+    document.getElementById('chd-meta').textContent = e.toString();
+  }
+}
+
+function closeChDetail() {
+  document.getElementById('modal-ch-detail').style.display = 'none';
 }
 
 function openAddChannel() { document.getElementById('modal-channel').classList.add('open'); }
