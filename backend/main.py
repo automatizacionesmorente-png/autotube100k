@@ -104,6 +104,55 @@ async def add_channel(req: ChannelRequest):
     upsert_channel(channel_id, req.name, req.niche)
     return {"id": channel_id, "name": req.name}
 
+@app.get("/api/channels/sync")
+async def sync_channels_stats():
+    """Sincroniza subs y vídeos de todos los canales conectados desde YouTube API."""
+    from .database import get_conn
+    from googleapiclient.discovery import build
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+
+    conn = get_conn()
+    channels = conn.execute(
+        "SELECT id, name, access_token, refresh_token, youtube_channel_id FROM channels WHERE connected=1"
+    ).fetchall()
+
+    updated = []
+    for ch in channels:
+        try:
+            creds = Credentials(
+                token=ch["access_token"],
+                refresh_token=ch["refresh_token"],
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=os.environ.get("YOUTUBE_CLIENT_ID"),
+                client_secret=os.environ.get("YOUTUBE_CLIENT_SECRET"),
+            )
+            if creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+                conn.execute(
+                    "UPDATE channels SET access_token=? WHERE id=?",
+                    (creds.token, ch["id"])
+                )
+
+            yt = build("youtube", "v3", credentials=creds)
+            resp = yt.channels().list(part="statistics,snippet", mine=True).execute()
+            if resp.get("items"):
+                stats = resp["items"][0]["statistics"]
+                subs = int(stats.get("subscriberCount", 0))
+                vids = int(stats.get("videoCount", 0))
+                views = int(stats.get("viewCount", 0))
+                conn.execute(
+                    "UPDATE channels SET subscribers=?, videos_count=?, total_views=? WHERE id=?",
+                    (subs, vids, views, ch["id"])
+                )
+                updated.append({"id": ch["id"], "name": ch["name"], "subscribers": subs, "videos": vids, "views": views})
+        except Exception as e:
+            updated.append({"id": ch["id"], "name": ch["name"], "error": str(e)})
+
+    conn.commit()
+    conn.close()
+    return {"synced": updated}
+
 YT_SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.readonly",

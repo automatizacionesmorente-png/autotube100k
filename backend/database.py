@@ -61,6 +61,9 @@ def init_db():
             access_token TEXT,
             refresh_token TEXT,
             connected INTEGER DEFAULT 0,
+            subscribers INTEGER DEFAULT 0,
+            videos_count INTEGER DEFAULT 0,
+            total_views INTEGER DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now'))
         );
 

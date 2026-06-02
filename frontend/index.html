@@ -776,7 +776,7 @@ function showPage(name, btn) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   if (btn) btn.classList.add('active');
-  if (name === 'canales')  loadChannels();
+  if (name === 'canales')  loadChannels(true);
   if (name === 'finanzas') loadFinance();
 }
 
@@ -883,7 +883,18 @@ async function loadJobs() {
     </div>`).join('');
 }
 
-async function loadChannels() {
+function fmtNum(n) {
+  if (n === null || n === undefined || n === 0) return '—';
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000)    return (n/1000).toFixed(1) + 'K';
+  return n.toLocaleString();
+}
+
+async function loadChannels(sync=false) {
+  if (sync) {
+    // Sincronizar stats desde YouTube en background
+    fetch(`${API}/api/channels/sync`).catch(()=>{});
+  }
   const chs = await fetch(`${API}/api/channels`).then(r => r.json()).catch(()=>[]);
   fillChannelSelect(chs);
   const grid = document.getElementById('channels-grid');
@@ -897,9 +908,10 @@ async function loadChannels() {
       <div class="ch-name">${c.name}</div>
       <div class="ch-niche">${c.niche||'Sin nicho'}</div>
       <div class="ch-row"><span class="k">Estado</span><span class="pill ${c.connected?'pill-green':'pill-red'}">${c.connected?'● Conectado':'○ Sin conectar'}</span></div>
-      <div class="ch-row"><span class="k">Subs</span><span class="v">—</span></div>
-      <div class="ch-row"><span class="k">Vídeos</span><span class="v">—</span></div>
-      ${!c.connected?`<button class="btn btn-outline" style="width:100%;margin-top:12px;font-size:10px;padding:5px;" onclick="connectYT('${c.id}')">Conectar YouTube →</button>`:''}
+      <div class="ch-row"><span class="k">Subs</span><span class="v fw-6">${c.connected ? fmtNum(c.subscribers) : '—'}</span></div>
+      <div class="ch-row"><span class="k">Vídeos</span><span class="v">${c.connected ? fmtNum(c.videos_count) : '—'}</span></div>
+      <div class="ch-row"><span class="k">Views</span><span class="v">${c.connected ? fmtNum(c.total_views) : '—'}</span></div>
+      ${!c.connected?`<button class="btn btn-outline" style="width:100%;margin-top:12px;font-size:10px;padding:5px;" onclick="connectYT('${c.id}')">Conectar YouTube →</button>`:`<button class="btn btn-outline" style="width:100%;margin-top:12px;font-size:10px;padding:5px;color:var(--muted);" onclick="loadChannels(true)">↻ Actualizar stats</button>`}
     </div>`).join('');
 }
 
