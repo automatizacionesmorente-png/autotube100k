@@ -1,8 +1,13 @@
 {
   "outputDirectory": "frontend",
+  "api": {
+    "baseUrl": "/api"
+  },
   "functions": {
     "api/**/*.js": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "memory": 1024,
+      "runtime": "nodejs20.x"
     }
   }
 }

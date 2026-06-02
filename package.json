@@ -1,0 +1,6 @@
+{
+  "name": "autotube",
+  "version": "1.0.0",
+  "description": "Automated YouTube video generation system",
+  "private": true
+}
