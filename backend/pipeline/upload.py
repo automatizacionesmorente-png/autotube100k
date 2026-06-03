@@ -52,15 +52,29 @@ Usa exactamente esas cuatro etiquetas en mayúsculas."""
         }]
     )
     text = msg.content[0].text
-    desc = _extract_between(text, "DESCRIPCION:", "CAPITULOS:").strip()
-    chapters_raw = _extract_between(text, "CAPITULOS:", "HASHTAGS:").strip()
-    hashtags = _extract_between(text, "HASHTAGS:", "TAGS:").strip()
-    tags_raw = _extract_after(text, "TAGS:").strip()
+    sec = _parse_sections(text)
+    desc = sec.get("DESCRIPCION", "").strip()
+    chapters_raw = sec.get("CAPITULOS", "").strip()
+    hashtags = sec.get("HASHTAGS", "").strip()
+    tags_raw = sec.get("TAGS", "").strip()
 
     chapters = _build_chapters(chapters_raw, audio_duration)
 
+    # Fallback: si la descripción salió vacía, no subir sin SEO — generar una mínima
+    if not desc:
+        desc = (f"{title}\n\nUn recorrido completo sobre {niche}. "
+                f"En este vídeo analizamos en profundidad esta historia con todos los detalles.\n\n"
+                f"📌 SUSCRÍBETE para más contenido sobre {niche}.")
+    if not hashtags:
+        base = niche.replace(' ', '')
+        hashtags = f"#{base} #documental #historia #YouTube #viral"
+
     # Combinar descripción con capítulos (YouTube los indexa automáticamente)
-    full_description = f"{desc}\n\n📖 CONTENIDO DEL VÍDEO:\n{chapters}\n\n{hashtags}"
+    parts = [desc]
+    if chapters:
+        parts.append(f"📖 CONTENIDO DEL VÍDEO:\n{chapters}")
+    parts.append(hashtags)
+    full_description = "\n\n".join(parts)
     tags_list = _sanitize_tags(tags_raw)
 
     return {
@@ -230,17 +244,34 @@ def _sanitize_tags(tags_raw: str) -> list[str]:
     return clean
 
 
-def _extract_between(text, start, end):
-    try:
-        s = text.index(start) + len(start)
-        e = text.index(end)
-        return text[s:e]
-    except ValueError:
-        return ""
-
-
-def _extract_after(text, tag):
-    try:
-        return text[text.index(tag) + len(tag):]
-    except ValueError:
-        return ""
+def _parse_sections(text: str) -> dict:
+    """
+    Extrae las 4 secciones de forma ROBUSTA: tolera acentos (DESCRIPCIÓN),
+    markdown (**DESCRIPCION:**, ## TAGS), mayúsculas/minúsculas y espacios.
+    Devuelve {DESCRIPCION, CAPITULOS, HASHTAGS, TAGS}.
+    """
+    import re
+    # Normalizar saltos de línea
+    headers = {
+        "DESCRIPCION": r"DESCRIPCI[OÓ]N",
+        "CAPITULOS":   r"CAP[IÍ]TULOS",
+        "HASHTAGS":    r"HASHTAGS",
+        "TAGS":        r"TAGS",
+    }
+    # Encontrar la posición de inicio de cada cabecera
+    positions = []
+    for key, pat in headers.items():
+        # cabecera al inicio de línea, con posible markdown/##/** y dos puntos
+        m = re.search(rf"(?im)^\s*[*#>\-\s]*{pat}\s*[*#]*\s*:", text)
+        if m:
+            positions.append((m.start(), m.end(), key))
+    positions.sort()
+    result = {k: "" for k in headers}
+    for i, (start, end, key) in enumerate(positions):
+        # El contenido va desde el final de esta cabecera hasta la siguiente
+        next_start = positions[i + 1][0] if i + 1 < len(positions) else len(text)
+        content = text[end:next_start]
+        # Limpiar restos de markdown al principio (**, ##, :) y espacios
+        content = re.sub(r"^[\s*#:>\-]+", "", content)
+        result[key] = content.strip()
+    return result
