@@ -118,6 +118,70 @@ def _image_to_clips_batch(images: list[Path], img_dur: float,
     return results  # type: ignore
 
 
+def _video_to_shot(video: Path, dur: float, out: Path):
+    """Convierte un clip de Pexels en un plano de `dur`s a 1920x1080, 25fps, con fundidos."""
+    try:
+        vdur = get_duration(video)
+    except Exception:
+        vdur = 0
+    vf = ("scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,fps=25,"
+          f"fade=t=in:st=0:d=0.3,fade=t=out:st={max(0,dur-0.3):.2f}:d=0.3")
+    if vdur >= dur:
+        _ffmpeg("-ss", "0", "-t", f"{dur:.2f}", "-i", str(video),
+                "-vf", vf, "-c:v", "libx264", "-preset", "ultrafast", "-an", "-r", "25", str(out))
+    else:
+        # clip corto → loop hasta cubrir la duración
+        _ffmpeg("-stream_loop", "-1", "-t", f"{dur:.2f}", "-i", str(video),
+                "-vf", vf, "-c:v", "libx264", "-preset", "ultrafast", "-an", "-r", "25", str(out))
+    return out
+
+
+def _build_dynamic_body(images: list[Path], videos: list[Path],
+                        body_dur: float, tmp: Path) -> list[Path]:
+    """
+    Construye el cuerpo intercalando imágenes (Ken Burns) con clips de vídeo real.
+    Plano nuevo cada ~body_dur/N segundos. Devuelve la lista ordenada de clips mp4.
+    """
+    # Intercalar: ~1 vídeo cada `gap` imágenes, repartido por todo el cuerpo
+    shots = []  # ('img'|'vid', path)
+    gap = max(1, round(len(images) / len(videos))) if videos else 10**9
+    vi = 0
+    for i, img in enumerate(images):
+        shots.append(("img", img))
+        if videos and (i + 1) % gap == 0 and vi < len(videos):
+            shots.append(("vid", videos[vi])); vi += 1
+    while videos and vi < len(videos):
+        shots.append(("vid", videos[vi])); vi += 1
+
+    n = len(shots)
+    per_shot = body_dur / n
+    results: list[list[Path] | None] = [None] * n
+
+    def work(idx, kind, path):
+        if kind == "img":
+            return idx, _image_to_clips(path, per_shot, tmp, idx)
+        else:
+            out = tmp / f"vid_{idx:03d}.mp4"
+            try:
+                _video_to_shot(path, per_shot, out)
+                return idx, [out]
+            except Exception:
+                # si el vídeo falla, rellenar con una imagen como respaldo
+                return idx, _image_to_clips(images[idx % len(images)], per_shot, tmp, 5000 + idx)
+
+    with ThreadPoolExecutor(max_workers=KB_WORKERS) as ex:
+        futs = [ex.submit(work, i, k, p) for i, (k, p) in enumerate(shots)]
+        for f in as_completed(futs):
+            idx, clips = f.result()
+            results[idx] = clips
+
+    ordered = []
+    for group in results:
+        if group:
+            ordered.extend(group)
+    return ordered
+
+
 def render_video(
     job_id: str,
     hook_clips: list[Path],
@@ -127,6 +191,7 @@ def render_video(
     title: str,
     hook_images: list[Path] = None,
     tone: str = "neutro",
+    body_videos: list[Path] = None,
 ) -> Path:
     add_step(job_id, "render", "running",
              f"Iniciando montaje — tono: {tone} · {KB_WORKERS} workers Ken Burns…")
@@ -187,22 +252,21 @@ def render_video(
         _ffmpeg("-f", "concat", "-safe", "0", "-i", str(tmp / "hf_list.txt"),
                 "-c:v", "libx264", "-preset", "ultrafast", "-an", str(hook_concat))
 
-    # ── CUERPO: Ken Burns + Whisper EN PARALELO ───────────────────────────────
+    # ── CUERPO DINÁMICO: imágenes (Ken Burns) + vídeo real Pexels + Whisper ────
     body_dur = audio_dur - hook_dur
-    img_dur = body_dur / len(valid_body)
-    n_subclips = math.ceil(img_dur / MAX_KB_DURATION)
+    valid_vids = [v for v in (body_videos or []) if v.exists() and v.stat().st_size > 50000]
+    total_shots = len(valid_body) + len(valid_vids)
     add_step(job_id, "render", "running",
-             f"Ken Burns paralelo ({KB_WORKERS} workers) + Whisper simultáneo — "
-             f"{len(valid_body)} imgs × {n_subclips} sub-clips…")
+             f"Montaje dinámico: {len(valid_body)} imágenes + {len(valid_vids)} clips de vídeo real "
+             f"= {total_shots} planos (~{body_dur/max(1,total_shots):.0f}s c/u) · Whisper simultáneo…")
 
     ass_path = tmp / "subs.ass"
 
-    # Lanzar Whisper en background MIENTRAS se procesan los Ken Burns
+    # Lanzar Whisper en background MIENTRAS se procesan los planos
     with ThreadPoolExecutor(max_workers=1) as whisper_ex:
         whisper_fut = whisper_ex.submit(_whisper_subtitles, audio_path, ass_path)
 
-        clip_groups = _image_to_clips_batch(valid_body, img_dur, tmp, base_idx=0)
-        all_body_clips = [c for group in clip_groups for c in group]
+        all_body_clips = _build_dynamic_body(valid_body, valid_vids, body_dur, tmp)
 
         _write_concat(tmp / "body_list.txt", all_body_clips)
         body_mp4 = tmp / "body.mp4"
@@ -404,6 +468,7 @@ def cleanup_intermediates(job_dir: Path) -> float:
         job_dir / "images",
         job_dir / "hook_images",
         job_dir / "hook_videos",
+        job_dir / "body_videos",
         job_dir / "thumbnail_base.jpg",
     ]
     # Carpetas temporales que pudieran haber quedado de un fallo

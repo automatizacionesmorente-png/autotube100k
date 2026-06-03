@@ -545,8 +545,9 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
                 "progress": pct, "cost": fal_cost, "realtime": True,
             })
 
-        emit("images", "running", "Generando 40 imágenes + 8 hook + thumbnail en paralelo…", 37)
-        from .pipeline.hook_videos import generate_hook_prompts as gen_hookvid_prompts, generate_hook_videos
+        emit("images", "running", "Generando 60 imágenes + 8 hook + B-roll vídeo + thumbnail en paralelo…", 37)
+        from .pipeline.hook_videos import (generate_hook_prompts as gen_hookvid_prompts,
+                                           generate_hook_videos, generate_body_videos)
         hook_vids_dir = job_dir / "hook_videos"
 
         def _hook_videos_task():
@@ -558,11 +559,12 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
         hook_task  = asyncio.to_thread(generate_hook_images, job_id, req.niche, script[:800], hook_imgs_dir)
         thumb_task = asyncio.to_thread(generate_thumbnail, job_id, req.title, req.niche, job_dir, req.tone)
         hookvid_task = asyncio.to_thread(_hook_videos_task)
-        body_images, hook_images, thumbnail_path, hook_clips = await asyncio.gather(
-            body_task, hook_task, thumb_task, hookvid_task
+        bodyvid_task = asyncio.to_thread(generate_body_videos, job_id, script, req.niche, 35)
+        body_images, hook_images, thumbnail_path, hook_clips, body_clips = await asyncio.gather(
+            body_task, hook_task, thumb_task, hookvid_task, bodyvid_task
         )
 
-        emit("images",    "done", f"{len(body_images)} imágenes del cuerpo listas", 60)
+        emit("images",    "done", f"{len(body_images)} imágenes + {len(body_clips)} clips vídeo (cuerpo dinámico)", 60)
         hook_src = f"{len(hook_clips)} clips vídeo Pexels" if hook_clips else f"{len(hook_images)} imágenes"
         emit("hook_videos","done", f"Hook: {hook_src}", 62)
         emit("thumbnail", "done", "Miniatura con título lista", 64)
@@ -576,7 +578,7 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
             render_video, job_id,
             hook_clips,
             body_images, audio_path, final_path, req.title,
-            hook_images, req.tone
+            hook_images, req.tone, body_clips
         )
         emit("render", "done", "Vídeo montado completamente", 90)
 

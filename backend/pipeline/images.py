@@ -11,8 +11,8 @@ FAL_UNIT_PRICE_USD      = 0.003   # Flux Schnell por imagen
 FAL_IDEOGRAM_PRICE_USD  = 0.05    # Ideogram v2 Turbo por imagen
 EUR_RATE = 0.92
 
-FLUX_COUNT = 40    # TODOS los frames del cuerpo con Flux Schnell — sin Pollinations
-TOTAL_COUNT = 40
+FLUX_COUNT = 60    # imágenes del cuerpo con Flux Schnell (máximo dinamismo)
+TOTAL_COUNT = 60
 HOOK_COUNT = 8     # 8 imágenes de impacto para el hook
 
 
