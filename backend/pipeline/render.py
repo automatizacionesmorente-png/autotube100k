@@ -493,24 +493,70 @@ def cleanup_intermediates(job_dir: Path) -> float:
 
 def cleanup_after_upload(job_dir: Path) -> float:
     """
-    Tras subir a YouTube: borra el vídeo y el short (ya están en YouTube).
-    Conserva solo thumbnail.jpg + metadata.json como registro ligero.
+    Tras subir a YouTube: borra TODO lo pesado — el contenido ya está en YouTube.
+    Conserva solo: metadata.json, thumbnail.jpg/b/c (registro ligero, ~500KB total).
     Devuelve MB liberados.
     """
     freed = 0.0
-    # Conservar las 3 miniaturas (A/B testing) — pesan poco y son útiles.
-    targets = [
-        job_dir / "final.mp4",
-        job_dir / "short.mp4",
+
+    # ── Archivos individuales a borrar ────────────────────────────────────────
+    big_files = [
+        "final.mp4",       # ~150-250MB — ya está en YouTube
+        "short.mp4",       # ~100MB — ya está (o se puede regenerar)
+        "narration.mp3",   # ~48MB — se puede regenerar si hace falta
+        "narration.raw.mp3",
     ]
-    for t in targets:
+    for name in big_files:
+        p = job_dir / name
         try:
-            if t.exists() and t.is_file():
-                freed += t.stat().st_size
-                t.unlink()
+            if p.exists():
+                freed += p.stat().st_size
+                p.unlink()
         except Exception:
             pass
-    return freed / 1024 / 1024
+
+    # ── Directorios pesados (imágenes, clips Pexels, temporales) ─────────────
+    big_dirs = [
+        "images",          # ~8MB — 40 imágenes Flux
+        "hook_images",     # ~2MB
+        "hook_videos",     # ~150MB — clips Pexels
+        "body_videos",     # ~150MB — clips Pexels cuerpo
+        "voices",          # temp si se generó algo
+    ]
+    for name in big_dirs:
+        d = job_dir / name
+        try:
+            if d.exists() and d.is_dir():
+                for f in d.rglob("*"):
+                    if f.is_file():
+                        freed += f.stat().st_size
+                shutil.rmtree(d)
+        except Exception:
+            pass
+
+    # ── Directorios temporales de render ──────────────────────────────────────
+    for tmp in job_dir.glob("tmp_*"):
+        try:
+            if tmp.is_dir():
+                for f in tmp.rglob("*"):
+                    if f.is_file():
+                        freed += f.stat().st_size
+                shutil.rmtree(tmp)
+        except Exception:
+            pass
+
+    freed_mb = freed / 1024 / 1024
+    # Log en un archivo pequeño de resumen
+    try:
+        summary = job_dir / "upload_summary.txt"
+        summary.write_text(
+            f"Subido a YouTube. {freed_mb:.0f} MB liberados del servidor.\n"
+            f"Conservado: metadata.json + thumbnails (~500KB)\n"
+        )
+    except Exception:
+        pass
+
+    return freed_mb
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
