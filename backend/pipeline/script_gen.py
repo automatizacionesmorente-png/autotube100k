@@ -20,6 +20,76 @@ TARGET_WORDS = 5200   # ~34-36 min a 145 pal/min — SIEMPRE +30 min (con margen
 MIN_WORDS    = 4800   # 4800 pal ≈ 33 min — nunca por debajo de 30 min
 MAX_WORDS    = 5800
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# HOOK — generación DEDICADA (los 30 primeros segundos deciden todo)
+# ═══════════════════════════════════════════════════════════════════════════
+
+HOOK_SYSTEM_PROMPT = """Eres el mejor escritor de HOOKS de YouTube del mundo en español. Tu única obsesión: los primeros 30-40 segundos de un vídeo, el momento exacto en que el espectador decide en su cerebro si se queda o hace scroll. Tus hooks han retenido a cientos de millones de personas.
+
+LAS 6 LEYES DEL HOOK PERFECTO (violar una es fracasar):
+
+1. LA PRIMERA FRASE DETIENE EL SCROLL.
+   Prohibido empezar con contexto, presentación, fecha o "hoy te voy a hablar de...".
+   La primera frase es un GOLPE: una afirmación audaz, una pregunta que incomoda, una imagen imposible, o una llamada directa al espectador. Si la primera frase suena "normal", has fracasado.
+
+2. HÁBLALE AL ESPECTADOR, NO DEL TEMA.
+   En los primeros segundos el espectador tiene que sentir que le hablas a ÉL, que sabes algo de él, que esto es para él y es HOY. Usa "tú", "te", "tu".
+
+3. SUELTA ALGO ESPECIAL — el momento "espera... ¿qué?".
+   Una verdad incómoda, un dato que rompe esquemas, una promesa enorme, un secreto que alguien quiso ocultar. Una sola línea que provoque un escalofrío o una chispa.
+
+4. ABRE UN BUCLE QUE SOLO SE CIERRA VIENDO EL VÍDEO.
+   Una pregunta o promesa específica que deja una tensión psicológica imposible de ignorar. El cerebro NECESITA el cierre.
+
+5. RITMO DE IMPACTO.
+   Frases cortas. Pausas. Una frase larga que sumerge. Otra corta que golpea. Nunca monótono.
+
+6. NADA DE RELLENO.
+   Cada palabra gana su sitio. Si una frase no aporta tensión, emoción o intriga, fuera.
+
+REGLAS TÉCNICAS:
+- Solo texto narrado (sin acotaciones, símbolos ni markdown).
+- 170-220 palabras (unos 75-90 segundos de narración).
+- No inventes datos verificables falsos (nombres, cifras, fechas, resultados). Si no es real, no lo afirmes.
+- Termina en tensión máxima, justo cuando el espectador NECESITA seguir."""
+
+
+# Estrategia de apertura según el género (lo que cambia el hook de raíz)
+HOOK_STRATEGY = {
+    "motivacional": """ESTRATEGIA (MOTIVACIÓN/SUPERACIÓN):
+Habla directo al alma del espectador y a su momento de hoy. Hazle sentir VISTO.
+Apertura tipo: señálalo ("Si este vídeo ha llegado a ti hoy, no es casualidad..."), nombra su dolor o su lucha silenciosa, y promete una transformación concreta. Crea sensación de destino y urgencia emocional. Tono: cercano, con peso, pausas. Es un mensaje personal, no una clase.""",
+    "misterio": """ESTRATEGIA (MISTERIO/INTRIGA):
+Abre con la escena o el dato más perturbador e inexplicable de toda la historia, como si el espectador acabara de entrar en una habitación a oscuras. Una imagen sensorial inquietante o una pregunta sin respuesta aparente. Luego insinúa que lo que va a descubrir cambia todo. Tono: grave, lento, tensión que sube.""",
+    "drama": """ESTRATEGIA (DRAMA/HISTORIA HUMANA):
+Abre en el instante de máximo impacto emocional de la historia (la pérdida, la decisión imposible, el segundo que lo cambió todo), con un protagonista concreto. Haz que el espectador SIENTA antes de entender. Luego abre el bucle: "para entender cómo se llega aquí, hay que volver atrás".""",
+    "documental": """ESTRATEGIA (DOCUMENTAL/DIVULGACIÓN):
+Abre con el dato o hecho más asombroso y contraintuitivo del tema, uno que rompa lo que el espectador creía saber. "Lo que estás a punto de descubrir contradice todo lo que te contaron." Aporta credibilidad inmediata y promete revelar lo que casi nadie sabe.""",
+    "humor": """ESTRATEGIA (HUMOR/CERCANO):
+Abre con una observación absurda, relatable o exagerada que arranque una sonrisa o un "es verdad". Complicidad inmediata. Luego promete una historia tan increíble que parece mentira (pero es real).""",
+    "neutro": """ESTRATEGIA (GENERAL):
+Abre con una afirmación audaz o una pregunta que despierte curiosidad inmediata sobre el tema, hablándole al espectador. Promete algo concreto y valioso que va a obtener por quedarse.""",
+}
+
+
+def generate_hook(client, niche: str, title: str, tone: str, context_block: str = "") -> str:
+    """Genera SOLO el hook (los 30-40s críticos) con foco total. Devuelve ~200 palabras."""
+    strategy = HOOK_STRATEGY.get(tone, HOOK_STRATEGY["neutro"])
+    user = f"""TEMA DEL VÍDEO: {title}
+NICHO: {niche}
+{strategy}{context_block}
+
+Escribe SOLO el HOOK (los primeros 75-90 segundos, 170-220 palabras).
+Recuerda: la PRIMERA frase debe detener el scroll. Háblale al espectador. Suelta algo especial. Abre un bucle. Acaba en tensión máxima.
+Devuelve solo el texto narrado del hook, nada más."""
+    msg = client.messages.create(
+        model=MODEL, max_tokens=600,
+        system=HOOK_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user}],
+    )
+    return msg.content[0].text.strip(), msg.usage
+
 SYSTEM_PROMPT = """Eres el mejor guionista de YouTube en español. Llevas 10 años creando vídeos virales de 30-35 minutos con retención del 65%+. Tus vídeos han acumulado más de 500 millones de visualizaciones.
 
 LEYES ABSOLUTAS — VIOLARIAS ES UN FRACASO:
@@ -94,30 +164,32 @@ habla en términos generales ciertos o como expectativa ("se espera", "según la
 {context.strip()}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
 
+    # ════════ ETAPA 1: HOOK DEDICADO (los 30s que deciden todo) ════════
+    add_step(job_id, "script", "running", "✍️ Escribiendo el HOOK (los 30 segundos que deciden todo)…")
+    hook_text, hook_usage = generate_hook(client, niche, title, tone, context_block)
+    hook_cost = (hook_usage.input_tokens * MODEL_IN_PRICE +
+                 hook_usage.output_tokens * MODEL_OUT_PRICE) / 1_000_000 * EUR_RATE
+    add_cost_event(job_id, "claude_sonnet", hook_usage.output_tokens,
+                   MODEL_OUT_PRICE / 1_000_000, hook_cost)
+    hook_words = len(hook_text.split())
+
+    # ════════ ETAPA 2: CUERPO que continúa el hook sin repetirlo ════════
+    add_step(job_id, "script", "running",
+             f"Hook listo ({hook_words} pal). Generando el cuerpo con Claude Sonnet 4.6…")
+
     user_prompt = f"""NICHO: {niche}
 TÍTULO: {title}
 TONO: {tone_desc}{context_block}
 
-Escribe el guión COMPLETO. Extensión CRÍTICA: entre {MIN_WORDS} y {MAX_WORDS} palabras.
-A 130 palabras/minuto = exactamente 30-35 minutos de vídeo.
+El HOOK del vídeo YA está escrito (no lo repitas, no lo reescribas). Es este:
+─────────────────────────────────────
+{hook_text}
+─────────────────────────────────────
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-HOOK (~450 palabras — EL LOOP PROHIBIDO — los primeros 3 minutos son vida o muerte)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PASO 1 — EL GOLPE INICIAL (primeras 3 frases):
-Empieza directamente con el momento más impactante de toda la historia. La escena climática. El dato que nadie conoce. La fecha exacta del desastre. Sin presentación, sin contexto previo. Directo al impacto máximo.
+Tu tarea: escribir el CUERPO del vídeo que CONTINÚA de forma fluida y natural justo después de ese hook, como si fuera la misma voz sin pausa. Mantén la promesa y el bucle que abrió el hook y ciérralos a lo largo del vídeo (y del todo al final).
 
-PASO 2 — EL LOOP (frases 4-6):
-Después de ese golpe inicial, di algo como:
-"Pero para entender cómo llegamos a este punto, tengo que llevarte [X años/meses] atrás."
-"Lo que estás a punto de escuchar cambió todo. Y lo más perturbador es que empezó con algo completamente ordinario."
-Esto crea el bucle: el espectador SABE que hay algo enorme al final y tiene que quedarse para entender el camino.
-
-PASO 3 — LA PROMESA ESPECÍFICA:
-"En los próximos 30 minutos vas a descubrir [algo concreto y específico que van a aprender]. Y antes de que acabe este vídeo, voy a revelarte algo que [los medios / los documentos oficiales / la versión oficial] nunca han contado."
-
-PASO 4 — EL ANZUELO EMOCIONAL:
-Termina el hook con una pregunta directa al espectador: "¿Tú qué habrías hecho en su lugar?" o una imagen mental tan vívida e inquietante que sea físicamente imposible cerrar el vídeo.
+Extensión CRÍTICA del cuerpo: entre {MIN_WORDS - hook_words} y {MAX_WORDS - hook_words} palabras (el hook ya aporta {hook_words}).
+La primera frase del cuerpo debe enlazar de forma natural con el final del hook (sin volver a saludar ni reintroducir el tema).
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BLOQUE 1 (~550 palabras): El origen — la historia que no te contaron
@@ -169,13 +241,15 @@ IMPORTANTE: SOLO el texto narrado. Sin títulos de sección. Sin corchetes. Sin 
         messages=[{"role": "user", "content": user_prompt}],
     )
 
-    script = msg.content[0].text.strip()
+    body = msg.content[0].text.strip()
+    script = hook_text + "\n\n" + body   # hook dedicado + cuerpo
     word_count = len(script.split())
 
-    cost_eur = (msg.usage.input_tokens * MODEL_IN_PRICE +
-                msg.usage.output_tokens * MODEL_OUT_PRICE) / 1_000_000 * EUR_RATE
+    body_cost = (msg.usage.input_tokens * MODEL_IN_PRICE +
+                 msg.usage.output_tokens * MODEL_OUT_PRICE) / 1_000_000 * EUR_RATE
     add_cost_event(job_id, "claude_sonnet", msg.usage.output_tokens,
-                   MODEL_OUT_PRICE / 1_000_000, cost_eur)
+                   MODEL_OUT_PRICE / 1_000_000, body_cost)
+    cost_eur = hook_cost + body_cost
 
     # Extensión si sale corto
     if word_count < MIN_WORDS:
