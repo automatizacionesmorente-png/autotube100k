@@ -101,18 +101,28 @@ async def cancel_job(job_id: str):
 
 @app.get("/api/jobs/{job_id}/video")
 async def stream_video(job_id: str):
-    """Sirve el vídeo final para preview en el navegador."""
+    """Sirve el vídeo final con soporte completo de range requests para streaming."""
+    from fastapi import Request
+    from fastapi.responses import StreamingResponse
+    import aiofiles
+
     job = get_job(job_id)
     if not job or not job.get("video_path"):
         raise HTTPException(404, "Vídeo no disponible aún")
     video_path = Path(job["video_path"])
     if not video_path.exists():
-        raise HTTPException(404, "Archivo de vídeo no encontrado")
-    return FileResponse(video_path, media_type="video/mp4",
-                        headers={"Accept-Ranges": "bytes"})
+        raise HTTPException(404, "Archivo de vídeo no encontrado en disco")
+    return FileResponse(
+        video_path,
+        media_type="video/mp4",
+        headers={
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "no-cache",
+        }
+    )
 
 class UploadRequest(BaseModel):
-    channel_id: str
+    channel_id: str | None = None
 
 @app.post("/api/jobs/{job_id}/upload")
 async def upload_job_to_youtube(job_id: str, req: UploadRequest, background_tasks: BackgroundTasks):
@@ -124,6 +134,8 @@ async def upload_job_to_youtube(job_id: str, req: UploadRequest, background_task
         raise HTTPException(400, "El vídeo aún no está listo")
     if job.get("youtube_url"):
         return {"youtube_url": job["youtube_url"], "already_uploaded": True}
+    if not req.channel_id:
+        raise HTTPException(400, "Selecciona un canal de YouTube conectado primero. Ve a la pestaña Canales y conecta tu canal con OAuth.")
 
     background_tasks.add_task(_do_upload, job_id, req.channel_id)
     return {"ok": True, "message": "Subiendo a YouTube…"}
@@ -131,21 +143,28 @@ async def upload_job_to_youtube(job_id: str, req: UploadRequest, background_task
 async def _do_upload(job_id: str, channel_id: str):
     job = get_job(job_id)
     try:
+        import json as _json
         from .pipeline.upload import generate_metadata, upload_to_youtube
-        from .pipeline.script_gen import generate_script
-        script = job.get("script", "")
         title  = job.get("title", "")
         niche  = job.get("niche", "")
-        metadata = await asyncio.to_thread(generate_metadata, job_id, script, title, niche)
-        youtube_url = await asyncio.to_thread(
+        # Intentar usar metadata.json guardado durante la generación (más completo)
+        meta_path = Path(job["video_path"]).parent / "metadata.json"
+        if meta_path.exists():
+            saved = _json.loads(meta_path.read_text())
+            metadata = {k: saved[k] for k in ("description", "hashtags", "tags") if k in saved}
+        else:
+            script = job.get("script", "")
+            metadata = await asyncio.to_thread(generate_metadata, job_id, script, title, niche)
+        result = await asyncio.to_thread(
             upload_to_youtube, job_id, Path(job["video_path"]),
             Path(job["video_path"]).parent / "thumbnail.jpg",
             title, metadata, channel_id
         )
+        youtube_url, studio_url = result if isinstance(result, tuple) else (result, None)
         from datetime import datetime
         update_job(job_id, youtube_url=youtube_url, finished_at=datetime.utcnow().isoformat())
         _job_events.setdefault(job_id, []).append(
-            {"type": "uploaded", "youtube_url": youtube_url}
+            {"type": "uploaded", "youtube_url": youtube_url, "studio_url": studio_url}
         )
     except Exception as e:
         update_job(job_id, error=f"Upload failed: {e}")
@@ -441,56 +460,63 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
         update_job(job_id, status="running")
 
         # ── Paso 1: Guión ──────────────────────────────────────────
-        emit("script", "running", "Generando guión con Claude Sonnet...", 5)
+        emit("script", "running", "Generando guión con Claude Sonnet 4.6…", 5)
         from .pipeline.script_gen import generate_script
         script = await asyncio.to_thread(generate_script, job_id, req.niche, req.title, req.tone)
-        update_job(job_id, script=script[:500])
-        emit("script", "done", f"Guión listo: {len(script.split())} palabras", 20, 0.07)
+        update_job(job_id, script=script[:8000])  # guardar más para metadata de calidad
+        wcount = len(script.split())
+        emit("script", "done", f"Guión listo: {wcount} palabras (~{wcount//130} min)", 18)
         check_cancelled()
 
-        # ── Paso 2: Voz ───────────────────────────────────────────
-        emit("tts", "running", "Convirtiendo a voz con Kokoro TTS...", 25)
+        # ── Pasos 2+3 en PARALELO: TTS + prompts de imagen ─────────
+        emit("tts", "running", "Convirtiendo a voz neural expresiva (Edge TTS + SSML)…", 20)
+        emit("images", "running", "Generando prompts de imagen con IA…", 20)
         from .pipeline.tts import generate_audio
+        from .pipeline.images import (generate_image_prompts, generate_images,
+                                       generate_hook_images, generate_thumbnail)
         audio_path = job_dir / "narration.mp3"
-        await asyncio.to_thread(generate_audio, job_id, script, req.tone, audio_path)
-        emit("tts", "done", "Audio generado", 40, 0.0)
+        audio_task   = asyncio.to_thread(generate_audio, job_id, script, req.tone, audio_path)
+        prompts_task = asyncio.to_thread(generate_image_prompts, job_id, script, req.niche, 40)
+        audio_result, img_prompts = await asyncio.gather(audio_task, prompts_task)
+        emit("tts", "done", "Audio con pausas dramáticas listo", 35)
         check_cancelled()
 
-        # ── Paso 3: Prompts de imágenes ────────────────────────────
-        emit("images", "running", "Analizando guión para prompts de imagen...", 42)
-        from .pipeline.images import generate_image_prompts, generate_images, generate_thumbnail
-        img_prompts = await asyncio.to_thread(generate_image_prompts, job_id, script, req.niche, 15)
+        # ── Pasos 4+5+6 en PARALELO: imágenes cuerpo + hook + thumbnail ──
+        images_dir   = job_dir / "images"
+        hook_imgs_dir = job_dir / "hook_images"
 
-        # ── Paso 4: Imágenes Flux Schnell ──────────────────────────
-        emit("images", "running", f"Generando {len(img_prompts)} imágenes con Flux Schnell...", 45)
-        images_dir = job_dir / "images"
-        body_images = await asyncio.to_thread(generate_images, job_id, img_prompts, images_dir)
-        emit("images", "done", f"{len(body_images)} imágenes generadas", 60, len(body_images) * 0.003 * 0.92)
+        def on_img_progress(done: int, total: int, fal_cost: float):
+            pct = 40 + int(done / total * 15)
+            _job_events.setdefault(job_id, []).append({
+                "type": "step", "step": "images", "status": "running",
+                "message": f"Imagen {done}/{total} · fal.ai acumulado: {fal_cost:.4f}€",
+                "progress": pct, "cost": fal_cost, "realtime": True,
+            })
+
+        emit("images", "running", "Generando 40 imágenes + 8 hook + thumbnail en paralelo…", 37)
+        body_task  = asyncio.to_thread(generate_images, job_id, img_prompts, images_dir, on_img_progress)
+        hook_task  = asyncio.to_thread(generate_hook_images, job_id, req.niche, script[:800], hook_imgs_dir)
+        thumb_task = asyncio.to_thread(generate_thumbnail, job_id, req.title, req.niche, job_dir, req.tone)
+        body_images, hook_images, thumbnail_path = await asyncio.gather(body_task, hook_task, thumb_task)
+
+        emit("images",    "done", f"{len(body_images)} imágenes del cuerpo listas", 60)
+        emit("hook_videos","done", f"{len(hook_images)} imágenes hook listas", 62)
+        emit("thumbnail", "done", "Miniatura con título lista", 64)
         check_cancelled()
 
-        # ── Paso 5: Thumbnail ──────────────────────────────────────
-        emit("thumbnail", "running", "Generando miniatura...", 62)
-        thumbnail_path = await asyncio.to_thread(generate_thumbnail, job_id, req.title, req.niche, job_dir)
-        emit("thumbnail", "done", "Miniatura lista", 65, 0.003 * 0.92)
-        check_cancelled()
-
-        # ── Paso 6: Vídeos hook Kling ──────────────────────────────
-        emit("hook_videos", "running", "Generando 5 vídeos hook con Kling Standard...", 65)
-        from .pipeline.hook_videos import generate_hook_prompts, generate_hook_videos
-        hook_prompts = await asyncio.to_thread(generate_hook_prompts, job_id, script, req.niche, 5)
-        videos_dir = job_dir / "hook_videos"
-        hook_videos = await asyncio.to_thread(generate_hook_videos, job_id, hook_prompts, videos_dir)
-        emit("hook_videos", "done", f"{len(hook_videos)} vídeos hook listos", 80, len(hook_videos) * 0.14 * 0.92)
-        check_cancelled()
-
-        # ── Paso 7: Render FFmpeg ──────────────────────────────────
-        emit("render", "running", "Montando vídeo con FFmpeg...", 82)
+        # ── Paso 7: Render FFmpeg ─────────────────────────────────
+        emit("render", "running", "Montando vídeo con FFmpeg (sin huecos en blanco)…", 66)
         from .pipeline.render import render_video
         final_path = job_dir / "final.mp4"
-        await asyncio.to_thread(render_video, job_id, hook_videos, body_images, audio_path, final_path, req.title)
-        emit("render", "done", "Vídeo montado", 90, 0)
+        await asyncio.to_thread(
+            render_video, job_id,
+            [],
+            body_images, audio_path, final_path, req.title,
+            hook_images, req.tone
+        )
+        emit("render", "done", "Vídeo montado completamente", 90)
 
-        # ── Paso 8: Metadata (sin subir aún — espera revisión manual) ──
+        # ── Paso 8: Metadata ──────────────────────────────────────
         emit("upload", "running", "Generando descripción y metadatos...", 92)
         from .pipeline.upload import generate_metadata
         metadata = await asyncio.to_thread(generate_metadata, job_id, script, req.title, req.niche)

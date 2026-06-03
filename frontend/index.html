@@ -648,9 +648,10 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
           <span class="pipeline-lbl" id="pipeline-lbl">Pipeline en curso</span>
           <div style="display:flex;align-items:center;gap:8px;">
             <button id="btn-cancel" onclick="cancelJob()" style="display:none;background:none;border:1px solid var(--border2);color:var(--muted);font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">⏹ Cancelar</button>
-            <div class="cost-chip">
+            <div class="cost-chip" title="Coste real acumulado de cada API">
               <span id="cost-display">0.000</span>
-              <span class="cost-eur">EUR</span>
+              <span class="cost-eur">€</span>
+              <span id="cost-fal" style="font-size:9px;color:var(--muted);margin-left:4px;display:none;">fal.ai: <span id="cost-fal-val">0</span>€</span>
             </div>
           </div>
         </div>
@@ -665,7 +666,16 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
         <!-- Preview + Upload (aparece cuando el vídeo está listo) -->
         <div id="video-review" style="display:none;padding:16px 20px;border-top:1px solid var(--border);">
           <div style="font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px;">📽 Revisión del vídeo</div>
-          <video id="video-preview" controls style="width:100%;border-radius:8px;background:#000;max-height:240px;margin-bottom:12px;"></video>
+          <video id="video-preview" controls preload="metadata" style="width:100%;border-radius:8px;background:#000;max-height:260px;margin-bottom:12px;" onerror="document.getElementById('video-error').style.display='block'"></video>
+          <div id="video-error" style="display:none;padding:10px;background:var(--red-bg);border-radius:6px;font-size:11px;color:var(--red);margin-bottom:10px;">
+            ⚠ El vídeo no se puede reproducir en el navegador. Usa el botón Descargar para verlo localmente.
+          </div>
+          <div id="upload-channel-row" style="display:none;margin-bottom:8px;">
+            <label style="font-size:10px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;display:block;margin-bottom:5px;">Canal de destino</label>
+            <select id="upload-channel-select" onchange="onUploadChannelChange()" style="width:100%;padding:9px 10px;border-radius:7px;border:1px solid var(--border2);background:white;color:var(--ink);font-size:12px;">
+              <option value="">— Selecciona canal —</option>
+            </select>
+          </div>
           <div style="display:flex;gap:8px;">
             <button id="btn-upload-yt" onclick="uploadToYoutube()" class="btn btn-dark" style="flex:1;padding:11px;font-size:12px;border-radius:8px;">
               ▶ Subir a YouTube
@@ -742,14 +752,15 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
   <div class="page-head">
     <div class="section-kicker" id="finance-month">Cargando…</div>
     <div class="page-title">Finanzas</div>
-    <div class="page-sub">Costes reales de producción desglosados por servicio</div>
+    <div class="page-sub">Costes reales conectados directamente a cada API</div>
   </div>
 
+  <!-- KPIs principales -->
   <div class="stats-grid">
     <div class="stat">
       <div class="stat-lbl">Gasto del mes</div>
       <div class="stat-num" id="f-total">—</div>
-      <div class="stat-note">en APIs de producción</div>
+      <div class="stat-note">coste real APIs</div>
     </div>
     <div class="stat">
       <div class="stat-lbl">Vídeos generados</div>
@@ -757,25 +768,81 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
       <div class="stat-note">este mes</div>
     </div>
     <div class="stat">
-      <div class="stat-lbl">Coste medio</div>
+      <div class="stat-lbl">Coste por vídeo</div>
       <div class="stat-num" id="f-avg">—</div>
-      <div class="stat-note">por vídeo</div>
+      <div class="stat-note">media real</div>
     </div>
     <div class="stat">
-      <div class="stat-lbl">Proyección anual</div>
-      <div class="stat-num" id="f-annual">—</div>
-      <div class="stat-note">a ritmo actual</div>
+      <div class="stat-lbl">Verificar gastos</div>
+      <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">
+        <a href="https://console.anthropic.com" target="_blank" style="font-size:10px;color:var(--gold);text-decoration:none;">◆ Anthropic →</a>
+        <a href="https://dashboard.fal.ai" target="_blank" style="font-size:10px;color:var(--gold);text-decoration:none;">⚡ FAL.AI →</a>
+        <a href="https://platform.openai.com/usage" target="_blank" style="font-size:10px;color:var(--gold);text-decoration:none;">◉ OpenAI →</a>
+      </div>
     </div>
   </div>
 
+  <!-- Desglose por proveedor -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;">
+      <span class="card-label">Coste por proveedor</span>
+      <span style="font-size:10px;color:var(--muted);">Precios reales de cada API</span>
+    </div>
+    <div class="card-body" id="finance-providers">
+      <div class="empty" style="padding:20px 0;"><div class="empty-icon">📡</div><div class="empty-title">Sin datos</div></div>
+    </div>
+  </div>
+
+  <!-- Desglose detallado por servicio -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;">
+      <span class="card-label">Desglose por servicio</span>
+      <button onclick="loadFinance()" style="background:none;border:none;font-size:11px;color:var(--muted);cursor:pointer;">↻ Actualizar</button>
+    </div>
+    <div class="card-body" id="finance-breakdown">
+      <div class="empty" style="padding:20px 0;"><div class="empty-icon">📊</div><div class="empty-title">Sin datos</div></div>
+    </div>
+  </div>
+
+  <!-- Historial de vídeos con coste -->
   <div class="card">
-    <div class="card-head"><span class="card-label">Desglose por servicio</span></div>
+    <div class="card-head">
+      <span class="card-label">Historial de producción este mes</span>
+    </div>
+    <div class="card-body" id="finance-jobs">
+      <div class="empty" style="padding:20px 0;"><div class="empty-icon">🎬</div><div class="empty-title">Sin vídeos este mes</div></div>
+    </div>
+  </div>
+
+  <!-- Calculadora ROI -->
+  <div class="card" style="margin-top:16px;">
+    <div class="card-head"><span class="card-label">Calculadora ROI</span></div>
     <div class="card-body">
-      <div id="finance-breakdown">
-        <div class="empty" style="padding:24px 0;">
-          <div class="empty-icon">📊</div>
-          <div class="empty-title">Sin datos este mes</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+        <div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Vídeos/mes</div>
+          <input id="roi-videos" type="number" value="30" min="1" max="300"
+            style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;background:var(--white);"
+            oninput="calcROI()">
         </div>
+        <div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Views/vídeo</div>
+          <input id="roi-views" type="number" value="1000" min="100"
+            style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;background:var(--white);"
+            oninput="calcROI()">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">RPM (€)</div>
+          <input id="roi-rpm" type="number" value="2.5" min="0.5" step="0.5"
+            style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;background:var(--white);"
+            oninput="calcROI()">
+        </div>
+      </div>
+      <div id="roi-result" style="background:var(--cream);border-radius:8px;padding:14px 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;text-align:center;">
+        <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:2px;">Ingresos/mes</div><div id="roi-income" style="font-size:18px;font-weight:700;color:var(--green);">—</div></div>
+        <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:2px;">Costes/mes</div><div id="roi-costs" style="font-size:18px;font-weight:700;color:var(--red);">—</div></div>
+        <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:2px;">Beneficio</div><div id="roi-profit" style="font-size:18px;font-weight:700;color:var(--ink);">—</div></div>
+        <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:2px;">ROI</div><div id="roi-pct" style="font-size:18px;font-weight:700;color:var(--gold);">—</div></div>
       </div>
     </div>
   </div>
@@ -814,7 +881,7 @@ const STEPS_META = {
   tts:         { icon: '◎', label: 'Voz Kokoro' },
   images:      { icon: '◈', label: 'Imágenes Flux' },
   thumbnail:   { icon: '⬡', label: 'Miniatura' },
-  hook_videos: { icon: '▷', label: 'Hook Kling AI' },
+  hook_videos: { icon: '▷', label: 'Hook — Imágenes impacto' },
   render:      { icon: '⚙', label: 'Render FFmpeg' },
   upload:      { icon: '↑', label: 'YouTube Upload' },
 };
@@ -851,15 +918,59 @@ async function cancelJob() {
   document.getElementById('pipeline-lbl').textContent = 'Producción cancelada';
 }
 
-async function uploadToYoutube() {
-  if (!currentJobId) return;
-  const channelId = currentChannelId || document.getElementById('inp-channel').value;
-  if (!channelId) { alert('Selecciona un canal de destino primero.'); return; }
+function onUploadChannelChange() {
+  const sel = document.getElementById('upload-channel-select');
+  currentChannelId = sel.value || null;
+}
 
+async function _loadUploadChannels(preselect) {
+  const channels = await fetch(`${API}/api/channels`).then(r=>r.json()).catch(()=>[]);
+  const connected = channels.filter(c => c.connected);
+  const sel = document.getElementById('upload-channel-select');
+  const row = document.getElementById('upload-channel-row');
+
+  if (connected.length === 0) {
+    document.getElementById('upload-status').innerHTML =
+      '⚠ Sin canales conectados. Ve a <strong>Canales</strong> → conecta con OAuth.';
+    return;
+  }
+  sel.innerHTML = '<option value="">— Selecciona canal —</option>' +
+    connected.map(c => `<option value="${c.id}"${(preselect && c.id===preselect)||connected.length===1?' selected':''}>${c.name}</option>`).join('');
+  row.style.display = 'block';
+  // auto-select if only one channel or preselect matched
+  if (connected.length === 1 || preselect) {
+    currentChannelId = sel.value || connected[0]?.id || null;
+    if (currentChannelId) sel.value = currentChannelId;
+  }
+}
+
+async function uploadToYoutube() {
+  if (!currentJobId) {
+    document.getElementById('upload-status').textContent = '⚠ Abre el vídeo desde el historial primero.';
+    return;
+  }
+  const sel = document.getElementById('upload-channel-select');
+  const channelId = currentChannelId || (sel && sel.value) || null;
+
+  if (!channelId) {
+    await _loadUploadChannels(null);
+    // Si hay un solo canal se auto-selecciona — continuar directamente
+    const autoId = currentChannelId || (sel && sel.value) || null;
+    if (!autoId) {
+      document.getElementById('upload-status').textContent = 'Selecciona el canal y pulsa Subir a YouTube.';
+      return;
+    }
+    return _doUploadRequest(autoId);
+  }
+
+  return _doUploadRequest(channelId);
+}
+
+async function _doUploadRequest(channelId) {
   const btn = document.getElementById('btn-upload-yt');
   btn.disabled = true;
   btn.textContent = 'Subiendo…';
-  document.getElementById('upload-status').textContent = 'Generando descripción y subiendo a YouTube…';
+  document.getElementById('upload-status').textContent = 'Generando metadatos y subiendo a YouTube…';
 
   const r = await fetch(`${API}/api/jobs/${currentJobId}/upload`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
@@ -867,35 +978,49 @@ async function uploadToYoutube() {
   }).then(r=>r.json()).catch(e=>({error:e.toString()}));
 
   if (r.youtube_url) {
-    document.getElementById('upload-status').innerHTML =
-      `✅ Subido: <a href="${r.youtube_url}" target="_blank" style="color:var(--red);">Ver en YouTube ↗</a>`;
-    btn.style.display = 'none';
+    _showUploaded(r.youtube_url, r.studio_url);
     loadJobs(); loadNavCost();
   } else if (r.ok) {
-    // Polling hasta que aparezca la URL
     document.getElementById('upload-status').textContent = 'Subiendo… puede tardar 1-2 minutos.';
     _pollUpload(currentJobId);
   } else {
-    document.getElementById('upload-status').textContent = 'Error: ' + (r.error || 'desconocido');
+    const errMsg = r.detail || r.error || 'Error desconocido';
+    document.getElementById('upload-status').innerHTML = `⚠ ${errMsg}`;
     btn.disabled = false; btn.textContent = '▶ Reintentar subida';
   }
 }
 
+function _showUploaded(youtubeUrl, studioUrl) {
+  const btn = document.getElementById('btn-upload-yt');
+  btn.style.display = 'none';
+  document.getElementById('upload-status').innerHTML =
+    `✅ Subido. <a href="${youtubeUrl}" target="_blank" style="color:var(--red);font-weight:600;">Ver en YouTube ↗</a>`;
+  // Abrir YouTube Studio automáticamente para revisar
+  const openUrl = studioUrl || `https://studio.youtube.com`;
+  window.open(openUrl, '_blank');
+}
+
 async function _pollUpload(jobId) {
-  for (let i = 0; i < 60; i++) {
-    await new Promise(r => setTimeout(r, 3000));
+  for (let i = 0; i < 90; i++) {
+    await new Promise(r => setTimeout(r, 4000));
     const job = await fetch(`${API}/api/jobs/${jobId}`).then(r=>r.json()).catch(()=>null);
     if (job?.youtube_url) {
-      document.getElementById('upload-status').innerHTML =
-        `✅ <a href="${job.youtube_url}" target="_blank" style="color:var(--red);font-weight:600;">Ver en YouTube ↗</a>`;
-      document.getElementById('btn-upload-yt').style.display = 'none';
+      _showUploaded(job.youtube_url, null);
       loadJobs(); loadNavCost();
       return;
     }
     if (job?.error && job.error.includes('Upload failed')) {
-      document.getElementById('upload-status').textContent = 'Error en la subida: ' + job.error;
+      const errDetail = job.error.replace('Upload failed: ', '');
+      document.getElementById('upload-status').innerHTML = `⚠ Error: ${errDetail}`;
+      document.getElementById('btn-upload-yt').disabled = false;
+      document.getElementById('btn-upload-yt').textContent = '↻ Reintentar subida';
       return;
     }
+    // Actualizar mensaje de espera
+    const mins = Math.floor(i * 4 / 60);
+    const secs = (i * 4) % 60;
+    document.getElementById('upload-status').textContent =
+      `Subiendo… ${mins}:${secs.toString().padStart(2,'0')} — los vídeos grandes tardan 3-5 min`;
   }
 }
 
@@ -1006,24 +1131,45 @@ async function startGeneration() {
   };
 }
 
-function onStep({step, status, message, progress, cost}) {
+let falCostAccum = 0;
+
+function onStep({step, status, message, progress, cost, realtime}) {
   const dot = document.getElementById('dot-' + step);
   const msg = document.getElementById('msg-' + step);
   const sc  = document.getElementById('scost-' + step);
   if (!dot) return;
-  dot.className = 'step-icon ' + status;
-  if (msg) msg.textContent = message;
-  // cost = total acumulado real desde la BD → calcular coste incremental del paso
-  if (cost > 0) {
-    const stepCost = cost - prevStepTotal;
-    prevStepTotal = cost;
-    totalCost = cost;  // total = valor real de la BD
-    if (sc && stepCost > 0) sc.textContent = stepCost.toFixed(4) + '€';
-    document.getElementById('cost-display').textContent = totalCost.toFixed(3);
+
+  // Actualizar dot/estado solo si no es un evento de progreso intermedio
+  if (!realtime) {
+    dot.className = 'step-icon ' + status;
   }
-  document.getElementById('progress-fill').style.width = progress + '%';
-  document.getElementById('progress-pct').textContent = progress + '%';
-  // Si el paso falla, parar polling y mostrar error visualmente
+  if (msg) msg.textContent = message;
+
+  // Actualizar coste acumulado
+  if (cost > 0) {
+    if (realtime) {
+      // Evento en tiempo real de fal.ai — cost es solo el coste fal.ai acumulado del paso
+      falCostAccum = cost;
+      document.getElementById('cost-fal').style.display = 'inline';
+      document.getElementById('cost-fal-val').textContent = falCostAccum.toFixed(4);
+      // Actualizar coste total leyendo el acumulado real del DB via polling
+    } else {
+      // Evento de paso completo — cost = total real acumulado en DB
+      const stepCost = cost - prevStepTotal;
+      prevStepTotal = cost;
+      totalCost = cost;
+      if (sc && stepCost > 0.0001) sc.textContent = stepCost.toFixed(4) + '€';
+      document.getElementById('cost-display').textContent = totalCost.toFixed(4);
+      document.getElementById('cost-fal').style.display = 'none';
+      falCostAccum = 0;
+    }
+  }
+
+  if (progress > 0) {
+    document.getElementById('progress-fill').style.width = progress + '%';
+    document.getElementById('progress-pct').textContent = progress + '%';
+  }
+
   if (status === 'error') {
     stopStatusPolling();
     document.getElementById('btn-cancel').style.display = 'none';
@@ -1055,6 +1201,7 @@ function onEnd({job}) {
     document.getElementById('upload-status').textContent = '';
     document.getElementById('btn-upload-yt').disabled = false;
     document.getElementById('btn-upload-yt').textContent = '▶ Subir a YouTube';
+    _loadUploadChannels(job.channel_id);
   }
   loadJobs(); loadNavCost();
 }
@@ -1158,6 +1305,7 @@ async function openJobDetail(jobId) {
       document.getElementById('video-review').style.display = 'block';
       currentJobId = job.id;
       currentChannelId = job.channel_id;
+      _loadUploadChannels(job.channel_id);
     }
   } else if (job.status === 'error') {
     document.getElementById('final-result').innerHTML = `
@@ -1347,27 +1495,147 @@ async function connectNewChannel() {
   }
 }
 
-async function loadFinance() {
-  const f = await fetch(`${API}/api/finance`).then(r=>r.json()).catch(()=>({total_cost:0,total_videos:0,avg_cost_per_video:0,by_service:[],month:''}));
-  document.getElementById('finance-month').textContent = f.month||'—';
-  document.getElementById('f-total').textContent   = f.total_cost.toFixed(2)+'€';
-  document.getElementById('f-videos').textContent  = f.total_videos;
-  document.getElementById('f-avg').textContent     = f.avg_cost_per_video.toFixed(2)+'€';
-  document.getElementById('f-annual').textContent  = (f.total_cost*12).toFixed(0)+'€';
+const SVC_LABELS = {
+  fal_flux_schnell:    'Flux Schnell — imágenes cuerpo ($0.003/img)',
+  fal_flux_hook:       'Flux Schnell — imágenes hook ($0.003/img)',
+  fal_flux_thumbnail:  'Flux Schnell — miniatura ($0.003/img)',
+  flux_schnell:        'Flux Schnell — imágenes ($0.003/img)',
+  flux_schnell_thumb:  'Flux Schnell — miniatura ($0.003/img)',
+  ideogram_thumbnail:  'Ideogram v2 Turbo — miniatura ($0.05/img)',
+  claude_haiku:        'Claude Haiku — guión ($0.80/$4 por 1M)',
+  claude_haiku_ext:    'Claude Haiku — extensión guión',
+  claude_haiku_prompts:'Claude Haiku — prompts imagen',
+  claude_sonnet:       'Claude Sonnet — guión ($3/$15 por 1M)',
+  claude_sonnet_ext:   'Claude Sonnet — extensión guión',
+  openai_tts:          'OpenAI TTS-HD — narración ($30/1M chars)',
+  edge_tts:            'Edge TTS — voz neural (gratis)',
+  kokoro_tts:          'Kokoro TTS — voz local (gratis)',
+  kling_standard:      'Kling Standard — hook vídeo',
+};
+const PROVIDER_META = {
+  'fal.ai':    { color: '#7c3aed', icon: '⚡', label: 'FAL.AI — dashboard.fal.ai' },
+  'anthropic': { color: '#c49b27', icon: '◆', label: 'Anthropic — console.anthropic.com' },
+  'openai':    { color: '#10a37f', icon: '◉', label: 'OpenAI — platform.openai.com/usage' },
+  'gratis':    { color: '#2e6e47', icon: '✓', label: 'Gratis' },
+};
 
-  const el = document.getElementById('finance-breakdown');
-  if (!f.by_service?.length) {
-    el.innerHTML = '<div class="empty" style="padding:24px 0;"><div class="empty-icon" style="font-size:22px">📊</div><div class="empty-title">Sin datos este mes</div></div>';
-    return;
+async function loadFinance() {
+  const f = await fetch(`${API}/api/finance`).then(r=>r.json())
+    .catch(()=>({total_cost:0,total_videos:0,avg_cost_per_video:0,
+                 by_service:[],by_provider:[],jobs:[],month:''}));
+
+  document.getElementById('finance-month').textContent = f.month || '—';
+  document.getElementById('f-total').textContent  = (f.total_cost||0).toFixed(3)+'€';
+  document.getElementById('f-videos').textContent = f.total_videos || 0;
+  document.getElementById('f-avg').textContent    = (f.avg_cost_per_video||0).toFixed(3)+'€';
+
+  // ── Proveedores — solo los que tienen gasto real > 0 ─────────
+  const provEl = document.getElementById('finance-providers');
+  const activeProv = (f.by_provider||[]).filter(p => p.total > 0);
+  if (!activeProv.length) {
+    provEl.innerHTML = '<div class="empty" style="padding:16px 0;"><div class="empty-title">Sin gastos este mes</div></div>';
+  } else {
+    const maxP = Math.max(...activeProv.map(p=>p.total), 0.001);
+    provEl.innerHTML = activeProv.map(p => {
+      const m = PROVIDER_META[p.provider] || {color:'#7a7468',icon:'○',label:p.provider};
+      const pct = f.total_cost > 0 ? (p.total / f.total_cost * 100) : 0;
+      return `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+        <div style="width:32px;height:32px;border-radius:8px;background:${m.color}18;
+          display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${m.icon}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+            <span style="font-size:12px;font-weight:600;color:var(--ink);">${m.label}</span>
+            <span style="font-size:13px;font-weight:700;color:var(--ink);">${p.total.toFixed(3)}€ <span style="font-size:10px;font-weight:400;color:var(--muted);">(${pct.toFixed(0)}%)</span></span>
+          </div>
+          <div style="height:5px;background:var(--cream2);border-radius:3px;">
+            <div style="height:5px;background:${m.color};border-radius:3px;width:${(p.total/maxP*100).toFixed(0)}%;"></div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
   }
-  const labels = { claude_sonnet:'Claude Sonnet', claude_haiku:'Claude Haiku', kokoro_tts:'Kokoro TTS', azure_tts:'Azure TTS', flux_schnell:'Flux Schnell', flux_schnell_thumb:'Flux (miniatura)', kling_standard:'Kling Standard' };
-  const max = Math.max(...f.by_service.map(s=>s.total));
-  el.innerHTML = f.by_service.map(s=>`
-    <div class="fin-row">
-      <span class="fin-svc">${labels[s.service]||s.service}</span>
-      <div class="fin-bar-wrap"><div class="fin-bar" style="width:${(s.total/max*100).toFixed(0)}%"></div></div>
-      <span class="fin-amt">${s.total.toFixed(4)}€</span>
-    </div>`).join('');
+
+  // ── Desglose por servicio — solo usados, con precio unitario ──
+  const brkEl = document.getElementById('finance-breakdown');
+  const activeSvc = (f.by_service||[]).filter(s => s.total > 0);
+  if (!activeSvc.length) {
+    brkEl.innerHTML = '<div class="empty" style="padding:16px 0;"><div class="empty-title">Sin datos</div></div>';
+  } else {
+    const maxS = Math.max(...activeSvc.map(s=>s.total), 0.001);
+    brkEl.innerHTML = activeSvc.map(s => {
+      const label = SVC_LABELS[s.service] || s.service;
+      const units = s.units > 0 ? ` · ${Math.round(s.units).toLocaleString()} unidades` : '';
+      return `
+      <div class="fin-row" style="padding:9px 0;">
+        <div style="flex:1;min-width:0;">
+          <span class="fin-svc" style="display:block;">${label}</span>
+          <span style="font-size:10px;color:var(--muted);">${units}</span>
+        </div>
+        <div class="fin-bar-wrap" style="width:120px;"><div class="fin-bar" style="width:${(s.total/maxS*100).toFixed(0)}%"></div></div>
+        <span class="fin-amt" style="min-width:60px;text-align:right;">${s.total.toFixed(3)}€</span>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Historial de vídeos ───────────────────────────────────────
+  const jobsEl = document.getElementById('finance-jobs');
+  if (!f.jobs?.length) {
+    jobsEl.innerHTML = '<div class="empty" style="padding:16px 0;"><div class="empty-icon">🎬</div><div class="empty-title">Sin vídeos este mes</div></div>';
+  } else {
+    jobsEl.innerHTML = f.jobs.map(j => {
+      const bkd = (j.breakdown||[]).filter(b=>b.total>0)
+        .map(b=>`<span style="font-size:10px;color:var(--muted);margin-right:8px;">${SVC_LABELS[b.service]||b.service}: ${b.total.toFixed(4)}€</span>`)
+        .join('');
+      const statusColor = {done:'var(--green)',error:'var(--red)',running:'var(--gold)',pending:'var(--muted)'};
+      const ytLink = j.youtube_url
+        ? `<a href="${j.youtube_url}" target="_blank" style="font-size:10px;color:var(--red);margin-left:8px;">ver ↗</a>`
+        : '';
+      return `
+      <div style="padding:12px 0;border-bottom:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px;">
+          <div style="flex:1;min-width:0;">
+            <span style="font-size:12px;font-weight:600;color:var(--ink);display:block;
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${j.title}</span>
+            <span style="font-size:10px;color:var(--muted);">${j.niche} · ${(j.created_at||'').substring(0,10)}</span>
+            ${ytLink}
+          </div>
+          <div style="text-align:right;flex-shrink:0;margin-left:12px;">
+            <div style="font-size:14px;font-weight:700;color:var(--ink);">${(j.cost_total||0).toFixed(4)}€</div>
+            <div style="font-size:10px;color:${statusColor[j.status]||'var(--muted)'};">${j.status}</div>
+          </div>
+        </div>
+        <div style="line-height:1.8;">${bkd || '<span style="font-size:10px;color:var(--muted);">Sin desglose disponible</span>'}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Actualizar calculadora con coste medio real
+  if (f.avg_cost_per_video > 0) {
+    calcROI(f.avg_cost_per_video);
+  } else {
+    calcROI();
+  }
+}
+
+function calcROI(costPerVideo = null) {
+  const videos  = parseFloat(document.getElementById('roi-videos')?.value) || 30;
+  const views   = parseFloat(document.getElementById('roi-views')?.value) || 1000;
+  const rpm     = parseFloat(document.getElementById('roi-rpm')?.value) || 2.5;
+  const cpv     = costPerVideo ?? (parseFloat(document.getElementById('f-avg')?.textContent) || 0.05);
+
+  const income  = (videos * views / 1000) * rpm;
+  const costs   = videos * cpv;
+  const profit  = income - costs;
+  const roi     = costs > 0 ? (profit / costs * 100) : 0;
+
+  const fmt = n => n.toFixed(2) + '€';
+  document.getElementById('roi-income').textContent = fmt(income);
+  document.getElementById('roi-costs').textContent  = fmt(costs);
+  const profEl = document.getElementById('roi-profit');
+  profEl.textContent = fmt(profit);
+  profEl.style.color = profit >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('roi-pct').textContent = roi.toFixed(0) + '%';
 }
 
 async function loadNavCost() {

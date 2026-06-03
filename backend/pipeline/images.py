@@ -1,143 +1,474 @@
 import os
 import httpx
-import asyncio
 import anthropic
 from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont
 from ..database import add_cost_event, add_step
 
-FAL_SYNC_BASE = "https://fal.run"          # síncrono — espera resultado
-FAL_QUEUE_BASE = "https://queue.fal.run"   # asíncrono — polling
-FLUX_SCHNELL = "fal-ai/flux/schnell"
+FAL_SYNC      = "https://fal.run/fal-ai/flux/schnell"
+FAL_IDEOGRAM  = "https://fal.run/fal-ai/ideogram/v2/turbo"
+FAL_UNIT_PRICE_USD      = 0.003   # Flux Schnell por imagen
+FAL_IDEOGRAM_PRICE_USD  = 0.05    # Ideogram v2 Turbo por imagen
+EUR_RATE = 0.92
 
-def generate_image_prompts(job_id: str, script: str, niche: str, count: int = 15) -> list[str]:
-    """Usa Claude Haiku para extraer prompts de imagen. Fallback automático si sin crédito."""
+FLUX_COUNT = 40    # TODOS los frames del cuerpo con Flux Schnell — sin Pollinations
+TOTAL_COUNT = 40
+HOOK_COUNT = 8     # 8 imágenes de impacto para el hook
+
+
+# ── Prompts de imagen — NARRATIVOS (cada imagen = momento exacto del guión) ───
+
+def generate_image_prompts(job_id: str, script: str, niche: str,
+                            count: int = TOTAL_COUNT) -> list[str]:
+    """
+    Divide el guión en `count` segmentos y genera un prompt visual para cada uno.
+    Cada imagen corresponde exactamente a lo que se está narrando en ese momento.
+    """
+    try:
+        client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+        # Dividir guión en segmentos proporcionales
+        words = script.split()
+        seg_size = max(1, len(words) // count)
+        segments = []
+        for i in range(count):
+            start = i * seg_size
+            end = start + seg_size if i < count - 1 else len(words)
+            seg = " ".join(words[start:end])
+            segments.append(seg[:300])  # max 300 chars por segmento al prompt
+
+        segments_text = "\n".join(
+            f"[{i+1}] {seg}" for i, seg in enumerate(segments)
+        )
+
+        msg = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=5000,
+            messages=[{"role": "user", "content": f"""Eres un director de fotografía de documentales. Para cada fragmento de guión, crea el prompt de imagen AI que capture VISUALMENTE y con PRECISIÓN lo que se está narrando.
+
+NICHO: {niche}
+
+REGLAS ESTRICTAS:
+- Cada prompt debe reflejar EL CONTENIDO ESPECÍFICO de ese fragmento (lugares reales, objetos, acciones, atmósferas descritas)
+- Si habla de una ciudad: pon esa ciudad concreta
+- Si habla de una persona: silhouette o primer plano de manos/ojos (sin rostro reconocible)
+- Si habla de un documento/carta/carta: close-up del objeto
+- Si es un momento de tensión: oscuro, dramático, expresivo
+- Si es informativo: documental natural, periodístico
+- Varía el tipo de plano: gran angular, primer plano, aéreo, detalle, conceptual
+- Siempre: photorealistic, 16:9, 4K, sin texto ni logos
+
+Devuelve SOLO {count} prompts en inglés, uno por línea, sin numeración ni texto extra.
+
+FRAGMENTOS DEL GUIÓN:
+{segments_text}"""}]
+        )
+
+        prompts = [p.strip() for p in msg.content[0].text.strip().split("\n")
+                   if p.strip()][:count]
+        while len(prompts) < count:
+            prompts.append(
+                f"cinematic documentary scene, {niche}, dramatic lighting, 16:9, 4K, photorealistic"
+            )
+
+        cost = (msg.usage.input_tokens * 0.8 + msg.usage.output_tokens * 4) / 1_000_000 * EUR_RATE
+        add_cost_event(job_id, "claude_haiku_prompts", msg.usage.output_tokens, 4/1_000_000, cost)
+        return prompts
+
+    except Exception:
+        return _fallback_prompts(niche, count)
+
+
+def generate_hook_prompts(niche: str, script_hook: str) -> list[str]:
+    """
+    8 prompts visuales para el hook generados a partir del texto real del guión.
+    Cada imagen captura una escena concreta mencionada en el hook.
+    """
     try:
         client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         msg = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=2000,
-            messages=[{
-                "role": "user",
-                "content": f"""Del siguiente guión sobre '{niche}', extrae {count} momentos visuales clave.
-Para cada uno, escribe un prompt en inglés para generar una imagen con IA.
-Los prompts deben ser: cinematográficos, detallados, photorealistic, 16:9.
-Devuelve SOLO los prompts, uno por línea, sin numeración ni explicaciones.
+            max_tokens=1200,
+            messages=[{"role": "user", "content": f"""Eres un director de fotografía. Lee este fragmento de guión y genera 8 prompts de imagen AI que capturen visualmente las escenas, lugares, personas o momentos ESPECÍFICOS mencionados.
 
-GUIÓN (primeras 3000 palabras):
-{script[:3000]}"""
-            }]
+NICHO: {niche}
+FRAGMENTO DEL GUIÓN (hook):
+{script_hook[:600]}
+
+REGLAS:
+- Cada prompt refleja algo CONCRETO del texto (lugar, objeto, persona, momento)
+- Estilo: cinematic, photorealistic, dramatic lighting, 16:9, 4K
+- Sin texto, sin logos, sin rostros reconocibles (silhouettes si hay personas)
+- Varía los planos: aerial, close-up, wide, detail
+- Máximo dramático e impactante
+
+Devuelve SOLO 8 prompts en inglés, uno por línea, sin numeración."""}]
         )
-        prompts = [p.strip() for p in msg.content[0].text.strip().split("\n") if p.strip()][:count]
-        cost = (msg.usage.input_tokens * 0.8 + msg.usage.output_tokens * 4) / 1_000_000 * 0.92
-        add_cost_event(job_id, "claude_haiku", msg.usage.output_tokens, 4 / 1_000_000, cost)
+        prompts = [p.strip() for p in msg.content[0].text.strip().split("\n") if p.strip()][:8]
+        while len(prompts) < 8:
+            prompts.append(
+                f"dramatic cinematic scene {niche}, dark moody lighting, photorealistic, 4K, 16:9"
+            )
         return prompts
     except Exception:
-        # Fallback: prompts genéricos basados en el nicho — no requiere Claude
-        return _fallback_prompts(niche, count)
+        # fallback genérico si falla Haiku
+        return [
+            f"extreme close-up human eyes wide open shock, {niche}, cinematic chiaroscuro, 4K",
+            f"dramatic dark corridor single beam of light, {niche}, heavy fog, cinematic, 4K",
+            f"aerial shot city at night rain neon reflections, {niche}, dark moody, cinematic",
+            f"silhouette lone figure stormy sky lightning, {niche}, backlit, wide shot, 4K",
+            f"close-up trembling hands holding document, {niche}, dramatic side light, 4K",
+            f"broken mirror reflection symbolic truth, {niche}, dark moody, cinematic, 4K",
+            f"old classified files documents secrets, {niche}, dramatic spotlight, photorealistic",
+            f"dramatic newspaper headline depth of field city, {niche}, desaturated, cinematic",
+        ]
 
 
 def _fallback_prompts(niche: str, count: int) -> list[str]:
-    """Genera prompts cinematográficos genéricos sin necesitar Claude."""
     base = [
-        f"cinematic wide shot, dramatic lighting, concept of {niche}, photorealistic, 16:9, 4K",
-        f"close-up dramatic face, deep thinking, {niche} theme, cinematic lighting, photorealistic",
-        f"futuristic city skyline at night, representing {niche}, dramatic colors, 16:9",
-        f"data visualization hologram, blue glow, {niche} concept, dark background, cinematic",
-        f"person at crossroads dramatic landscape, {niche} metaphor, golden hour, photorealistic",
-        f"abstract technological neural network, representing {niche}, dark blue tones, 4K",
-        f"dramatic storm clouds over city, symbolic of {niche}, moody atmosphere, cinematic",
-        f"empty boardroom with city view, power and {niche}, dramatic lighting, photorealistic",
-        f"human silhouette vs robot silhouette, {niche} concept, high contrast, cinematic",
-        f"global map with glowing connections, {niche} worldwide impact, dark background",
-        f"newspaper headlines dramatic blur, {niche} news, moody black and white, cinematic",
-        f"crowd of people from above, drone shot, {niche} society, golden hour, photorealistic",
-        f"close-up of hands on keyboard, {niche} technology, dramatic side lighting, 4K",
-        f"hourglass with digital particles, {niche} time concept, cinematic, photorealistic",
-        f"sunrise over mountain, hope and {niche}, wide angle, dramatic colors, photorealistic",
+        f"cinematic wide dramatic sky at night, {niche}, epic colors, 16:9, 4K",
+        f"dramatic close-up hands evidence clue, {niche}, studio lighting, bokeh",
+        f"aerial drone city night lights fog, {niche}, neon, 4K, cinematic",
+        f"documentary natural scene investigation, {niche}, soft light, photorealistic",
+        f"dark abstract concept mystery, {niche}, deep shadows, 4K",
+        f"silhouette figure dramatic landscape, {niche}, golden hour, 16:9",
+        f"extreme close-up eyes reflection truth, {niche}, warm light, photorealistic",
+        f"abandoned building interior mystery, {niche}, chiaroscuro lighting",
+        f"close-up old documents files secrets, {niche}, dramatic light, photorealistic",
+        f"night street rain reflections lonely, {niche}, blue tones, cinematic, 4K",
     ]
-    return (base * ((count // len(base)) + 1))[:count]
+    return (base * 5)[:count]
 
-def _fal_generate_image(client: httpx.Client, prompt: str, headers: dict) -> str:
-    """Llama a FAL.ai en modo síncrono. Devuelve URL de la imagen."""
-    resp = client.post(
-        f"{FAL_SYNC_BASE}/{FLUX_SCHNELL}",
-        headers=headers,
+
+# ── Generación de imágenes — TODO Flux Schnell ────────────────────────────────
+
+def _fal(client: httpx.Client, prompt: str, key: str) -> tuple[str, float]:
+    r = client.post(
+        FAL_SYNC,
+        headers={"Authorization": f"Key {key}", "Content-Type": "application/json"},
         json={"prompt": prompt, "image_size": "landscape_16_9", "num_images": 1},
         timeout=120,
     )
-    if resp.status_code != 200:
-        raise RuntimeError(f"FAL error {resp.status_code}: {resp.text[:200]}")
-    data = resp.json()
-    images = data.get("images") or data.get("output", {}).get("images", [])
-    if not images:
-        raise RuntimeError(f"FAL no devolvió imágenes: {str(data)[:200]}")
-    return images[0]["url"]
+    if r.status_code != 200:
+        raise RuntimeError(f"FAL {r.status_code}: {r.text[:200]}")
+    data = r.json()
+    imgs = data.get("images") or data.get("output", {}).get("images", [])
+    if not imgs:
+        raise RuntimeError("FAL: sin imágenes")
+    units = float(r.headers.get("x-fal-billable-units", "1"))
+    cost_eur = units * FAL_UNIT_PRICE_USD * EUR_RATE
+    return imgs[0]["url"], cost_eur
 
 
-def generate_images(job_id: str, prompts: list[str], output_dir: Path) -> list[Path]:
-    add_step(job_id, "images", "running", f"Generando {len(prompts)} imágenes con Flux Schnell")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    fal_key = os.environ["FAL_API_KEY"]
-    headers = {"Authorization": f"Key {fal_key}", "Content-Type": "application/json"}
-    paths = []
-
-    with httpx.Client(timeout=180) as client:
-        for i, prompt in enumerate(prompts):
-            try:
-                img_url = _fal_generate_image(client, prompt, headers)
-                img_resp = client.get(img_url, timeout=60)
-                img_resp.raise_for_status()
-                path = output_dir / f"img_{i:02d}.jpg"
-                path.write_bytes(img_resp.content)
-                paths.append(path)
-                add_cost_event(job_id, "flux_schnell", 1, 0.003, 0.003 * 0.92)
-            except Exception as e:
-                # Fallback: Pollinations (gratis)
-                path = _pollinations_fallback(client, prompt, output_dir, i)
-                if path:
-                    paths.append(path)
-
-    add_step(job_id, "images", "done", f"{len(paths)} imágenes generadas", len(paths) * 0.003 * 0.92)
-    return paths
-
-
-def generate_thumbnail(job_id: str, title: str, niche: str, output_dir: Path) -> Path:
-    add_step(job_id, "thumbnail", "running", "Generando miniatura")
-    fal_key = os.environ["FAL_API_KEY"]
-    headers = {"Authorization": f"Key {fal_key}", "Content-Type": "application/json"}
-
-    prompt = (
-        f"YouTube thumbnail, dramatic cinematic, topic: {title}, niche: {niche}, "
-        "bold colors, high contrast, photorealistic, 16:9, no text overlays, "
-        "professional photography, eye-catching, viral style"
-    )
-
-    with httpx.Client(timeout=180) as client:
-        try:
-            img_url = _fal_generate_image(client, prompt, headers)
-            img_resp = client.get(img_url, timeout=60)
-            img_resp.raise_for_status()
-            path = output_dir / "thumbnail.jpg"
-            path.write_bytes(img_resp.content)
-        except Exception as e:
-            # Fallback Pollinations
-            path = _pollinations_fallback(client, prompt, output_dir, 99)
-            if not path:
-                raise RuntimeError(f"Thumbnail falló en FAL y Pollinations: {e}")
-
-    add_cost_event(job_id, "flux_schnell_thumb", 1, 0.003, 0.003 * 0.92)
-    add_step(job_id, "thumbnail", "done", "Miniatura generada", 0.003 * 0.92)
-    return path
-
-def _pollinations_fallback(client, prompt, output_dir, index) -> Path | None:
+def _pollinations(client: httpx.Client, prompt: str, out: Path) -> Path | None:
+    """Fallback gratuito si fal.ai falla."""
     try:
-        encoded = prompt[:200].replace(" ", "%20")
-        url = f"https://image.pollinations.ai/prompt/{encoded}?width=1280&height=720&nologo=true"
-        resp = client.get(url, timeout=30)
-        if resp.status_code == 200:
-            path = output_dir / f"img_{index:02d}.jpg"
-            path.write_bytes(resp.content)
-            return path
+        safe = prompt[:220].replace(" ", "%20").replace(",", "%2C").replace(":", "%3A").replace("'", "")
+        url = f"https://image.pollinations.ai/prompt/{safe}?width=1280&height=720&nologo=true&model=flux"
+        r = client.get(url, timeout=50, follow_redirects=True)
+        if r.status_code == 200 and len(r.content) > 8000:
+            out.write_bytes(r.content)
+            return out
     except Exception:
         pass
     return None
+
+
+def _download(client: httpx.Client, url: str, out: Path) -> Path:
+    r = client.get(url, timeout=60)
+    r.raise_for_status()
+    out.write_bytes(r.content)
+    return out
+
+
+def generate_images(job_id: str, prompts: list[str], output_dir: Path,
+                    on_progress=None) -> list[Path]:
+    """Genera TODAS las imágenes con Flux Schnell. Pollinations solo como fallback."""
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    add_step(job_id, "images", "running",
+             f"Generando {len(prompts)} imágenes con Flux Schnell (3 concurrentes)…")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    key = os.environ.get("FAL_API_KEY", "")
+
+    paths: list[Path | None] = [None] * len(prompts)
+    fal_cost_total = 0.0
+    lock = threading.Lock()
+    done_count = 0
+
+    def _process_one(i: int, prompt: str):
+        nonlocal fal_cost_total, done_count
+        out = output_dir / f"img_{i:03d}.jpg"
+        result = None
+        with httpx.Client(timeout=200) as client:
+            if key:
+                try:
+                    url, cost_eur = _fal(client, prompt, key)
+                    _download(client, url, out)
+                    result = out
+                    with lock:
+                        fal_cost_total += cost_eur
+                    add_cost_event(job_id, "fal_flux_schnell", 1,
+                                   FAL_UNIT_PRICE_USD, round(cost_eur, 6))
+                except Exception:
+                    result = _pollinations(client, prompt, out)
+            else:
+                result = _pollinations(client, prompt, out)
+
+        with lock:
+            paths[i] = result
+            done_count += 1
+            current_done = done_count
+            current_cost = fal_cost_total
+
+        if on_progress:
+            on_progress(current_done, len(prompts), current_cost)
+        elif current_done % 5 == 0:
+            add_step(job_id, "images", "running",
+                     f"Imágenes: {current_done}/{len(prompts)} · fal.ai: {current_cost:.4f}€")
+
+    # 3 workers concurrentes — fal.ai lo soporta bien
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        futs = {ex.submit(_process_one, i, prompts[i]): i for i in range(len(prompts))}
+        for f in futs:
+            f.result()
+
+    valid = [p for p in paths if p]
+    add_step(job_id, "images", "done",
+             f"{len(valid)}/{len(prompts)} imágenes · fal.ai: {fal_cost_total:.4f}€",
+             fal_cost_total)
+    return valid
+
+
+def generate_hook_images(job_id: str, niche: str, script_hook: str,
+                          output_dir: Path) -> list[Path]:
+    """8 imágenes de alta calidad para el hook — siempre Flux Schnell."""
+    add_step(job_id, "hook_images", "running",
+             f"Generando {HOOK_COUNT} imágenes de impacto para el hook…")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    key = os.environ.get("FAL_API_KEY", "")
+    prompts = generate_hook_prompts(niche, script_hook)
+    paths = []
+    fal_cost = 0.0
+
+    with httpx.Client(timeout=200) as client:
+        for i, prompt in enumerate(prompts):
+            out = output_dir / f"hook_{i:02d}.jpg"
+            if key:
+                try:
+                    url, cost_eur = _fal(client, prompt, key)
+                    _download(client, url, out)
+                    paths.append(out)
+                    fal_cost += cost_eur
+                    add_cost_event(job_id, "fal_flux_hook", 1,
+                                   FAL_UNIT_PRICE_USD, round(cost_eur, 6))
+                    continue
+                except Exception:
+                    pass
+            p = _pollinations(client, prompt, out)
+            if p:
+                paths.append(p)
+
+    add_step(job_id, "hook_images", "done",
+             f"{len(paths)} imágenes hook · fal.ai: {fal_cost:.4f}€", fal_cost)
+    return paths
+
+
+def generate_thumbnail(job_id: str, title: str, niche: str, output_dir: Path,
+                        tone: str = "neutro") -> Path:
+    add_step(job_id, "thumbnail", "running",
+             "Generando miniatura viral con Ideogram v2 (texto integrado)…")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    key = os.environ.get("FAL_API_KEY", "")
+    final = output_dir / "thumbnail.jpg"
+
+    if key:
+        try:
+            thumb_text, ideogram_prompt = _build_ideogram_prompt(title, niche, tone)
+            with httpx.Client(timeout=180) as client:
+                r = client.post(
+                    FAL_IDEOGRAM,
+                    headers={"Authorization": f"Key {key}",
+                             "Content-Type": "application/json"},
+                    json={
+                        "prompt": ideogram_prompt,
+                        "aspect_ratio": "16:9",
+                        "style_type": "DESIGN",
+                        "magic_prompt_option": "OFF",
+                    },
+                    timeout=120,
+                )
+                if r.status_code == 200:
+                    imgs = r.json().get("images", [])
+                    if imgs:
+                        img_url = imgs[0]["url"]
+                        _download(client, img_url, final)
+                        cost_eur = FAL_IDEOGRAM_PRICE_USD * EUR_RATE
+                        add_cost_event(job_id, "ideogram_thumbnail", 1,
+                                       FAL_IDEOGRAM_PRICE_USD, round(cost_eur, 6))
+                        add_step(job_id, "thumbnail", "done",
+                                 f"Miniatura Ideogram lista · {cost_eur:.4f}€", cost_eur)
+                        return final
+        except Exception:
+            pass
+
+    # Fallback: Flux Schnell + PIL si Ideogram falla
+    add_step(job_id, "thumbnail", "running", "Fallback: Flux + PIL…")
+    prompt_flux = (
+        f"YouTube thumbnail viral, epic cinematic, {niche} topic, "
+        "dramatic god rays lighting, high contrast, vivid colors, "
+        "dark moody background, 16:9, 4K, no text, no logos, photorealistic"
+    )
+    base = output_dir / "thumbnail_base.jpg"
+    with httpx.Client(timeout=200) as client:
+        if key:
+            try:
+                url, cost_eur = _fal(client, prompt_flux, key)
+                _download(client, url, base)
+                add_cost_event(job_id, "fal_flux_thumbnail", 1,
+                               FAL_UNIT_PRICE_USD, round(cost_eur, 6))
+            except Exception:
+                _pollinations(client, prompt_flux, base)
+        else:
+            _pollinations(client, prompt_flux, base)
+
+    if base.exists():
+        _add_title_text(base, title, final)
+    else:
+        _solid_thumbnail(title, final)
+
+    add_step(job_id, "thumbnail", "done", "Miniatura (fallback PIL) lista",
+             FAL_UNIT_PRICE_USD * EUR_RATE)
+    return final
+
+
+def _build_ideogram_prompt(title: str, niche: str, tone: str) -> tuple[str, str]:
+    """Usa Haiku para generar texto corto + prompt Ideogram optimizado."""
+    try:
+        client_ai = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        msg = client_ai.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=300,
+            messages=[{"role": "user", "content": f"""Eres un diseñador de miniaturas virales de YouTube.
+Para el vídeo "{title}" sobre "{niche}", genera:
+
+1. TEXTO_MINIATURA: 3-5 palabras en mayúsculas, impactante, que genere curiosidad extrema (NO el título completo)
+2. PROMPT_IDEOGRAM: prompt en inglés para Ideogram AI que genere una miniatura YouTube espectacular con ese texto integrado
+
+El prompt debe incluir:
+- El texto exacto entre comillas
+- Una cara humana con expresión de shock/terror/asombro (sin rostro reconocible si es posible)
+- Estilo visual según tono "{tone}": {'oscuro azul frío dramático' if tone in ('misterio','drama') else 'energético cálido' if tone == 'motivacional' else 'cinematográfico profesional'}
+- Alta resolución, colores muy saturados, contraste extremo
+- Estilo YouTube thumbnail profesional
+
+Responde EXACTAMENTE así:
+TEXTO: [texto]
+PROMPT: [prompt en inglés]"""}]
+        )
+        text = msg.content[0].text.strip()
+        lines = {line.split(":")[0].strip(): ":".join(line.split(":")[1:]).strip()
+                 for line in text.split("\n") if ":" in line}
+        thumb_text = lines.get("TEXTO", title[:30].upper())
+        prompt = lines.get("PROMPT", "")
+        if not prompt:
+            raise ValueError("no prompt")
+        cost = (msg.usage.input_tokens * 0.8 + msg.usage.output_tokens * 4) / 1_000_000 * EUR_RATE
+        add_cost_event(job_id, "claude_haiku_thumb", msg.usage.output_tokens, 4/1_000_000, cost)
+        return thumb_text, prompt
+    except Exception:
+        # Fallback manual
+        words = title.upper().split()
+        thumb_text = " ".join(words[:4])
+        prompt = (
+            f'YouTube thumbnail, bold white text "{thumb_text}" with red outline, '
+            f"shocked human face expression, {niche} concept, dark dramatic background, "
+            f"red and black color scheme, extreme contrast, professional graphic design, "
+            f"clickbait viral style, high saturation, cinematic lighting"
+        )
+        return thumb_text, prompt
+
+
+# ── Thumbnail con texto ────────────────────────────────────────────────────────
+
+def _add_title_text(base: Path, title: str, out: Path):
+    try:
+        img = Image.open(base).convert("RGB").resize((1280, 720), Image.LANCZOS)
+        overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        ov = ImageDraw.Draw(overlay)
+        for y in range(350, 720):
+            alpha = int(200 * (y - 350) / 370)
+            ov.line([(0, y), (1280, y)], fill=(0, 0, 0, alpha))
+        img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
+        draw = ImageDraw.Draw(img)
+        words = title.upper().split()
+        lines, cur = [], ""
+        for w in words:
+            test = (cur + " " + w).strip()
+            if len(test) <= 26:
+                cur = test
+            else:
+                if cur:
+                    lines.append(cur)
+                cur = w
+        if cur:
+            lines.append(cur)
+        lines = lines[:3]
+        fsize = 82 if len(lines) == 1 else (70 if len(lines) == 2 else 58)
+        font = _load_font(fsize)
+        total_h = len(lines) * (fsize + 10)
+        y = 720 - total_h - 30
+        for line in lines:
+            bbox = draw.textbbox((0, 0), line, font=font)
+            x = (1280 - (bbox[2] - bbox[0])) // 2
+            draw.text((x+3, y+3), line, fill=(0, 0, 0, 200), font=font)
+            draw.text((x, y), line, fill=(255, 255, 255), font=font)
+            y += fsize + 10
+        img.save(out, "JPEG", quality=93)
+    except Exception:
+        import shutil
+        shutil.copy2(base, out)
+
+
+def _solid_thumbnail(title: str, out: Path):
+    img = Image.new("RGB", (1280, 720))
+    draw = ImageDraw.Draw(img)
+    for y in range(720):
+        r = int(10 + 160 * y / 720)
+        draw.line([(0, y), (1280, y)], fill=(r, 10, 30))
+    font = _load_font(72)
+    words = title.upper().split()
+    lines, cur = [], ""
+    for w in words:
+        if len((cur + " " + w).strip()) <= 18:
+            cur = (cur + " " + w).strip()
+        else:
+            if cur:
+                lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    total_h = len(lines) * 86
+    y = (720 - total_h) // 2
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        x = (1280 - (bbox[2] - bbox[0])) // 2
+        draw.text((x+3, y+3), line, fill=(0, 0, 0), font=font)
+        draw.text((x, y), line, fill=(255, 215, 0), font=font)
+        y += 86
+    img.save(out, "JPEG", quality=93)
+
+
+def _load_font(size: int):
+    for path in [
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/System/Library/Fonts/Arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    ]:
+        try:
+            return ImageFont.truetype(path, size)
+        except Exception:
+            pass
+    return ImageFont.load_default()
