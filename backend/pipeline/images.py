@@ -335,6 +335,9 @@ def generate_thumbnail(job_id: str, title: str, niche: str, output_dir: Path,
 
     if base.exists():
         _add_title_text(base, title, final)
+        # Generar 2 variantes gratis con PIL (distintos estilos visuales)
+        _variant_red(base, title, output_dir / "thumbnail_b.jpg")
+        _variant_minimal(base, title, output_dir / "thumbnail_c.jpg")
     else:
         _solid_thumbnail(title, final)
 
@@ -472,3 +475,80 @@ def _load_font(size: int):
         except Exception:
             pass
     return ImageFont.load_default()
+
+
+def _title_lines(title: str, max_chars: int = 22) -> list[str]:
+    """Divide el título en líneas cortas para miniatura."""
+    words = title.upper().split()
+    lines, cur = [], ""
+    for w in words:
+        test = (cur + " " + w).strip()
+        if len(test) <= max_chars:
+            cur = test
+        else:
+            if cur:
+                lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return lines[:3]
+
+
+def _variant_red(base: Path, title: str, out: Path):
+    """Variante B: fondo oscuro + texto rojo brillante + barra lateral roja."""
+    try:
+        img = Image.open(base).convert("RGB").resize((1280, 720), Image.LANCZOS)
+        # Oscurecer imagen base
+        overlay = Image.new("RGBA", img.size, (0, 0, 0, 140))
+        img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
+        draw = ImageDraw.Draw(img)
+
+        # Barra lateral roja izquierda
+        draw.rectangle([(0, 0), (18, 720)], fill=(220, 30, 30))
+
+        lines = _title_lines(title, 18)
+        fsize = 88 if len(lines) == 1 else (72 if len(lines) == 2 else 60)
+        font = _load_font(fsize)
+        y = 720 // 2 - (len(lines) * (fsize + 8)) // 2
+        for line in lines:
+            # Sombra
+            draw.text((42, y + 4), line, font=font, fill=(0, 0, 0))
+            # Texto rojo brillante
+            draw.text((40, y), line, font=font, fill=(255, 50, 50))
+            y += fsize + 8
+        img.save(out, "JPEG", quality=93)
+    except Exception:
+        pass
+
+
+def _variant_minimal(base: Path, title: str, out: Path):
+    """Variante C: franja negra inferior grande + texto blanco enorme — máximo impacto texto."""
+    try:
+        img = Image.open(base).convert("RGB").resize((1280, 720), Image.LANCZOS)
+        draw = ImageDraw.Draw(img)
+
+        lines = _title_lines(title, 20)
+        fsize = 90 if len(lines) == 1 else (76 if len(lines) == 2 else 62)
+        font = _load_font(fsize)
+        total_h = len(lines) * (fsize + 10) + 40
+
+        # Franja negra semitransparente en la parte inferior
+        bar_top = 720 - total_h - 20
+        bar_overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        bar_draw = ImageDraw.Draw(bar_overlay)
+        bar_draw.rectangle([(0, bar_top), (1280, 720)], fill=(0, 0, 0, 200))
+        img = Image.alpha_composite(img.convert("RGBA"), bar_overlay).convert("RGB")
+        draw = ImageDraw.Draw(img)
+
+        y = bar_top + 20
+        for line in lines:
+            bbox = draw.textbbox((0, 0), line, font=font)
+            x = (1280 - (bbox[2] - bbox[0])) // 2
+            # Stroke
+            for dx, dy in [(-2, -2), (2, -2), (-2, 2), (2, 2)]:
+                draw.text((x + dx, y + dy), line, font=font, fill=(0, 0, 0))
+            draw.text((x, y), line, font=font, fill=(255, 255, 255))
+            y += fsize + 10
+        img.save(out, "JPEG", quality=93)
+    except Exception:
+        pass

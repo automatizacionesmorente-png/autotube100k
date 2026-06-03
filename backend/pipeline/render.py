@@ -261,10 +261,111 @@ def render_video(
         pass
 
     size_mb = output_path.stat().st_size / 1024 / 1024
-    add_step(job_id, "render", "done",
-             f"Vídeo listo: {size_mb:.0f} MB · {audio_dur/60:.0f} min · "
-             f"subtítulos {'✓' if subs_ok else '✗'} · grade: {tone}", 0)
+
+    # ── AUTO-GENERAR SHORT VERTICAL (gratis, segunda fuente de ingresos) ──────
+    short_path = output_path.parent / "short.mp4"
+    try:
+        add_step(job_id, "render", "running", "Generando Short vertical 9:16 automático…")
+        _generate_short(output_path, short_path, audio_dur)
+        short_mb = short_path.stat().st_size / 1024 / 1024
+        add_step(job_id, "render", "done",
+                 f"✅ Vídeo {size_mb:.0f}MB · Short {short_mb:.0f}MB · "
+                 f"{audio_dur/60:.0f} min · subtítulos {'✓' if subs_ok else '✗'}", 0)
+    except Exception as e:
+        add_step(job_id, "render", "done",
+                 f"Vídeo listo: {size_mb:.0f} MB · {audio_dur/60:.0f} min "
+                 f"(Short falló: {str(e)[:40]})", 0)
+
     return output_path
+
+
+def _generate_short(video_path: Path, output_path: Path, total_dur: float):
+    """
+    Genera un Short vertical 9:16 de 58s con los momentos más impactantes:
+    - Primeros 20s (hook) + segundos 300-330 (mid reveal) + últimos 8s (CTA)
+    Escala al centro para llenar el frame vertical.
+    """
+    short_dur = min(58.0, total_dur)
+    # Tomar el hook completo si el vídeo es largo, si no el vídeo entero
+    if total_dur > 120:
+        # Segmento 1: primeros 30s (hook), Segmento 2: mitad -15s, Segmento 3: últimos 8s
+        seg1_end = 30.0
+        mid = total_dur / 2
+        seg2_start = max(seg1_end + 5, mid - 10)
+        seg2_end = seg2_start + 12
+        seg3_start = max(seg2_end + 5, total_dur - 10)
+        seg3_end = min(total_dur, seg3_start + 8)
+        # Calcular duración total real
+        actual_dur = (seg1_end + (seg2_end - seg2_start) + (seg3_end - seg3_start))
+        actual_dur = min(actual_dur, short_dur)
+    else:
+        seg1_end = short_dur
+        seg2_start = seg2_end = seg3_start = seg3_end = 0
+
+    # Filtro: escala 16:9 → recorte centro → 720×1280 (9:16)
+    # scale=-1:1280 → 2275×1280, luego crop=720:1280 centro
+    vf_short = (
+        "scale=-1:1280,"
+        "crop=720:1280,"
+        "drawtext=text='¡SUSCRÍBETE!':"
+        "fontcolor=white:fontsize=52:box=1:boxcolor=black@0.7:boxborderw=10:"
+        "x=(w-text_w)/2:y=h*0.88:"
+        f"enable='between(t,{max(0,actual_dur-6):.0f},{actual_dur:.0f})'"
+        if total_dur > 120 else
+        "scale=-1:1280,crop=720:1280"
+    )
+
+    if total_dur > 120:
+        # Crear segmentos y concatenar
+        import tempfile
+        tmp = output_path.parent / "_short_tmp"
+        tmp.mkdir(exist_ok=True)
+
+        segs = [
+            (0, seg1_end),
+            (seg2_start, seg2_end),
+            (seg3_start, seg3_end),
+        ]
+        seg_files = []
+        for idx, (ss, se) in enumerate(segs):
+            if se <= ss:
+                continue
+            seg_out = tmp / f"seg_{idx}.mp4"
+            _ffmpeg(
+                "-ss", f"{ss:.2f}", "-to", f"{se:.2f}",
+                "-i", str(video_path),
+                "-vf", "scale=-1:1280,crop=720:1280",
+                "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac",
+                str(seg_out)
+            )
+            seg_files.append(seg_out)
+
+        list_file = tmp / "short_list.txt"
+        list_file.write_text("\n".join(f"file '{f.resolve()}'" for f in seg_files))
+        _ffmpeg(
+            "-f", "concat", "-safe", "0", "-i", str(list_file),
+            "-vf", "drawtext=text='¡SUSCRÍBETE!':"
+                   "fontcolor=white:fontsize=52:box=1:boxcolor=black@0.7:boxborderw=10:"
+                   "x=(w-text_w)/2:y=h*0.88",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "26",
+            "-c:a", "aac", "-b:a", "128k",
+            "-movflags", "+faststart",
+            str(output_path)
+        )
+        try:
+            shutil.rmtree(tmp)
+        except Exception:
+            pass
+    else:
+        _ffmpeg(
+            "-i", str(video_path),
+            "-t", f"{short_dur:.2f}",
+            "-vf", "scale=-1:1280,crop=720:1280",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "26",
+            "-c:a", "aac", "-b:a", "128k",
+            "-movflags", "+faststart",
+            str(output_path)
+        )
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────

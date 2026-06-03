@@ -666,10 +666,26 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
         <!-- Preview + Upload (aparece cuando el vídeo está listo) -->
         <div id="video-review" style="display:none;padding:16px 20px;border-top:1px solid var(--border);">
           <div style="font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px;">📽 Revisión del vídeo</div>
-          <video id="video-preview" controls preload="metadata" style="width:100%;border-radius:8px;background:#000;max-height:260px;margin-bottom:12px;" onerror="document.getElementById('video-error').style.display='block'"></video>
+          <video id="video-preview" controls preload="metadata" style="width:100%;border-radius:8px;background:#000;max-height:240px;margin-bottom:10px;" onerror="document.getElementById('video-error').style.display='block'"></video>
           <div id="video-error" style="display:none;padding:10px;background:var(--red-bg);border-radius:6px;font-size:11px;color:var(--red);margin-bottom:10px;">
             ⚠ El vídeo no se puede reproducir en el navegador. Usa el botón Descargar para verlo localmente.
           </div>
+
+          <!-- Miniaturas A/B/C -->
+          <div style="margin-bottom:12px;">
+            <div style="font-size:10px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;">🖼 Elige miniatura (3 variantes)</div>
+            <div id="thumb-variants" style="display:flex;gap:6px;"></div>
+          </div>
+
+          <!-- Short disponible -->
+          <div id="short-row" style="display:none;margin-bottom:10px;padding:10px;background:var(--cream2);border-radius:8px;">
+            <div style="font-size:10px;font-weight:600;color:var(--ink);margin-bottom:6px;">📱 Short vertical generado automáticamente</div>
+            <div style="display:flex;gap:6px;">
+              <a id="btn-download-short" href="#" download="short.mp4" class="btn" style="font-size:11px;padding:7px 12px;background:var(--gold);color:white;border-radius:6px;text-decoration:none;">⬇ Descargar Short</a>
+              <span style="font-size:10px;color:var(--muted);align-self:center;">Súbelo manualmente a YouTube Shorts</span>
+            </div>
+          </div>
+
           <div id="upload-channel-row" style="display:none;margin-bottom:8px;">
             <label style="font-size:10px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;display:block;margin-bottom:5px;">Canal de destino</label>
             <select id="upload-channel-select" onchange="onUploadChannelChange()" style="width:100%;padding:9px 10px;border-radius:7px;border:1px solid var(--border2);background:white;color:var(--ink);font-size:12px;">
@@ -1303,6 +1319,8 @@ async function openJobDetail(jobId) {
       currentJobId = job.id;
       currentChannelId = job.channel_id;
       _loadUploadChannels(job.channel_id);
+      _loadThumbnailVariants(job.id);
+      _checkShort(job.id);
     }
   } else if (job.status === 'error') {
     document.getElementById('final-result').innerHTML = `
@@ -1641,6 +1659,53 @@ async function loadNavCost() {
 }
 
 loadJobs(); loadChannels(); loadNavCost();
+
+// ── Miniaturas A/B/C ──────────────────────────────────────────────────────────
+function _loadThumbnailVariants(jobId) {
+  const container = document.getElementById('thumb-variants');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const variants = [
+    { file: 'thumbnail.jpg',   label: 'A — Principal',  border: 'var(--gold)' },
+    { file: 'thumbnail_b.jpg', label: 'B — Rojo',       border: '#e53' },
+    { file: 'thumbnail_c.jpg', label: 'C — Minimalista',border: '#555' },
+  ];
+
+  variants.forEach(({ file, label, border }) => {
+    const url = `${API}/api/jobs/${jobId}/file/${file}`;
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'flex:1;cursor:pointer;border-radius:8px;overflow:hidden;border:2px solid var(--border);position:relative;';
+    wrap.title = `Usar variante ${label}`;
+    wrap.onclick = () => _selectThumbnail(jobId, file, wrap);
+    wrap.innerHTML = `
+      <img src="${url}" style="width:100%;display:block;" onerror="this.parentElement.style.display='none'">
+      <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.65);color:white;font-size:9px;padding:3px 5px;text-align:center;">${label}</div>`;
+    container.appendChild(wrap);
+  });
+}
+
+function _selectThumbnail(jobId, file, el) {
+  // Highlight seleccionado
+  document.querySelectorAll('#thumb-variants > div').forEach(d => d.style.border = '2px solid var(--border)');
+  el.style.border = '2px solid var(--gold)';
+  // Guardar selección para la subida
+  window._selectedThumbnail = file;
+}
+
+// ── Short vertical ─────────────────────────────────────────────────────────────
+async function _checkShort(jobId) {
+  const url = `${API}/api/jobs/${jobId}/file/short.mp4`;
+  try {
+    const r = await fetch(url, { method: 'HEAD' });
+    if (r.ok) {
+      const row = document.getElementById('short-row');
+      const btn = document.getElementById('btn-download-short');
+      if (row) row.style.display = 'block';
+      if (btn) btn.href = url;
+    }
+  } catch(e) {}
+}
 </script>
 </body>
 </html>

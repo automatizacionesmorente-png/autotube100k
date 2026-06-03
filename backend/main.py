@@ -121,6 +121,24 @@ async def stream_video(job_id: str):
         }
     )
 
+@app.get("/api/jobs/{job_id}/file/{filename}")
+async def serve_job_file(job_id: str, filename: str):
+    """Sirve cualquier archivo del job (miniaturas, short, etc.)."""
+    import re
+    if not re.match(r'^[\w\-\.]+$', filename):
+        raise HTTPException(400, "Nombre de archivo inválido")
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job no encontrado")
+    job_dir = OUTPUT_DIR / job_id
+    file_path = job_dir / filename
+    if not file_path.exists():
+        raise HTTPException(404, f"{filename} no encontrado")
+    mt = "video/mp4" if filename.endswith(".mp4") else "image/jpeg"
+    return FileResponse(file_path, media_type=mt,
+                        headers={"Cache-Control": "no-cache"})
+
+
 class UploadRequest(BaseModel):
     channel_id: str | None = None
 
