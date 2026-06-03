@@ -135,6 +135,41 @@ async def stream_video(job_id: str):
         }
     )
 
+class ThumbnailUpload(BaseModel):
+    image: str  # data URL base64 (data:image/...;base64,XXXX) o base64 puro
+
+@app.post("/api/jobs/{job_id}/thumbnail")
+async def upload_custom_thumbnail(job_id: str, req: ThumbnailUpload):
+    """Sube una miniatura propia (hecha externamente). Se guarda como custom_thumbnail.jpg
+    y tiene prioridad sobre la auto-generada al subir a YouTube."""
+    import base64, io
+    job_dir = OUTPUT_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    data = req.image
+    if "," in data and data.strip().startswith("data:"):
+        data = data.split(",", 1)[1]  # quitar prefijo data:image/...;base64,
+    try:
+        raw = base64.b64decode(data)
+    except Exception:
+        raise HTTPException(400, "Imagen base64 inválida")
+    if len(raw) < 1000:
+        raise HTTPException(400, "Imagen demasiado pequeña o vacía")
+    # Normalizar a JPG 1280x720 con PIL (YouTube recomienda 1280x720, <2MB)
+    try:
+        from PIL import Image
+        img = Image.open(io.BytesIO(raw)).convert("RGB")
+        w, h = img.size
+        target = 1280 / 720
+        if w / h > target:  # demasiado ancha → recortar lados
+            nw = int(h * target); img = img.crop(((w - nw)//2, 0, (w - nw)//2 + nw, h))
+        else:                # demasiado alta → recortar arriba/abajo
+            nh = int(w / target); img = img.crop((0, (h - nh)//2, w, (h - nh)//2 + nh))
+        img = img.resize((1280, 720), Image.LANCZOS)
+        img.save(job_dir / "custom_thumbnail.jpg", "JPEG", quality=92)
+    except Exception as e:
+        raise HTTPException(400, f"No se pudo procesar la imagen: {e}")
+    return {"ok": True, "file": "custom_thumbnail.jpg"}
+
 @app.get("/api/jobs/{job_id}/file/{filename}")
 async def serve_job_file(job_id: str, filename: str):
     """Sirve cualquier archivo del job (miniaturas, short, etc.)."""
@@ -193,12 +228,19 @@ async def _do_upload(job_id: str, channel_id: str, thumbnail: str = None):
             except Exception:
                 dur = None
             metadata = await asyncio.to_thread(generate_metadata, job_id, script, title, niche, dur)
-        # Miniatura elegida por el usuario (A/B/C); por defecto la principal
+        # Miniatura: prioridad a la PROPIA del usuario (custom_thumbnail.jpg) si existe.
         import re as _re
-        thumb_name = thumbnail if (thumbnail and _re.match(r'^[\w\-\.]+$', thumbnail)) else "thumbnail.jpg"
-        thumb_path = Path(job["video_path"]).parent / thumb_name
+        job_d = Path(job["video_path"]).parent
+        thumb_name = thumbnail if (thumbnail and _re.match(r'^[\w\-\.]+$', thumbnail)) else None
+        custom = job_d / "custom_thumbnail.jpg"
+        if thumb_name:
+            thumb_path = job_d / thumb_name
+        elif custom.exists():
+            thumb_path = custom            # sin selección explícita → usar la propia si existe
+        else:
+            thumb_path = job_d / "thumbnail.jpg"
         if not thumb_path.exists():
-            thumb_path = Path(job["video_path"]).parent / "thumbnail.jpg"
+            thumb_path = custom if custom.exists() else (job_d / "thumbnail.jpg")
         result = await asyncio.to_thread(
             upload_to_youtube, job_id, Path(job["video_path"]),
             thumb_path,

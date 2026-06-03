@@ -601,6 +601,12 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
             <label>Datos verificados (opcional) — para temas de actualidad</label>
             <textarea id="inp-context" rows="4" placeholder="Pega aquí hechos reales verificados (alineaciones, fechas, cifras...). El guion los usará como base y NO inventará. Déjalo vacío para temas históricos." style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border2);background:white;color:var(--ink);font-size:12px;font-family:inherit;resize:vertical;"></textarea>
           </div>
+          <div class="field">
+            <label>Miniatura propia (opcional) — la tuya tiene prioridad</label>
+            <input id="inp-thumb" type="file" accept="image/*" onchange="_previewCustomThumb()" style="font-size:11px;color:var(--muted);">
+            <img id="thumb-preview" style="display:none;width:100%;max-width:200px;border-radius:8px;margin-top:8px;border:2px solid var(--gold);">
+            <div style="font-size:9.5px;color:var(--muted);margin-top:4px;">Si subes tu miniatura, se usará esa al publicar (en vez de la auto-generada). Recomendado 1280×720.</div>
+          </div>
           <button class="btn-generate" id="btn-generate" onclick="startGeneration()">
             Generar vídeo automáticamente
           </button>
@@ -1137,6 +1143,19 @@ async function startGeneration() {
   });
   const { job_id } = await res.json();
   currentJobId = job_id;
+
+  // Si el usuario subió su propia miniatura, enviarla al job recién creado
+  const thumbFile = document.getElementById('inp-thumb').files[0];
+  if (thumbFile) {
+    try {
+      const dataUrl = await _fileToDataURL(thumbFile);
+      await fetch(`${API}/api/jobs/${job_id}/thumbnail`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ image: dataUrl })
+      });
+    } catch(e) { console.warn('No se pudo subir la miniatura propia', e); }
+  }
+
   startStatusPolling(job_id);  // fallback visual por si SSE pierde eventos
 
   if (eventSource) eventSource.close();
@@ -1669,35 +1688,67 @@ async function loadNavCost() {
 
 loadJobs(); loadChannels(); loadNavCost();
 
-// ── Miniaturas A/B/C ──────────────────────────────────────────────────────────
+// ── Miniatura propia: preview y helpers ──────────────────────────────────────
+function _fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+function _previewCustomThumb() {
+  const f = document.getElementById('inp-thumb').files[0];
+  const img = document.getElementById('thumb-preview');
+  if (f) { img.src = URL.createObjectURL(f); img.style.display = 'block'; }
+  else { img.style.display = 'none'; }
+}
+// Subir miniatura propia desde el panel de revisión (cuando llega después)
+async function _uploadOwnThumbnail(jobId, fileInput) {
+  const f = fileInput.files[0];
+  if (!f) return;
+  try {
+    const dataUrl = await _fileToDataURL(f);
+    const r = await fetch(`${API}/api/jobs/${jobId}/thumbnail`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ image: dataUrl })
+    }).then(r=>r.json());
+    if (r.ok) { window._selectedThumbnail = 'custom_thumbnail.jpg'; _loadThumbnailVariants(jobId); }
+  } catch(e) { alert('No se pudo subir la miniatura: ' + e); }
+}
+
+// ── Miniaturas A/B/C + propia ─────────────────────────────────────────────────
 function _loadThumbnailVariants(jobId) {
   const container = document.getElementById('thumb-variants');
   if (!container) return;
   container.innerHTML = '';
 
   const variants = [
+    { file: 'custom_thumbnail.jpg', label: '★ La tuya',     border: 'var(--gold)' },
     { file: 'thumbnail.jpg',   label: 'A — Principal',  border: 'var(--gold)' },
     { file: 'thumbnail_b.jpg', label: 'B — Rojo',       border: '#e53' },
     { file: 'thumbnail_c.jpg', label: 'C — Minimalista',border: '#555' },
   ];
 
-  window._selectedThumbnail = 'thumbnail.jpg';  // por defecto la A
-  variants.forEach(({ file, label }, idx) => {
+  window._selectedThumbnail = 'thumbnail.jpg';  // por defecto la A (si hay propia, se auto-selecciona abajo)
+  variants.forEach(({ file, label }) => {
     const url = `${API}/api/jobs/${jobId}/file/${file}`;
+    const isCustom = file === 'custom_thumbnail.jpg';
     const wrap = document.createElement('div');
-    const isFirst = idx === 0;
-    wrap.style.cssText = `flex:1;cursor:pointer;border-radius:8px;overflow:hidden;border:2px solid ${isFirst?'var(--gold)':'var(--border)'};position:relative;`;
+    wrap.style.cssText = `flex:1;cursor:pointer;border-radius:8px;overflow:hidden;border:2px solid var(--border);position:relative;`;
     wrap.title = `Usar variante ${label} para la subida`;
     wrap.onclick = () => _selectThumbnail(jobId, file, wrap);
     wrap.innerHTML = `
-      <img src="${url}" style="width:100%;display:block;" onerror="this.parentElement.style.display='none'">
+      <img src="${url}" style="width:100%;display:block;"
+           onload="${isCustom ? `window._selectedThumbnail='custom_thumbnail.jpg';this.parentElement.style.border='2px solid var(--gold)'` : ''}"
+           onerror="this.parentElement.style.display='none'">
       <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.65);color:white;font-size:9px;padding:3px 5px;text-align:center;">${label}</div>
       <a href="${url}" download="${file}" onclick="event.stopPropagation()" title="Descargar"
          style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.7);color:white;font-size:10px;width:20px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;text-decoration:none;">⬇</a>`;
     container.appendChild(wrap);
   });
 
-  // Nota sobre A/B testing nativo de YouTube
+  // Nota + botón para subir tu propia miniatura aquí (cuando llega después)
   let note = document.getElementById('thumb-ab-note');
   if (!note) {
     note = document.createElement('div');
@@ -1705,7 +1756,12 @@ function _loadThumbnailVariants(jobId) {
     note.style.cssText = 'font-size:9.5px;color:var(--muted);margin-top:6px;line-height:1.4;';
     container.parentElement.appendChild(note);
   }
-  note.innerHTML = '💡 Se subirá la variante seleccionada (borde dorado). Para <b>A/B test</b>: descarga las 3 (⬇) y súbelas en YouTube Studio → vídeo → miniatura → <b>“Probar y comparar”</b>.';
+  note.innerHTML = `
+    <label style="display:inline-block;cursor:pointer;color:var(--gold);font-weight:600;margin-bottom:4px;">
+      ⬆ Subir mi miniatura
+      <input type="file" accept="image/*" style="display:none" onchange="_uploadOwnThumbnail('${jobId}', this)">
+    </label><br>
+    💡 Se subirá la variante con borde dorado. La tuya (★) tiene prioridad. Para <b>A/B test</b>: descarga (⬇) y usa "Probar y comparar" en YouTube Studio.`;
 }
 
 function _selectThumbnail(jobId, file, el) {
