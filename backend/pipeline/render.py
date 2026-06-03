@@ -388,6 +388,65 @@ def _generate_short(video_path: Path, output_path: Path, total_dur: float):
         )
 
 
+# ── Limpieza de disco ────────────────────────────────────────────────────────
+
+def cleanup_intermediates(job_dir: Path) -> float:
+    """
+    Tras renderizar: borra archivos de trabajo que ya no se necesitan
+    (el vídeo final ya los contiene). Devuelve MB liberados.
+    Conserva: final.mp4, short.mp4, thumbnail*.jpg, metadata.json
+    """
+    freed = 0.0
+    targets = [
+        job_dir / "narration.mp3",
+        job_dir / "images",
+        job_dir / "hook_images",
+        job_dir / "hook_videos",
+        job_dir / "thumbnail_base.jpg",
+    ]
+    # Carpetas temporales que pudieran haber quedado de un fallo
+    targets += list(job_dir.glob("tmp_*"))
+    targets += list(job_dir.glob("_xtts_tmp"))
+    targets += list(job_dir.glob("_short_tmp"))
+
+    for t in targets:
+        try:
+            if not t.exists():
+                continue
+            if t.is_dir():
+                freed += sum(f.stat().st_size for f in t.rglob("*") if f.is_file())
+                shutil.rmtree(t)
+            else:
+                freed += t.stat().st_size
+                t.unlink()
+        except Exception:
+            pass
+    return freed / 1024 / 1024
+
+
+def cleanup_after_upload(job_dir: Path) -> float:
+    """
+    Tras subir a YouTube: borra el vídeo y el short (ya están en YouTube).
+    Conserva solo thumbnail.jpg + metadata.json como registro ligero.
+    Devuelve MB liberados.
+    """
+    freed = 0.0
+    targets = [
+        job_dir / "final.mp4",
+        job_dir / "short.mp4",
+        job_dir / "thumbnail_b.jpg",
+        job_dir / "thumbnail_c.jpg",
+    ]
+    for t in targets:
+        try:
+            if t.exists() and t.is_file():
+                freed += t.stat().st_size
+                t.unlink()
+        except Exception:
+            pass
+    return freed / 1024 / 1024
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _write_concat(path: Path, clips: list[Path]):

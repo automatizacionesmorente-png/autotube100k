@@ -35,6 +35,19 @@ _cancelled_jobs: set[str] = set()
 async def startup():
     init_db()
     OUTPUT_DIR.mkdir(exist_ok=True)
+    _sweep_orphan_temp()
+
+
+def _sweep_orphan_temp():
+    """Borra carpetas temporales huérfanas (de vídeos que fallaron a medias)."""
+    import shutil
+    try:
+        for pattern in ("*/tmp_*", "*/_xtts_tmp", "*/_short_tmp"):
+            for d in OUTPUT_DIR.glob(pattern):
+                if d.is_dir():
+                    shutil.rmtree(d, ignore_errors=True)
+    except Exception:
+        pass
 
 # ── Frontend ───────────────────────────────────────────────────────
 app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
@@ -184,6 +197,13 @@ async def _do_upload(job_id: str, channel_id: str):
         _job_events.setdefault(job_id, []).append(
             {"type": "uploaded", "youtube_url": youtube_url, "studio_url": studio_url}
         )
+        # Limpieza post-subida: el vídeo ya está en YouTube, liberar disco
+        if youtube_url:
+            try:
+                from .pipeline.render import cleanup_after_upload
+                cleanup_after_upload(Path(job["video_path"]).parent)
+            except Exception:
+                pass
     except Exception as e:
         update_job(job_id, error=f"Upload failed: {e}")
 
@@ -547,6 +567,15 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
             hook_images, req.tone
         )
         emit("render", "done", "Vídeo montado completamente", 90)
+
+        # Limpieza post-render: borrar archivos de trabajo (el vídeo ya los contiene)
+        try:
+            from .pipeline.render import cleanup_intermediates
+            freed = cleanup_intermediates(job_dir)
+            if freed > 5:
+                emit("render", "done", f"Vídeo montado · {freed:.0f}MB de temporales liberados", 90)
+        except Exception:
+            pass
 
         # ── Paso 8: Metadata ──────────────────────────────────────
         emit("upload", "running", "Generando descripción y metadatos...", 92)
