@@ -144,6 +144,10 @@ def get_finance_summary():
     ).fetchone()[0]
     avg_cost = (total_cost / total_videos) if total_videos > 0 else 0
 
+    all_time_cost = conn.execute(
+        "SELECT COALESCE(SUM(cost_total), 0) FROM jobs WHERE status='done'"
+    ).fetchone()[0]
+
     # Desglose granular por servicio (todos los eventos del mes, incluyendo jobs en curso)
     by_service = conn.execute(
         "SELECT service, ROUND(SUM(total_cost),5) as total, SUM(units) as units "
@@ -164,6 +168,7 @@ def get_finance_summary():
         "claude_haiku":        "anthropic",
         "claude_haiku_ext":    "anthropic",
         "claude_haiku_prompts":"anthropic",
+        "claude_haiku_thumb":  "anthropic",
         "claude_sonnet":       "anthropic",
         "claude_sonnet_ext":   "anthropic",
         # OpenAI
@@ -202,6 +207,7 @@ def get_finance_summary():
     return {
         "month": month,
         "total_cost":        round(total_cost, 4),
+        "all_time_cost":     round(all_time_cost, 4),
         "total_videos":      total_videos,
         "avg_cost_per_video": round(avg_cost, 4),
         "by_service": [dict(r) for r in by_service],

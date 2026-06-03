@@ -1540,9 +1540,10 @@ async function loadFinance() {
                  by_service:[],by_provider:[],jobs:[],month:''}));
 
   document.getElementById('finance-month').textContent = f.month || '—';
-  document.getElementById('f-total').textContent  = (f.total_cost||0).toFixed(3)+'€';
-  document.getElementById('f-videos').textContent = f.total_videos || 0;
-  document.getElementById('f-avg').textContent    = (f.avg_cost_per_video||0).toFixed(3)+'€';
+  document.getElementById('f-total').textContent    = (f.total_cost||0).toFixed(3)+'€';
+  document.getElementById('f-videos').textContent   = f.total_videos || 0;
+  document.getElementById('f-avg').textContent      = (f.avg_cost_per_video||0).toFixed(3)+'€';
+  document.getElementById('f-total-all').textContent= (f.all_time_cost||0).toFixed(3)+'€';
 
   // ── Proveedores — solo los que tienen gasto real > 0 ─────────
   const provEl = document.getElementById('finance-providers');
