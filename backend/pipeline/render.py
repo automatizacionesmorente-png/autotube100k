@@ -1,8 +1,40 @@
 import subprocess
 import json
-import re
+import math
+import shutil
+import random
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from ..database import add_step
+
+MUSIC_DIR = Path(__file__).parent.parent.parent / "music"
+
+# Mapa tono → subcarpeta de música
+MUSIC_TONE_MAP = {
+    "misterio":     ["misterio", "neutro"],
+    "drama":        ["drama", "misterio"],
+    "motivacional": ["motivacional", "neutro"],
+    "documental":   ["documental", "neutro"],
+    "humor":        ["humor", "neutro"],
+    "neutro":       ["neutro", "documental"],
+}
+
+def _pick_music(tone: str) -> Path | None:
+    """Selecciona un MP3 aleatorio de la carpeta del tono. Fallback a carpetas alternativas."""
+    folders = MUSIC_TONE_MAP.get(tone, ["neutro"])
+    for folder in folders:
+        d = MUSIC_DIR / folder
+        if d.exists():
+            mp3s = list(d.glob("*.mp3"))
+            if mp3s:
+                return random.choice(mp3s)
+    # Buscar en cualquier subcarpeta
+    all_mp3s = list(MUSIC_DIR.rglob("*.mp3"))
+    return random.choice(all_mp3s) if all_mp3s else None
+
+MAX_KB_DURATION = 8.0  # Ken Burns máx 8s por sub-clip — evita bug de zoompan con d>300
+KB_WORKERS = 12        # ffmpeg Ken Burns en paralelo
+FADE_SEC = 0.35        # fundido entre imágenes (segundos)
 
 
 def get_duration(path: Path) -> float:
@@ -14,233 +46,314 @@ def get_duration(path: Path) -> float:
 
 
 def _ffmpeg(*args):
-    """Ejecuta FFmpeg y lanza error con stderr si falla."""
-    result = subprocess.run(
-        ["ffmpeg", "-y"] + list(args),
-        capture_output=True, text=True
-    )
+    result = subprocess.run(["ffmpeg", "-y"] + list(args), capture_output=True, text=True)
     if result.returncode != 0:
-        # Incluir las últimas líneas de stderr para diagnóstico claro
-        stderr_tail = "\n".join(result.stderr.strip().splitlines()[-8:])
-        raise RuntimeError(f"FFmpeg error (código {result.returncode}):\n{stderr_tail}")
+        tail = "\n".join(result.stderr.strip().splitlines()[-10:])
+        raise RuntimeError(f"FFmpeg error ({result.returncode}):\n{tail}")
     return result
+
+
+def _color_grade(tone: str) -> str:
+    """Filtro de color grading según el tono narrativo."""
+    grades = {
+        "misterio": "eq=contrast=1.12:brightness=-0.06:saturation=0.75,colorchannelmixer=rr=0.9:gg=0.95:bb=1.1",
+        "drama":    "eq=contrast=1.15:brightness=-0.08:saturation=0.70,colorchannelmixer=rr=0.85:gg=0.90:bb=1.05",
+        "motivacional": "eq=contrast=1.05:brightness=0.02:saturation=1.15",
+        "documental":   "eq=contrast=1.08:brightness=-0.02:saturation=0.90",
+        "humor":        "eq=contrast=1.0:brightness=0.03:saturation=1.10",
+        "neutro":       "eq=contrast=1.05:brightness=-0.01:saturation=0.95",
+    }
+    return grades.get(tone, grades["neutro"])
+
+
+def _image_to_clips(img: Path, total_dur: float, tmp_dir: Path,
+                    base_idx: int) -> list[Path]:
+    """Convierte 1 imagen a N sub-clips con Ken Burns + fade in/out en imagen completa."""
+    n = max(1, math.ceil(total_dur / MAX_KB_DURATION))
+    clip_dur = total_dur / n
+    clips = []
+
+    for j in range(n):
+        out = tmp_dir / f"img_{base_idx:03d}_{j}.mp4"
+        kb = _ken_burns(base_idx * 8 + j, clip_dur)
+
+        # Fade in solo en el primer sub-clip, fade out solo en el último
+        fade_parts = [kb]
+        if j == 0 and FADE_SEC > 0:
+            fade_parts.append(f"fade=t=in:st=0:d={FADE_SEC}")
+        if j == n - 1 and FADE_SEC > 0:
+            fade_parts.append(f"fade=t=out:st={max(0, clip_dur - FADE_SEC):.3f}:d={FADE_SEC}")
+
+        vf = ",".join(fade_parts)
+
+        _ffmpeg(
+            "-loop", "1", "-i", str(img),
+            "-vf", vf,
+            "-t", f"{clip_dur:.4f}",
+            "-c:v", "libx264", "-preset", "ultrafast", "-an", "-r", "25",
+            str(out)
+        )
+        clips.append(out)
+    return clips
+
+
+def _image_to_clips_batch(images: list[Path], img_dur: float,
+                           tmp_dir: Path, base_idx: int = 0) -> list[list[Path]]:
+    """Procesa todas las imágenes en paralelo con KB_WORKERS workers."""
+    results: list[list[Path] | None] = [None] * len(images)
+
+    def work(i: int, img: Path):
+        return i, _image_to_clips(img, img_dur, tmp_dir, base_idx + i)
+
+    with ThreadPoolExecutor(max_workers=KB_WORKERS) as ex:
+        futs = {ex.submit(work, i, img): i for i, img in enumerate(images)}
+        for f in as_completed(futs):
+            i, clips = f.result()
+            results[i] = clips
+
+    return results  # type: ignore
 
 
 def render_video(
     job_id: str,
-    hook_videos: list[Path],
+    hook_clips: list[Path],
     body_images: list[Path],
     audio_path: Path,
     output_path: Path,
     title: str,
+    hook_images: list[Path] = None,
+    tone: str = "neutro",
 ) -> Path:
-    add_step(job_id, "render", "running", "Montando vídeo con FFmpeg")
+    add_step(job_id, "render", "running",
+             f"Iniciando montaje — tono: {tone} · {KB_WORKERS} workers Ken Burns…")
 
-    # ── Verificaciones previas ─────────────────────────────────────────────
     if not audio_path.exists() or audio_path.stat().st_size == 0:
-        raise RuntimeError(f"Audio no encontrado o vacío: {audio_path}")
-    valid_images = [img for img in body_images if img.exists() and img.stat().st_size > 0]
-    if len(valid_images) < 3:
-        raise RuntimeError(f"Imágenes insuficientes para el vídeo: {len(valid_images)} (mínimo 3)")
+        raise RuntimeError(f"Audio vacío: {audio_path}")
+
+    valid_body = [i for i in body_images if i.exists() and i.stat().st_size > 5000]
+    if len(valid_body) < 3:
+        raise RuntimeError(f"Solo {len(valid_body)} imágenes válidas (mínimo 3)")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_dir = output_path.parent / f"tmp_{job_id}"
-    tmp_dir.mkdir(exist_ok=True)
+    tmp = output_path.parent / f"tmp_{job_id}"
+    tmp.mkdir(exist_ok=True)
 
-    audio_duration = get_duration(audio_path)
+    audio_dur = get_duration(audio_path)
+    add_step(job_id, "render", "running",
+             f"Audio: {audio_dur/60:.1f} min | {len(valid_body)} imágenes | "
+             f"color: {tone}")
 
-    # ── 1. Hook: vídeos Kling SI existen, si no → primeras imágenes como intro ──
-    valid_hook_videos = [v for v in hook_videos if v.exists() and v.stat().st_size > 0]
-    hook_concat = tmp_dir / "hook.mp4"
+    # ── HOOK ──────────────────────────────────────────────────────────────────
+    hook_dur = min(25.0, audio_dur * 0.15)
+    hook_concat = tmp / "hook.mp4"
 
-    if valid_hook_videos:
-        hook_duration = min(len(valid_hook_videos) * 5, audio_duration * 0.15)
-        hook_list = tmp_dir / "hook_list.txt"
-        hook_list.write_text("\n".join(f"file '{v.resolve()}'" for v in valid_hook_videos))
-        _ffmpeg(
-            "-f", "concat", "-safe", "0",
-            "-i", str(hook_list),
-            "-vf", "scale=1280:720",
-            "-c:v", "libx264", "-preset", "fast", "-an",
-            str(hook_concat)
+    valid_hook_vids = [v for v in (hook_clips or []) if v.exists() and v.stat().st_size > 0]
+    valid_hook_imgs = [i for i in (hook_images or []) if i.exists() and i.stat().st_size > 5000]
+
+    if valid_hook_vids:
+        lst = tmp / "hv_list.txt"
+        lst.write_text("\n".join(f"file '{v.resolve()}'" for v in valid_hook_vids))
+        _ffmpeg("-f", "concat", "-safe", "0", "-i", str(lst),
+                "-vf", "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720",
+                "-c:v", "libx264", "-preset", "ultrafast", "-an", str(hook_concat))
+    elif valid_hook_imgs:
+        per_img = hook_dur / len(valid_hook_imgs)
+        hook_clip_groups = _image_to_clips_batch(valid_hook_imgs, per_img, tmp, base_idx=900)
+        clips_h = [c for group in hook_clip_groups for c in group]
+        _write_concat(tmp / "hi_list.txt", clips_h)
+        _ffmpeg("-f", "concat", "-safe", "0", "-i", str(tmp / "hi_list.txt"),
+                "-c:v", "libx264", "-preset", "ultrafast", "-an", str(hook_concat))
+    else:
+        n_h = min(4, len(valid_body))
+        per_h = hook_dur / n_h
+        hook_clip_groups = _image_to_clips_batch(valid_body[:n_h], per_h, tmp, base_idx=900)
+        clips_h = [c for group in hook_clip_groups for c in group]
+        _write_concat(tmp / "hf_list.txt", clips_h)
+        _ffmpeg("-f", "concat", "-safe", "0", "-i", str(tmp / "hf_list.txt"),
+                "-c:v", "libx264", "-preset", "ultrafast", "-an", str(hook_concat))
+
+    # ── CUERPO: Ken Burns + Whisper EN PARALELO ───────────────────────────────
+    body_dur = audio_dur - hook_dur
+    img_dur = body_dur / len(valid_body)
+    n_subclips = math.ceil(img_dur / MAX_KB_DURATION)
+    add_step(job_id, "render", "running",
+             f"Ken Burns paralelo ({KB_WORKERS} workers) + Whisper simultáneo — "
+             f"{len(valid_body)} imgs × {n_subclips} sub-clips…")
+
+    ass_path = tmp / "subs.ass"
+
+    # Lanzar Whisper en background MIENTRAS se procesan los Ken Burns
+    with ThreadPoolExecutor(max_workers=1) as whisper_ex:
+        whisper_fut = whisper_ex.submit(_whisper_subtitles, audio_path, ass_path)
+
+        clip_groups = _image_to_clips_batch(valid_body, img_dur, tmp, base_idx=0)
+        all_body_clips = [c for group in clip_groups for c in group]
+
+        _write_concat(tmp / "body_list.txt", all_body_clips)
+        body_mp4 = tmp / "body.mp4"
+        _ffmpeg("-f", "concat", "-safe", "0", "-i", str(tmp / "body_list.txt"),
+                "-c:v", "libx264", "-preset", "ultrafast", "-an", str(body_mp4))
+
+        _write_concat(tmp / "full_list.txt", [hook_concat, body_mp4])
+        full_mp4 = tmp / "full.mp4"
+        _ffmpeg("-f", "concat", "-safe", "0", "-i", str(tmp / "full_list.txt"),
+                "-c:v", "libx264", "-preset", "ultrafast", "-an", str(full_mp4))
+
+        subs_ok = whisper_fut.result()
+
+    music_path = _pick_music(tone)
+    has_music = music_path is not None and music_path.exists()
+    add_step(job_id, "render", "running",
+             f"Subtítulos {'✓' if subs_ok else '✗'} · música {'✓ ' + music_path.stem[:30] if has_music else '✗ (sin música aún)'} · encode final…")
+
+    # ── MEZCLA FINAL: audio + música + subtítulos + color grade + CTA ─────────
+    cta_start = max(0, audio_dur - 12)
+    grade = _color_grade(tone)
+
+    if subs_ok:
+        esc = str(ass_path.resolve()).replace("'", "\\'").replace(":", "\\:")
+        vf = (
+            f"subtitles='{esc}',"
+            f"{grade},"
+            f"drawtext=text='¡SUSCRÍBETE Y ACTIVA LA CAMPANITA!':"
+            f"fontcolor=white:fontsize=36:box=1:boxcolor=red@0.88:boxborderw=14:"
+            f"x=(w-text_w)/2:y=h*0.06:enable='between(t,{cta_start:.1f},{audio_dur:.1f})'"
         )
     else:
-        # Fallback: usa las 3 primeras imágenes con Ken Burns como hook (15 seg)
-        add_step(job_id, "render", "running", "Sin vídeos hook — usando imágenes intro como fallback")
-        n_hook_imgs = min(3, len(valid_images))
-        hook_duration = min(15, audio_duration * 0.15)
-        img_dur_hook = hook_duration / n_hook_imgs
-        hook_clips = []
-        for i, img in enumerate(valid_images[:n_hook_imgs]):
-            out = tmp_dir / f"hook_img_{i}.mp4"
-            zoompan = _ken_burns_filter(i + 10, img_dur_hook)
-            _ffmpeg(
-                "-loop", "1", "-i", str(img),
-                "-vf", zoompan, "-t", str(img_dur_hook),
-                "-c:v", "libx264", "-preset", "fast", "-an", "-r", "25",
-                str(out)
-            )
-            hook_clips.append(out)
-        hook_list = tmp_dir / "hook_list.txt"
-        hook_list.write_text("\n".join(f"file '{v.resolve()}'" for v in hook_clips))
-        _ffmpeg(
-            "-f", "concat", "-safe", "0",
-            "-i", str(hook_list),
-            "-c:v", "libx264", "-preset", "fast", "-an",
-            str(hook_concat)
+        vf = (
+            f"{grade},"
+            f"drawtext=text='¡SUSCRÍBETE Y ACTIVA LA CAMPANITA!':"
+            f"fontcolor=white:fontsize=36:box=1:boxcolor=red@0.88:boxborderw=14:"
+            f"x=(w-text_w)/2:y=h*0.06:enable='between(t,{cta_start:.1f},{audio_dur:.1f})'"
         )
 
-    body_duration = audio_duration - hook_duration
-    img_duration = body_duration / len(valid_images) if valid_images else 5
-
-    # ── 2. Imágenes con Ken Burns ──────────────────────────────────────────
-    add_step(job_id, "render", "running", f"Aplicando Ken Burns a {len(valid_images)} imágenes...")
-    img_clips = []
-    for i, img in enumerate(valid_images):
-        out = tmp_dir / f"img_{i:02d}.mp4"
-        zoompan = _ken_burns_filter(i, img_duration)
+    if has_music:
+        # Mezcla: narración al 100% + música a -22dB de fondo (barely noticeable, cinematic)
         _ffmpeg(
-            "-loop", "1", "-i", str(img),
-            "-vf", zoompan,
-            "-t", str(img_duration),
-            "-c:v", "libx264", "-preset", "fast", "-an", "-r", "25",
-            str(out)
+            "-i", str(full_mp4),
+            "-i", str(audio_path),
+            "-stream_loop", "-1", "-i", str(music_path),
+            "-filter_complex",
+            f"[1:a]volume=1.0[voice];[2:a]volume=0.08,atrim=0:duration={audio_dur:.2f},afade=t=out:st={max(0,audio_dur-3):.1f}:d=3[music];[voice][music]amix=inputs=2:duration=first[aout]",
+            "-map", "0:v", "-map", "[aout]",
+            "-vf", vf,
+            "-c:v", "libx264", "-preset", "fast", "-crf", "26",
+            "-c:a", "aac", "-b:a", "128k",
+            "-movflags", "+faststart",
+            "-shortest",
+            str(output_path)
         )
-        img_clips.append(out)
+    else:
+        _ffmpeg(
+            "-i", str(full_mp4),
+            "-i", str(audio_path),
+            "-vf", vf,
+            "-c:v", "libx264", "-preset", "fast", "-crf", "26",
+            "-c:a", "aac", "-b:a", "128k",
+            "-movflags", "+faststart",
+            "-shortest",
+            str(output_path)
+        )
 
-    # ── 3. Concatenar imágenes ─────────────────────────────────────────────
-    body_list = tmp_dir / "body_list.txt"
-    body_list.write_text("\n".join(f"file '{v.resolve()}'" for v in img_clips))
-    body_concat = tmp_dir / "body.mp4"
-    _ffmpeg(
-        "-f", "concat", "-safe", "0",
-        "-i", str(body_list),
-        "-c:v", "libx264", "-preset", "fast", "-an",
-        str(body_concat)
-    )
+    try:
+        shutil.rmtree(tmp)
+    except Exception:
+        pass
 
-    # ── 4. Unir hook + body ────────────────────────────────────────────────
-    full_list = tmp_dir / "full_list.txt"
-    full_list.write_text(f"file '{hook_concat.resolve()}'\nfile '{body_concat.resolve()}'")
-    full_video = tmp_dir / "full_video.mp4"
-    _ffmpeg(
-        "-f", "concat", "-safe", "0",
-        "-i", str(full_list),
-        "-c:v", "libx264", "-preset", "fast", "-an",
-        str(full_video)
-    )
-
-    # ── 5. Generar subtítulos estilo TikTok con Whisper ───────────────────
-    add_step(job_id, "render", "running", "Transcribiendo audio para subtítulos (Whisper)...")
-    ass_path = tmp_dir / "subtitles.ass"
-    _generate_tiktok_subtitles(audio_path, ass_path)
-
-    # ── 6. CTA overlay + audio ────────────────────────────────────────────
-    add_step(job_id, "render", "running", "Añadiendo subtítulos, CTA y audio final...")
-    cta_start = audio_duration - 8
-    cta_filter = (
-        f"subtitles={ass_path},"
-        f"drawtext=text='¡SUSCRÍBETE Y ACTIVA LA CAMPANITA!'"
-        f":fontcolor=white:fontsize=42:box=1:boxcolor=red@0.85:boxborderw=14"
-        f":x=(w-text_w)/2:y=h*0.08"
-        f":enable='between(t,{cta_start:.1f},{audio_duration:.1f})'"
-    )
-
-    _ffmpeg(
-        "-i", str(full_video),
-        "-i", str(audio_path),
-        "-vf", cta_filter,
-        "-c:v", "libx264", "-preset", "medium", "-crf", "22",
-        "-c:a", "aac", "-b:a", "192k",
-        "-shortest",
-        str(output_path)
-    )
-
-    add_step(job_id, "render", "done", f"Vídeo listo con subtítulos: {output_path.name}", 0)
+    size_mb = output_path.stat().st_size / 1024 / 1024
+    add_step(job_id, "render", "done",
+             f"Vídeo listo: {size_mb:.0f} MB · {audio_dur/60:.0f} min · "
+             f"subtítulos {'✓' if subs_ok else '✗'} · grade: {tone}", 0)
     return output_path
 
 
-def _generate_tiktok_subtitles(audio_path: Path, ass_path: Path):
-    """Transcribe audio con Whisper y genera subtítulos estilo TikTok (.ass)."""
-    from faster_whisper import WhisperModel
+# ── Helpers ────────────────────────────────────────────────────────────────────
 
-    model = WhisperModel("small", device="cpu", compute_type="int8")
-    segments, _ = model.transcribe(
-        str(audio_path),
-        language="es",
-        word_timestamps=True,
-        vad_filter=True,
-    )
+def _write_concat(path: Path, clips: list[Path]):
+    path.write_text("\n".join(f"file '{c.resolve()}'" for c in clips))
 
-    words = []
-    for seg in segments:
-        if seg.words:
-            for w in seg.words:
-                words.append((w.start, w.end, w.word.strip()))
 
-    groups = []
-    chunk, chunk_start, chunk_end = [], None, None
-    for start, end, word in words:
-        if not word:
-            continue
-        if chunk_start is None:
-            chunk_start = start
-        chunk.append(word)
-        chunk_end = end
-        if len(chunk) >= 5:
-            groups.append((chunk_start, chunk_end, " ".join(chunk)))
-            chunk, chunk_start, chunk_end = [], None, None
+def _whisper_subtitles(audio_path: Path, ass_path: Path) -> bool:
+    try:
+        from faster_whisper import WhisperModel
+        model = WhisperModel("small", device="cpu", compute_type="int8")
+        segments, _ = model.transcribe(str(audio_path), language="es",
+                                       word_timestamps=True, vad_filter=True)
+        words = []
+        for seg in segments:
+            if seg.words:
+                for w in seg.words:
+                    if w.word.strip():
+                        words.append((w.start, w.end, w.word.strip()))
 
-    if chunk:
-        groups.append((chunk_start, chunk_end, " ".join(chunk)))
+        # 3 palabras por grupo = más dinámico (TikTok style)
+        groups, chunk, cs, ce = [], [], None, None
+        for s, e, w in words:
+            if cs is None:
+                cs = s
+            chunk.append(w)
+            ce = e
+            if len(chunk) >= 3:
+                groups.append((cs, ce, " ".join(chunk)))
+                chunk, cs, ce = [], None, None
+        if chunk:
+            groups.append((cs, ce, " ".join(chunk)))
 
-    ass_path.write_text(_build_ass(groups), encoding="utf-8")
+        ass_path.write_text(_build_ass(groups), encoding="utf-8")
+        return True
+    except Exception:
+        return False
 
 
 def _build_ass(groups: list) -> str:
-    """Genera archivo ASS con fuente grande, negrita, centrada y sombra — estilo TikTok."""
-    header = """[Script Info]
-ScriptType: v4.00+
-PlayResX: 1280
-PlayResY: 720
-ScaledBorderAndShadow: yes
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: TikTok,Arial,58,&H00FFFFFF,&H000000FF,&H00000000,&H99000000,-1,0,0,0,100,100,0,0,1,3,2,2,40,40,80,1
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-"""
+    header = (
+        "[Script Info]\nScriptType: v4.00+\nPlayResX: 1280\nPlayResY: 720\n"
+        "ScaledBorderAndShadow: yes\n\n"
+        "[V4+ Styles]\n"
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
+        "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
+        "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+        "Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        # Texto blanco, sombra negra gruesa, fuente grande — estilo True Crime
+        "Style: TikTok,Arial,68,&H00FFFFFF,&H000000FF,&H00000000,&HCC000000,"
+        "-1,0,0,0,100,100,1,0,1,4,2,2,40,40,100,1\n\n"
+        "[Events]\nFormat: Layer, Start, End, Style, Name, "
+        "MarginL, MarginR, MarginV, Effect, Text\n"
+    )
     lines = []
-    for start, end, text in groups:
+    for s, e, text in groups:
         text = text.replace("{", "").replace("}", "").replace("\\n", " ").strip()
         if not text:
             continue
-        s = _fmt_time(start)
-        e = _fmt_time(end + 0.05)
-        styled = f"{{\\an2}}{text.upper()}"
-        lines.append(f"Dialogue: 0,{s},{e},TikTok,,0,0,0,,{styled}")
-
+        lines.append(
+            f"Dialogue: 0,{_t(s)},{_t(e+0.05)},TikTok,,0,0,0,,"
+            f"{{\\an2}}{text.upper()}"
+        )
     return header + "\n".join(lines) + "\n"
 
 
-def _fmt_time(seconds: float) -> str:
-    """Convierte segundos a formato ASS: H:MM:SS.cs"""
-    s = max(0, seconds)
-    h = int(s // 3600)
-    m = int((s % 3600) // 60)
-    sec = s % 60
-    cs = int((sec - int(sec)) * 100)
-    return f"{h}:{m:02d}:{int(sec):02d}.{cs:02d}"
+def _t(seconds: float) -> str:
+    s = max(0.0, seconds)
+    h, rem = divmod(s, 3600)
+    m, sec = divmod(rem, 60)
+    return f"{int(h)}:{int(m):02d}:{int(sec):02d}.{int((sec%1)*100):02d}"
 
 
-def _ken_burns_filter(index: int, duration: float) -> str:
-    d = int(duration * 25)
-    effects = [
+def _ken_burns(idx: int, dur: float) -> str:
+    """12 efectos distintos. dur limitado a MAX_KB_DURATION por _image_to_clips."""
+    d = max(1, int(dur * 25))
+    fx = [
         f"scale=1920:1080,zoompan=z='min(zoom+0.001,1.3)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={d}:s=1280x720",
-        f"scale=1440:810,zoompan=z=1.2:x='if(lte(x,0),0,x-1)':y='ih/2-(ih/zoom/2)':d={d}:s=1280x720",
-        f"scale=1920:1080,zoompan=z='if(lte(zoom,1.0),1.3,max(zoom-0.001,1.0))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={d}:s=1280x720",
-        f"scale=1440:810,zoompan=z=1.15:x='min(iw/2,x+0.5)':y='ih/2-(ih/zoom/2)':d={d}:s=1280x720",
+        f"scale=1440:810,zoompan=z=1.2:x='iw/2-(iw/zoom/2)+((iw/zoom/4)*on/{d})':y='ih/2-(ih/zoom/2)':d={d}:s=1280x720",
+        f"scale=1920:1080,zoompan=z='max(1.3-0.001*on,1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={d}:s=1280x720",
+        f"scale=1440:810,zoompan=z=1.2:x='iw/2-(iw/zoom/2)-((iw/zoom/4)*on/{d})':y='ih/2-(ih/zoom/2)':d={d}:s=1280x720",
+        f"scale=1920:1080,zoompan=z='min(zoom+0.0008,1.25)':x='iw/2-(iw/zoom/2)':y='ih-(ih/zoom)':d={d}:s=1280x720",
+        f"scale=1440:810,zoompan=z=1.2:x='iw/2-(iw/zoom/2)':y='ih/zoom*(0.9-0.4*on/{d})':d={d}:s=1280x720",
+        f"scale=1920:1080,zoompan=z='min(zoom+0.001,1.3)':x='iw*0.1':y='ih*0.1':d={d}:s=1280x720",
+        f"scale=1440:810,zoompan=z=1.2:x='(iw/zoom/2)*(0.6+0.8*on/{d})':y='(ih/zoom/2)*(0.6+0.8*on/{d})':d={d}:s=1280x720",
+        f"scale=1920:1080,zoompan=z='1.1+0.1*sin(3.14*on/{d})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={d}:s=1280x720",
+        f"scale=1440:810,zoompan=z=1.2:x='iw/2-(iw/zoom/2)':y='ih/zoom*(0.5+0.4*on/{d})':d={d}:s=1280x720",
+        f"scale=1920:1080,zoompan=z='min(zoom+0.001,1.3)':x='iw*0.7':y='ih*0.7':d={d}:s=1280x720",
+        f"scale=1920:1080,zoompan=z='max(1.2-0.0005*on,1.05)':x='iw/2-(iw/zoom/2)+((iw/zoom/6)*on/{d})':y='ih/2-(ih/zoom/2)':d={d}:s=1280x720",
     ]
-    return effects[index % len(effects)]
+    return fx[idx % len(fx)]

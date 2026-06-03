@@ -6,28 +6,54 @@ from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
 from ..database import add_step, get_conn
 
+
 def generate_metadata(job_id: str, script: str, title: str, niche: str) -> dict:
-    """Haiku genera descripción y hashtags."""
+    """Genera descripción con capítulos, hashtags SEO y tags optimizados."""
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     msg = client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=600,
+        max_tokens=900,
         messages=[{
             "role": "user",
-            "content": f"""Título: {title}
+            "content": f"""Título del vídeo: {title}
 Nicho: {niche}
 
-Escribe:
-1. DESCRIPCION: (2-3 párrafos atractivos para YouTube, incluye palabras clave naturalmente)
-2. HASHTAGS: (10-15 hashtags relevantes separados por espacio, sin salto de línea)
+Genera metadatos optimizados para YouTube SEO:
 
-Usa exactamente esas etiquetas."""
+DESCRIPCION:
+Escribe 3-4 párrafos atractivos con palabras clave naturales sobre el tema.
+Incluye al final: "📌 SUSCRÍBETE para más contenido sobre {niche}: [enlace]"
+
+CAPITULOS:
+Escribe 8 capítulos con timestamps en formato "MM:SS Nombre del capítulo".
+Empieza siempre con "00:00 Introducción".
+
+HASHTAGS:
+Exactamente 15 hashtags relevantes separados por espacio. Empieza cada uno con #.
+Mezcla hashtags amplios (#YouTube, #{niche.replace(' ','')}) con específicos del tema.
+
+TAGS:
+15 tags SEO separados por comas, sin # (para el campo tags de YouTube).
+
+Usa exactamente esas cuatro etiquetas en mayúsculas."""
         }]
     )
     text = msg.content[0].text
-    desc = _extract_between(text, "DESCRIPCION:", "HASHTAGS:").strip()
-    hashtags = _extract_after(text, "HASHTAGS:").strip()
-    return {"description": desc, "hashtags": hashtags}
+    desc = _extract_between(text, "DESCRIPCION:", "CAPITULOS:").strip()
+    chapters = _extract_between(text, "CAPITULOS:", "HASHTAGS:").strip()
+    hashtags = _extract_between(text, "HASHTAGS:", "TAGS:").strip()
+    tags_raw = _extract_after(text, "TAGS:").strip()
+
+    # Combinar descripción con capítulos (YouTube los indexa automáticamente)
+    full_description = f"{desc}\n\n📖 CONTENIDO DEL VÍDEO:\n{chapters}\n\n{hashtags}"
+    tags_list = _sanitize_tags(tags_raw)
+
+    return {
+        "description": full_description,
+        "hashtags": hashtags,
+        "tags": tags_list,
+    }
+
 
 def upload_to_youtube(
     job_id: str,
@@ -37,22 +63,23 @@ def upload_to_youtube(
     metadata: dict,
     channel_id: str,
 ) -> str:
-    add_step(job_id, "upload", "running", "Subiendo vídeo a YouTube")
+    add_step(job_id, "upload", "running", "Subiendo vídeo a YouTube...")
 
     creds = _get_channel_credentials(channel_id)
     if not creds:
-        add_step(job_id, "upload", "skipped", "Canal sin credenciales YouTube configuradas")
+        add_step(job_id, "upload", "skipped",
+                 "Canal sin credenciales — configura YouTube OAuth en Canales")
         return None
 
     youtube = build("youtube", "v3", credentials=creds)
 
-    description = metadata["description"] + "\n\n" + metadata["hashtags"]
+    description = metadata.get("description", "") + "\n\n" + metadata.get("hashtags", "")
     body = {
         "snippet": {
             "title": title[:100],
             "description": description[:5000],
-            "tags": [t.lstrip("#") for t in metadata["hashtags"].split()[:15]],
-            "categoryId": "22",  # People & Blogs
+            "tags": metadata.get("tags", []),
+            "categoryId": "22",
             "defaultLanguage": "es",
         },
         "status": {
@@ -61,34 +88,56 @@ def upload_to_youtube(
         }
     }
 
-    media = MediaFileUpload(str(video_path), mimetype="video/mp4", resumable=True, chunksize=10*1024*1024)
-    request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
+    media = MediaFileUpload(
+        str(video_path), mimetype="video/mp4",
+        resumable=True, chunksize=10 * 1024 * 1024
+    )
 
-    response = None
-    while response is None:
-        _, response = request.next_chunk()
+    def _do_insert(b):
+        req = youtube.videos().insert(part="snippet,status", body=b, media_body=media)
+        resp = None
+        while resp is None:
+            _, resp = req.next_chunk()
+        return resp
+
+    try:
+        response = _do_insert(body)
+    except Exception as e:
+        if "invalidTags" in str(e) or "keyword" in str(e).lower():
+            # Reintentar sin tags
+            add_step(job_id, "upload", "running", "Tags inválidos — reintentando sin tags…")
+            body["snippet"]["tags"] = []
+            response = _do_insert(body)
+        else:
+            raise
 
     video_id = response["id"]
 
-    # Subir thumbnail
     if thumbnail_path and thumbnail_path.exists():
-        youtube.thumbnails().set(
-            videoId=video_id,
-            media_body=MediaFileUpload(str(thumbnail_path), mimetype="image/jpeg")
-        ).execute()
+        try:
+            youtube.thumbnails().set(
+                videoId=video_id,
+                media_body=MediaFileUpload(str(thumbnail_path), mimetype="image/jpeg")
+            ).execute()
+        except Exception:
+            pass  # la miniatura es opcional, no fallar si no funciona
 
     youtube_url = f"https://www.youtube.com/watch?v={video_id}"
-    add_step(job_id, "upload", "done", f"Subido: {youtube_url}", 0)
-    return youtube_url
+    studio_url  = f"https://studio.youtube.com/video/{video_id}/edit"
+    add_step(job_id, "upload", "done", f"✅ Subido — revisa en YouTube Studio: {studio_url}", 0)
+    return youtube_url, studio_url
+
 
 def _get_channel_credentials(channel_id: str) -> Credentials | None:
+    if not channel_id:
+        return None
     conn = get_conn()
     row = conn.execute(
         "SELECT access_token, refresh_token FROM channels WHERE id = ? AND connected = 1",
         (channel_id,)
     ).fetchone()
     conn.close()
-    if not row:
+    if not row or not row["access_token"]:
         return None
     return Credentials(
         token=row["access_token"],
@@ -98,13 +147,44 @@ def _get_channel_credentials(channel_id: str) -> Credentials | None:
         client_secret=os.environ.get("YOUTUBE_CLIENT_SECRET"),
     )
 
+
+def _sanitize_tags(tags_raw: str) -> list[str]:
+    """
+    Limpia los tags para que YouTube los acepte.
+    YouTube solo acepta: letras, números, espacios. Sin comas, #, símbolos.
+    Max 30 chars/tag, max 500 chars total.
+    """
+    import re
+    # Limpiar todo lo que no sea letra/número/espacio
+    raw = tags_raw.replace("#", " ").replace('"', " ").replace("'", " ")
+    raw = raw.replace(";", ",")  # normalizar separadores alternativos
+    candidates = [t.strip() for t in raw.split(",") if t.strip()]
+    clean = []
+    total_chars = 0
+    for tag in candidates:
+        # Solo ASCII letras/números + espacios (lo más seguro para YouTube API)
+        tag = re.sub(r"[^a-zA-Z0-9áéíóúüñÁÉÍÓÚÜÑ\s]", " ", tag)
+        tag = " ".join(tag.split())  # normalizar espacios múltiples
+        tag = tag[:30].strip()
+        if len(tag) < 2:
+            continue
+        if total_chars + len(tag) + 1 > 490:
+            break
+        clean.append(tag)
+        total_chars += len(tag) + 1
+        if len(clean) >= 15:
+            break
+    return clean
+
+
 def _extract_between(text, start, end):
     try:
         s = text.index(start) + len(start)
         e = text.index(end)
         return text[s:e]
     except ValueError:
-        return text
+        return ""
+
 
 def _extract_after(text, tag):
     try:

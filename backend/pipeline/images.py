@@ -285,7 +285,7 @@ def generate_thumbnail(job_id: str, title: str, niche: str, output_dir: Path,
 
     if key:
         try:
-            thumb_text, ideogram_prompt = _build_ideogram_prompt(title, niche, tone)
+            thumb_text, ideogram_prompt = _build_ideogram_prompt(job_id, title, niche, tone)
             with httpx.Client(timeout=180) as client:
                 r = client.post(
                     FAL_IDEOGRAM,
@@ -343,7 +343,7 @@ def generate_thumbnail(job_id: str, title: str, niche: str, output_dir: Path,
     return final
 
 
-def _build_ideogram_prompt(title: str, niche: str, tone: str) -> tuple[str, str]:
+def _build_ideogram_prompt(job_id: str, title: str, niche: str, tone: str) -> tuple[str, str]:
     """Usa Haiku para generar texto corto + prompt Ideogram optimizado."""
     try:
         client_ai = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])

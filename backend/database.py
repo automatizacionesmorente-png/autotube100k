@@ -133,27 +133,81 @@ def get_jobs(limit=50):
 def get_finance_summary():
     conn = get_conn()
     month = datetime.now().strftime("%Y-%m")
+
     total_cost = conn.execute(
-        "SELECT COALESCE(SUM(cost_total), 0) FROM jobs WHERE created_at LIKE ? AND status = 'done'",
+        "SELECT COALESCE(SUM(cost_total), 0) FROM jobs WHERE created_at LIKE ? AND status='done'",
         (f"{month}%",)
     ).fetchone()[0]
     total_videos = conn.execute(
-        "SELECT COUNT(*) FROM jobs WHERE created_at LIKE ? AND status = 'done'",
+        "SELECT COUNT(*) FROM jobs WHERE created_at LIKE ? AND status='done'",
         (f"{month}%",)
     ).fetchone()[0]
     avg_cost = (total_cost / total_videos) if total_videos > 0 else 0
+
+    # Desglose granular por servicio (todos los eventos del mes, incluyendo jobs en curso)
     by_service = conn.execute(
-        "SELECT service, ROUND(SUM(total_cost), 4) as total FROM cost_events "
-        "WHERE created_at LIKE ? GROUP BY service ORDER BY total DESC",
+        "SELECT service, ROUND(SUM(total_cost),5) as total, SUM(units) as units "
+        "FROM cost_events WHERE created_at LIKE ? GROUP BY service ORDER BY total DESC",
         (f"{month}%",)
     ).fetchall()
+
+    # Agrupar por proveedor para vista resumida
+    provider_map = {
+        # FAL.AI
+        "fal_flux_schnell":    "fal.ai",
+        "fal_flux_hook":       "fal.ai",
+        "fal_flux_thumbnail":  "fal.ai",
+        "flux_schnell":        "fal.ai",
+        "flux_schnell_thumb":  "fal.ai",
+        "ideogram_thumbnail":  "fal.ai",
+        # Anthropic
+        "claude_haiku":        "anthropic",
+        "claude_haiku_ext":    "anthropic",
+        "claude_haiku_prompts":"anthropic",
+        "claude_sonnet":       "anthropic",
+        "claude_sonnet_ext":   "anthropic",
+        # OpenAI
+        "openai_tts":          "openai",
+        # Gratis
+        "edge_tts":            "gratis",
+        "kokoro_tts":          "gratis",
+        "pollinations":        "gratis",
+    }
+    by_provider: dict[str, float] = {}
+    for row in by_service:
+        svc = row["service"]
+        prov = provider_map.get(svc, svc)
+        by_provider[prov] = round(by_provider.get(prov, 0) + row["total"], 5)
+
+    # Últimos 10 vídeos con su coste desglosado
+    jobs_detail = conn.execute(
+        "SELECT id, title, niche, status, cost_total, created_at, "
+        "youtube_url, finished_at FROM jobs WHERE created_at LIKE ? "
+        "ORDER BY created_at DESC LIMIT 10",
+        (f"{month}%",)
+    ).fetchall()
+
+    jobs_with_breakdown = []
+    for j in jobs_detail:
+        jd = dict(j)
+        svc_rows = conn.execute(
+            "SELECT service, ROUND(SUM(total_cost),5) as total "
+            "FROM cost_events WHERE job_id=? GROUP BY service ORDER BY total DESC",
+            (j["id"],)
+        ).fetchall()
+        jd["breakdown"] = [dict(r) for r in svc_rows]
+        jobs_with_breakdown.append(jd)
+
     conn.close()
     return {
         "month": month,
-        "total_cost": round(total_cost, 4),
-        "total_videos": total_videos,
+        "total_cost":        round(total_cost, 4),
+        "total_videos":      total_videos,
         "avg_cost_per_video": round(avg_cost, 4),
         "by_service": [dict(r) for r in by_service],
+        "by_provider": [{"provider": k, "total": v}
+                        for k, v in sorted(by_provider.items(), key=lambda x: -x[1])],
+        "jobs": jobs_with_breakdown,
     }
 
 def get_channels():

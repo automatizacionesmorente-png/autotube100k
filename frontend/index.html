@@ -773,12 +773,9 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
       <div class="stat-note">media real</div>
     </div>
     <div class="stat">
-      <div class="stat-lbl">Verificar gastos</div>
-      <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">
-        <a href="https://console.anthropic.com" target="_blank" style="font-size:10px;color:var(--gold);text-decoration:none;">◆ Anthropic →</a>
-        <a href="https://dashboard.fal.ai" target="_blank" style="font-size:10px;color:var(--gold);text-decoration:none;">⚡ FAL.AI →</a>
-        <a href="https://platform.openai.com/usage" target="_blank" style="font-size:10px;color:var(--gold);text-decoration:none;">◉ OpenAI →</a>
-      </div>
+      <div class="stat-lbl">Coste acumulado</div>
+      <div class="stat-num" id="f-total-all">—</div>
+      <div class="stat-note">desde el inicio</div>
     </div>
   </div>
 
@@ -1513,9 +1510,9 @@ const SVC_LABELS = {
   kling_standard:      'Kling Standard — hook vídeo',
 };
 const PROVIDER_META = {
-  'fal.ai':    { color: '#7c3aed', icon: '⚡', label: 'FAL.AI — dashboard.fal.ai' },
-  'anthropic': { color: '#c49b27', icon: '◆', label: 'Anthropic — console.anthropic.com' },
-  'openai':    { color: '#10a37f', icon: '◉', label: 'OpenAI — platform.openai.com/usage' },
+  'fal.ai':    { color: '#c49b27', icon: '⚡', label: 'FAL.AI — dashboard.fal.ai' },
+  'anthropic': { color: '#8a6e1f', icon: '◆', label: 'Anthropic — console.anthropic.com' },
+  'openai':    { color: '#a07c18', icon: '◉', label: 'OpenAI — platform.openai.com/usage' },
   'gratis':    { color: '#2e6e47', icon: '✓', label: 'Gratis' },
 };
 
