@@ -607,6 +607,13 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
             <img id="thumb-preview" style="display:none;width:100%;max-width:200px;border-radius:8px;margin-top:8px;border:2px solid var(--gold);">
             <div style="font-size:9.5px;color:var(--muted);margin-top:4px;">Si subes tu miniatura, se usará esa al publicar (en vez de la auto-generada). Recomendado 1280×720.</div>
           </div>
+          <div class="field">
+            <label>Voz personalizada (opcional) — clonar una voz real</label>
+            <input id="inp-voice" type="file" accept="audio/*" onchange="_uploadVoiceSample()" style="font-size:11px;color:var(--muted);">
+            <div id="voice-status" style="font-size:10px;color:var(--muted);margin-top:5px;"></div>
+            <audio id="voice-test" controls style="display:none;width:100%;margin-top:6px;height:34px;"></audio>
+            <div style="font-size:9.5px;color:var(--muted);margin-top:4px;">Sube 15-30s de voz clara (con permiso). XTTS la clona gratis. Escucha la prueba antes de generar.</div>
+          </div>
           <button class="btn-generate" id="btn-generate" onclick="startGeneration()">
             Generar vídeo automáticamente
           </button>
@@ -1139,7 +1146,8 @@ async function startGeneration() {
 
   const res = await fetch(`${API}/api/generate`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ niche, title, tone: selectedTone, channel_id, context })
+    body: JSON.stringify({ niche, title, tone: selectedTone, channel_id, context,
+                           use_custom_voice: !!window._useCustomVoice })
   });
   const { job_id } = await res.json();
   currentJobId = job_id;
@@ -1702,6 +1710,37 @@ function _previewCustomThumb() {
   const img = document.getElementById('thumb-preview');
   if (f) { img.src = URL.createObjectURL(f); img.style.display = 'block'; }
   else { img.style.display = 'none'; }
+}
+// Subir muestra de voz → clonar con XTTS → reproducir prueba
+window._useCustomVoice = false;
+async function _uploadVoiceSample() {
+  const f = document.getElementById('inp-voice').files[0];
+  const status = document.getElementById('voice-status');
+  const player = document.getElementById('voice-test');
+  if (!f) { window._useCustomVoice = false; return; }
+  status.textContent = '⏳ Procesando y clonando la voz (puede tardar ~30s)…';
+  player.style.display = 'none';
+  try {
+    const dataUrl = await _fileToDataURL(f);
+    const r = await fetch(`${API}/api/voice-sample`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ audio: dataUrl })
+    }).then(r=>r.json());
+    if (r.ok) {
+      window._useCustomVoice = true;
+      status.innerHTML = '✅ Voz clonada lista. Se usará en este vídeo. Escucha la prueba:';
+      if (r.test_url) {
+        player.src = `${API}${r.test_url}?t=` + Date.now();
+        player.style.display = 'block';
+      }
+    } else {
+      status.textContent = '⚠ No se pudo procesar la voz.';
+      window._useCustomVoice = false;
+    }
+  } catch(e) {
+    status.textContent = '⚠ Error subiendo la voz: ' + e;
+    window._useCustomVoice = false;
+  }
 }
 // Subir miniatura propia desde el panel de revisión (cuando llega después)
 async function _uploadOwnThumbnail(jobId, fileInput) {

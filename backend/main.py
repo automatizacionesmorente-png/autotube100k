@@ -63,6 +63,7 @@ class GenerateRequest(BaseModel):
     tone: str = "neutro"
     channel_id: str | None = None
     context: str | None = None  # datos verificados para temas de actualidad (el guion NO inventa)
+    use_custom_voice: bool = False  # usar voz clonada subida (voices/custom.wav)
 
 class ChannelRequest(BaseModel):
     name: str
@@ -134,6 +135,71 @@ async def stream_video(job_id: str):
             "Cache-Control": "no-cache",
         }
     )
+
+class VoiceUpload(BaseModel):
+    audio: str  # data URL base64 de un audio (mp3/wav/m4a) con la voz a clonar
+
+VOICES_DIR_SRV = Path("/root/autotube100k/voices")
+
+@app.post("/api/voice-sample")
+async def upload_voice_sample(req: VoiceUpload):
+    """Sube una muestra de voz real, la limpia y la prepara para clonar con XTTS.
+    Genera además un clip de prueba de 6s para escuchar el clon. Gratis."""
+    import base64, subprocess, tempfile
+    data = req.audio
+    if "," in data and data.strip().startswith("data:"):
+        data = data.split(",", 1)[1]
+    try:
+        raw = base64.b64decode(data)
+    except Exception:
+        raise HTTPException(400, "Audio base64 inválido")
+    if len(raw) < 2000:
+        raise HTTPException(400, "Audio demasiado corto o vacío")
+
+    VOICES_DIR_SRV.mkdir(parents=True, exist_ok=True)
+    tmp = Path(tempfile.mktemp(suffix=".bin"))
+    tmp.write_bytes(raw)
+    ref = VOICES_DIR_SRV / "custom.wav"
+    # Convertir: mono, 22050Hz, primeros 30s, filtro de ruido suave (formato ideal XTTS)
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", str(tmp), "-t", "30",
+             "-af", "highpass=f=70,lowpass=f=8000,afftdn=nf=-25,loudnorm=I=-18",
+             "-ac", "1", "-ar", "22050", str(ref)],
+            check=True, capture_output=True, timeout=60
+        )
+    except Exception as e:
+        raise HTTPException(400, f"No se pudo procesar el audio: {str(e)[:120]}")
+    finally:
+        tmp.unlink(missing_ok=True)
+
+    # Clip de prueba de 6s con la voz clonada (para que el usuario la escuche ya)
+    test_url = None
+    try:
+        from .pipeline.tts import _xtts_available, _xtts_generate, _postprocess_audio
+        if _xtts_available():
+            test_dir = OUTPUT_DIR / "_voicetest"
+            test_dir.mkdir(parents=True, exist_ok=True)
+            raw_mp3 = test_dir / "test.raw.mp3"
+            out_mp3 = test_dir / "voicetest.mp3"
+            await asyncio.to_thread(
+                _xtts_generate,
+                "Hola, esta es una prueba de mi voz clonada para el canal. Suena natural y profesional.",
+                raw_mp3, str(ref)
+            )
+            await asyncio.to_thread(_postprocess_audio, raw_mp3, out_mp3, "neutro")
+            raw_mp3.unlink(missing_ok=True)
+            test_url = "/api/voice-sample/test"
+    except Exception:
+        pass
+    return {"ok": True, "test_url": test_url}
+
+@app.get("/api/voice-sample/test")
+async def voice_sample_test():
+    p = OUTPUT_DIR / "_voicetest" / "voicetest.mp3"
+    if not p.exists():
+        raise HTTPException(404, "Sin clip de prueba")
+    return FileResponse(p, media_type="audio/mpeg", headers={"Cache-Control": "no-cache"})
 
 class ThumbnailUpload(BaseModel):
     image: str  # data URL base64 (data:image/...;base64,XXXX) o base64 puro
@@ -570,7 +636,12 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
         from .pipeline.images import (generate_image_prompts, generate_images,
                                        generate_hook_images, generate_thumbnail)
         audio_path = job_dir / "narration.mp3"
-        audio_task   = asyncio.to_thread(generate_audio, job_id, script, req.tone, audio_path)
+        custom_voice_ref = None
+        if getattr(req, "use_custom_voice", False):
+            _cv = Path("/root/autotube100k/voices/custom.wav")
+            if _cv.exists():
+                custom_voice_ref = str(_cv)
+        audio_task   = asyncio.to_thread(generate_audio, job_id, script, req.tone, audio_path, custom_voice_ref)
         prompts_task = asyncio.to_thread(generate_image_prompts, job_id, script, req.niche, 40)
         audio_result, img_prompts = await asyncio.gather(audio_task, prompts_task)
         emit("tts", "done", "Audio con pausas dramáticas listo", 35)

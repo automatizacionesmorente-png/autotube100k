@@ -46,7 +46,8 @@ XTTS_VOICE_MAP = {
 }
 
 
-def generate_audio(job_id: str, script: str, tone: str, output_path: Path) -> Path:
+def generate_audio(job_id: str, script: str, tone: str, output_path: Path,
+                   custom_ref: str = None) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     raw_path = output_path.with_suffix(".raw.mp3")
 
@@ -69,8 +70,13 @@ def generate_audio(job_id: str, script: str, tone: str, output_path: Path) -> Pa
     # ── Intentar XTTS v2 primero (calidad narrador profesional, gratis) ───────
     if _xtts_available():
         try:
-            voice_profile = XTTS_VOICE_MAP.get(tone, "neutro_profesional")
-            ref_wav = f"{VOICES_DIR}/{voice_profile}.wav"
+            # Voz personalizada subida por el usuario tiene prioridad sobre el perfil del tono
+            if custom_ref and Path(custom_ref).exists():
+                voice_profile = "voz personalizada (clonada)"
+                ref_wav = custom_ref
+            else:
+                voice_profile = XTTS_VOICE_MAP.get(tone, "neutro_profesional")
+                ref_wav = f"{VOICES_DIR}/{voice_profile}.wav"
             add_step(job_id, "tts", "running",
                      f"Generando voz con XTTS v2 · perfil '{voice_profile}' · gratis…")
             _xtts_generate(script, raw_path, ref_wav)
