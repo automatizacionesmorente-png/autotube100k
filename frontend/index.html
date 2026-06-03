@@ -1547,7 +1547,7 @@ async function loadFinance() {
 
   // ── Proveedores — solo los que tienen gasto real > 0 ─────────
   const provEl = document.getElementById('finance-providers');
-  const activeProv = (f.by_provider||[]).filter(p => p.total > 0);
+  const activeProv = (f.by_provider||[]).filter(p => p.total >= 0.0005);
   if (!activeProv.length) {
     provEl.innerHTML = '<div class="empty" style="padding:16px 0;"><div class="empty-title">Sin gastos este mes</div></div>';
   } else {
@@ -1574,7 +1574,7 @@ async function loadFinance() {
 
   // ── Desglose por servicio — solo usados, con precio unitario ──
   const brkEl = document.getElementById('finance-breakdown');
-  const activeSvc = (f.by_service||[]).filter(s => s.total > 0);
+  const activeSvc = (f.by_service||[]).filter(s => s.total >= 0.0005);
   if (!activeSvc.length) {
     brkEl.innerHTML = '<div class="empty" style="padding:16px 0;"><div class="empty-title">Sin datos</div></div>';
   } else {

@@ -16,9 +16,9 @@ MODEL_IN_PRICE  = 3    # USD/M tokens input
 MODEL_OUT_PRICE = 15   # USD/M tokens output
 EUR_RATE = 0.92
 
-TARGET_WORDS = 4200   # ~32 min a 130 palabras/min — sweet spot retención YouTube
-MIN_WORDS    = 3800
-MAX_WORDS    = 4600
+TARGET_WORDS = 5200   # ~34-36 min a 145 pal/min — SIEMPRE +30 min (con margen)
+MIN_WORDS    = 4800   # 4800 pal ≈ 33 min — nunca por debajo de 30 min
+MAX_WORDS    = 5800
 
 SYSTEM_PROMPT = """Eres el mejor guionista de YouTube en español. Llevas 10 años creando vídeos virales de 30-35 minutos con retención del 65%+. Tus vídeos han acumulado más de 500 millones de visualizaciones.
 

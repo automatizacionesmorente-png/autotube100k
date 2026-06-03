@@ -48,9 +48,25 @@ XTTS_VOICE_MAP = {
 
 def generate_audio(job_id: str, script: str, tone: str, output_path: Path) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    raw_path = output_path.with_suffix(".raw.mp3")
+
+    # ── Reutilizar voz ya generada (evita repetir ~50 min si algo falló después) ──
+    if output_path.exists() and output_path.stat().st_size > 100_000:
+        add_step(job_id, "tts", "done",
+                 f"Voz ya generada · reutilizada · 0.00€", 0)
+        return output_path
+    # Si existe el audio crudo pero falló el post-proceso, solo re-procesar
+    if raw_path.exists() and raw_path.stat().st_size > 100_000:
+        try:
+            add_step(job_id, "tts", "running", "Re-procesando voz ya generada…")
+            _postprocess_audio(raw_path, output_path, tone)
+            raw_path.unlink(missing_ok=True)
+            add_step(job_id, "tts", "done", "Voz recuperada y procesada · 0.00€", 0)
+            return output_path
+        except Exception:
+            pass  # si falla, regenerar normalmente abajo
 
     # ── Intentar XTTS v2 primero (calidad narrador profesional, gratis) ───────
-    raw_path = output_path.with_suffix(".raw.mp3")
     if _xtts_available():
         try:
             voice_profile = XTTS_VOICE_MAP.get(tone, "neutro_profesional")
@@ -168,15 +184,16 @@ def _postprocess_audio(raw: Path, out: Path, tone: str):
     """
     import subprocess
 
-    # Parámetros de reverb según el tono
+    # Reverb por tono — formato CORRECTO de aecho: delays(ms):decays(0-1)
+    # aecho completo = in_gain:out_gain:delays:decays (4 parámetros)
     reverb = {
-        "misterio":     "0.3:0.3:50:0.5:0.3:0.3",   # sala oscura, eco medio
-        "drama":        "0.4:0.4:60:0.5:0.4:0.3",   # sala grande, dramático
-        "motivacional": "0.15:0.15:20:0.4:0.2:0.2", # sala pequeña, íntimo, energético
-        "documental":   "0.2:0.2:30:0.4:0.25:0.2",  # sala neutral
-        "humor":        "0.1:0.1:15:0.3:0.15:0.15", # muy íntimo, cercano
-        "neutro":       "0.2:0.2:25:0.4:0.2:0.2",   # sala estándar
-    }.get(tone, "0.2:0.2:25:0.4:0.2:0.2")
+        "misterio":     "55:0.30",   # sala oscura, eco medio
+        "drama":        "70:0.35",   # sala grande, dramático
+        "motivacional": "25:0.18",   # sala pequeña, íntimo, energético
+        "documental":   "35:0.25",   # sala neutral
+        "humor":        "18:0.16",   # muy íntimo, cercano
+        "neutro":       "30:0.22",   # sala estándar
+    }.get(tone, "30:0.22")
 
     subprocess.run([
         "ffmpeg", "-y", "-i", str(raw),
@@ -185,8 +202,8 @@ def _postprocess_audio(raw: Path, out: Path, tone: str):
             "highpass=f=80,"
             # 2. Compresor (voz más uniforme, sin picos)
             "acompressor=threshold=-18dB:ratio=3:attack=5:release=50:makeup=2dB,"
-            # 3. Reverb ligero de sala (voz más cálida)
-            f"aecho=0.8:0.85:{reverb},"
+            # 3. Reverb ligero de sala (voz más cálida) — aecho=in:out:delays:decays
+            f"aecho=0.8:0.88:{reverb},"
             # 4. Normalización a -16 LUFS (estándar YouTube)
             "loudnorm=I=-16:TP=-1.5:LRA=11"
         ),
