@@ -1553,19 +1553,28 @@ async function loadFinance() {
   } else {
     const maxP = Math.max(...activeProv.map(p=>p.total), 0.001);
     provEl.innerHTML = activeProv.map(p => {
-      const m = PROVIDER_META[p.provider] || {color:'#7a7468',icon:'○',label:p.provider};
+      const m = PROVIDER_META[p.provider] || {color:'#c49b27',icon:'○',label:p.provider};
       const pct = f.total_cost > 0 ? (p.total / f.total_cost * 100) : 0;
+      // Nombre limpio sin dominio
+      const provName = m.label.split(' — ')[0];
+      const provDomain = m.label.split(' — ')[1] || '';
       return `
-      <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
-        <div style="width:32px;height:32px;border-radius:8px;background:${m.color}18;
-          display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${m.icon}</div>
+      <div style="display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);">
+        <div style="width:36px;height:36px;border-radius:10px;background:${m.color}20;
+          display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">${m.icon}</div>
         <div style="flex:1;min-width:0;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
-            <span style="font-size:12px;font-weight:600;color:var(--ink);">${m.label}</span>
-            <span style="font-size:13px;font-weight:700;color:var(--ink);">${p.total.toFixed(3)}€ <span style="font-size:10px;font-weight:400;color:var(--muted);">(${pct.toFixed(0)}%)</span></span>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px;">
+            <div>
+              <span style="font-size:13px;font-weight:700;color:var(--ink);">${provName}</span>
+              ${provDomain ? `<span style="font-size:10px;color:var(--muted);margin-left:6px;">${provDomain}</span>` : ''}
+            </div>
+            <div style="text-align:right;">
+              <span style="font-size:14px;font-weight:700;color:var(--ink);">${p.total.toFixed(3)}€</span>
+              <span style="font-size:10px;color:var(--muted);margin-left:4px;">${pct.toFixed(0)}%</span>
+            </div>
           </div>
-          <div style="height:5px;background:var(--cream2);border-radius:3px;">
-            <div style="height:5px;background:${m.color};border-radius:3px;width:${(p.total/maxP*100).toFixed(0)}%;"></div>
+          <div style="height:6px;background:var(--cream2);border-radius:4px;overflow:hidden;">
+            <div style="height:6px;background:linear-gradient(90deg,${m.color}cc,${m.color});border-radius:4px;width:${pct.toFixed(0)}%;transition:width .4s ease;"></div>
           </div>
         </div>
       </div>`;
@@ -1581,15 +1590,27 @@ async function loadFinance() {
     const maxS = Math.max(...activeSvc.map(s=>s.total), 0.001);
     brkEl.innerHTML = activeSvc.map(s => {
       const label = SVC_LABELS[s.service] || s.service;
-      const units = s.units > 0 ? ` · ${Math.round(s.units).toLocaleString()} unidades` : '';
+      const svcName = label.split(' — ')[0] || label;
+      const svcDetail = label.split(' — ')[1] || '';
+      const units = s.units > 0 ? `${Math.round(s.units).toLocaleString()} uds` : '';
+      const barPct = (s.total/maxS*100).toFixed(0);
       return `
-      <div class="fin-row" style="padding:9px 0;">
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);">
         <div style="flex:1;min-width:0;">
-          <span class="fin-svc" style="display:block;">${label}</span>
-          <span style="font-size:10px;color:var(--muted);">${units}</span>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+            <div>
+              <span style="font-size:12px;font-weight:600;color:var(--ink);">${svcName}</span>
+              ${svcDetail ? `<span style="font-size:10px;color:var(--muted);margin-left:5px;">${svcDetail}</span>` : ''}
+            </div>
+            <div style="display:flex;align-items:baseline;gap:8px;">
+              ${units ? `<span style="font-size:10px;color:var(--muted);">${units}</span>` : ''}
+              <span style="font-size:13px;font-weight:700;color:var(--ink);">${s.total.toFixed(3)}€</span>
+            </div>
+          </div>
+          <div style="height:4px;background:var(--cream2);border-radius:3px;overflow:hidden;">
+            <div style="height:4px;background:var(--gold);border-radius:3px;width:${barPct}%;opacity:0.75;transition:width .4s ease;"></div>
+          </div>
         </div>
-        <div class="fin-bar-wrap" style="width:120px;"><div class="fin-bar" style="width:${(s.total/maxS*100).toFixed(0)}%"></div></div>
-        <span class="fin-amt" style="min-width:60px;text-align:right;">${s.total.toFixed(3)}€</span>
       </div>`;
     }).join('');
   }
