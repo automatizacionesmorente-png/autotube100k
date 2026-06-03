@@ -597,6 +597,10 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
               <option value="">Sin canal — guardar en local</option>
             </select>
           </div>
+          <div class="field">
+            <label>Datos verificados (opcional) — para temas de actualidad</label>
+            <textarea id="inp-context" rows="4" placeholder="Pega aquí hechos reales verificados (alineaciones, fechas, cifras...). El guion los usará como base y NO inventará. Déjalo vacío para temas históricos." style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border2);background:white;color:var(--ink);font-size:12px;font-family:inherit;resize:vertical;"></textarea>
+          </div>
           <button class="btn-generate" id="btn-generate" onclick="startGeneration()">
             Generar vídeo automáticamente
           </button>
@@ -1097,6 +1101,7 @@ async function startGeneration() {
   const niche      = document.getElementById('inp-niche').value.trim();
   const title      = document.getElementById('inp-title').value.trim();
   const channel_id = document.getElementById('inp-channel').value || null;
+  const context    = document.getElementById('inp-context').value.trim() || null;
   if (!niche || !title) { alert('Escribe el nicho y el título del vídeo.'); return; }
 
   currentChannelId = channel_id;
@@ -1128,7 +1133,7 @@ async function startGeneration() {
 
   const res = await fetch(`${API}/api/generate`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ niche, title, tone: selectedTone, channel_id })
+    body: JSON.stringify({ niche, title, tone: selectedTone, channel_id, context })
   });
   const { job_id } = await res.json();
   currentJobId = job_id;

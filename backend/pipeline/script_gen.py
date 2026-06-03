@@ -74,14 +74,29 @@ LEYES ABSOLUTAS — VIOLARIAS ES UN FRACASO:
    - Devuelve SOLO el texto narrado, listo para locutar"""
 
 
-def generate_script(job_id: str, niche: str, title: str, tone: str) -> str:
+def generate_script(job_id: str, niche: str, title: str, tone: str, context: str = None) -> str:
     add_step(job_id, "script", "running", "Generando guión con Claude Sonnet 4.6…")
     tone_desc = TONES.get(tone, TONES["neutro"])
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
+    context_block = ""
+    if context and context.strip():
+        context_block = f"""
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DATOS VERIFICADOS Y REALES (USO OBLIGATORIO)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Estos son hechos REALES y actuales verificados. Úsalos como base factual del vídeo.
+NO inventes datos que contradigan o vayan más allá de esto. Para cualquier detalle
+concreto (nombres, fechas, cifras, resultados) que no esté aquí, NO lo inventes:
+habla en términos generales ciertos o como expectativa ("se espera", "según las previsiones").
+
+{context.strip()}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
+
     user_prompt = f"""NICHO: {niche}
 TÍTULO: {title}
-TONO: {tone_desc}
+TONO: {tone_desc}{context_block}
 
 Escribe el guión COMPLETO. Extensión CRÍTICA: entre {MIN_WORDS} y {MAX_WORDS} palabras.
 A 130 palabras/minuto = exactamente 30-35 minutos de vídeo.

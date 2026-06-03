@@ -62,6 +62,7 @@ class GenerateRequest(BaseModel):
     title: str
     tone: str = "neutro"
     channel_id: str | None = None
+    context: str | None = None  # datos verificados para temas de actualidad (el guion NO inventa)
 
 class ChannelRequest(BaseModel):
     name: str
@@ -514,7 +515,7 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
         # ── Paso 1: Guión ──────────────────────────────────────────
         emit("script", "running", "Generando guión con Claude Sonnet 4.6…", 5)
         from .pipeline.script_gen import generate_script
-        script = await asyncio.to_thread(generate_script, job_id, req.niche, req.title, req.tone)
+        script = await asyncio.to_thread(generate_script, job_id, req.niche, req.title, req.tone, req.context)
         update_job(job_id, script=script[:8000])  # guardar más para metadata de calidad
         wcount = len(script.split())
         emit("script", "done", f"Guión listo: {wcount} palabras (~{wcount//130} min)", 18)
