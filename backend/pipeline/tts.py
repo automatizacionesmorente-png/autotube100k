@@ -28,7 +28,22 @@ RATE_MAP = {
 
 XTTS_VENV   = "/root/tts-venv/bin/python"
 XTTS_SCRIPT = "/root/autotube100k/xtts_generate.py"
-XTTS_REF    = "/root/autotube100k/voice_ref.wav"   # opcional: tu voz de referencia
+VOICES_DIR  = "/root/autotube100k/voices"
+
+# Mapa tono → perfil de voz de referencia (generado con Edge TTS, clonado por XTTS v2)
+XTTS_VOICE_MAP = {
+    "misterio":     "misterio_masculino",
+    "drama":        "drama_masculino",
+    "motivacional": "motivacional_masculino",
+    "documental":   "documental_femenino",
+    "humor":        "humor_femenino",
+    "neutro":       "neutro_profesional",
+    # Tonos extra disponibles (asignar manualmente si creas nuevos canales):
+    # "truecrime":    "truecrime_femenino",
+    # "historia":     "historia_masculino",
+    # "conspiracion": "conspiracion_masculino",
+    # "ciencia":      "ciencia_femenino",
+}
 
 
 def generate_audio(job_id: str, script: str, tone: str, output_path: Path) -> Path:
@@ -37,13 +52,15 @@ def generate_audio(job_id: str, script: str, tone: str, output_path: Path) -> Pa
     # ── Intentar XTTS v2 primero (calidad narrador profesional, gratis) ───────
     if _xtts_available():
         try:
+            voice_profile = XTTS_VOICE_MAP.get(tone, "neutro_profesional")
+            ref_wav = f"{VOICES_DIR}/{voice_profile}.wav"
             add_step(job_id, "tts", "running",
-                     "Generando voz con XTTS v2 (calidad narrador profesional · gratis)…")
-            _xtts_generate(script, output_path)
+                     f"Generando voz con XTTS v2 · perfil '{voice_profile}' · gratis…")
+            _xtts_generate(script, output_path, ref_wav)
             size_mb = output_path.stat().st_size / 1024 / 1024
             add_cost_event(job_id, "xtts_v2", len(script), 0, 0)
             add_step(job_id, "tts", "done",
-                     f"Audio XTTS v2: {size_mb:.1f} MB · calidad profesional · 0.00€", 0)
+                     f"Audio XTTS v2: {size_mb:.1f} MB · {voice_profile} · 0.00€", 0)
             return output_path
         except Exception as e:
             add_step(job_id, "tts", "running",
@@ -68,17 +85,16 @@ def _xtts_available() -> bool:
     return (shutil.which(XTTS_VENV) or P(XTTS_VENV).exists()) and P(XTTS_SCRIPT).exists()
 
 
-def _xtts_generate(script: str, output_path: Path):
+def _xtts_generate(script: str, output_path: Path, ref_wav: str = None):
     """Genera audio con XTTS v2 dividiendo en chunks y concatenando con ffmpeg."""
-    import subprocess, tempfile, shutil
+    import subprocess, shutil
 
-    # Dividir el guión en chunks de 250 palabras (XTTS trabaja mejor con textos cortos)
     chunks = _split_text(script, max_chars=1200)
     tmp_dir = output_path.parent / "_xtts_tmp"
     tmp_dir.mkdir(exist_ok=True)
     wav_files = []
 
-    ref = XTTS_REF if Path(XTTS_REF).exists() else None
+    ref = ref_wav if ref_wav and Path(ref_wav).exists() else None
 
     try:
         for i, chunk in enumerate(chunks):
