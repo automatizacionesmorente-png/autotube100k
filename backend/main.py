@@ -281,11 +281,13 @@ async def channel_detail_stats(channel_id: str):
                         "duration": v.get("contentDetails", {}).get("duration", ""),
                     })
 
+        # Sumar views de los vídeos individuales (más fresco que el contador del canal)
+        real_views = sum(v["views"] for v in videos) if videos else int(stats.get("viewCount", 0))
         return {
             "channel": ch,
             "stats": {
                 "subscribers": int(stats.get("subscriberCount", 0)),
-                "total_views": int(stats.get("viewCount", 0)),
+                "total_views": real_views,
                 "videos_count": int(stats.get("videoCount", 0)),
                 "description": snippet.get("description", ""),
                 "country": snippet.get("country", ""),
