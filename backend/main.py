@@ -154,6 +154,7 @@ async def serve_job_file(job_id: str, filename: str):
 
 class UploadRequest(BaseModel):
     channel_id: str | None = None
+    thumbnail: str | None = None  # variante de miniatura elegida (A/B/C)
 
 @app.post("/api/jobs/{job_id}/upload")
 async def upload_job_to_youtube(job_id: str, req: UploadRequest, background_tasks: BackgroundTasks):
@@ -168,10 +169,10 @@ async def upload_job_to_youtube(job_id: str, req: UploadRequest, background_task
     if not req.channel_id:
         raise HTTPException(400, "Selecciona un canal de YouTube conectado primero. Ve a la pestaña Canales y conecta tu canal con OAuth.")
 
-    background_tasks.add_task(_do_upload, job_id, req.channel_id)
+    background_tasks.add_task(_do_upload, job_id, req.channel_id, req.thumbnail)
     return {"ok": True, "message": "Subiendo a YouTube…"}
 
-async def _do_upload(job_id: str, channel_id: str):
+async def _do_upload(job_id: str, channel_id: str, thumbnail: str = None):
     job = get_job(job_id)
     try:
         import json as _json
@@ -185,10 +186,21 @@ async def _do_upload(job_id: str, channel_id: str):
             metadata = {k: saved[k] for k in ("description", "hashtags", "tags") if k in saved}
         else:
             script = job.get("script", "")
-            metadata = await asyncio.to_thread(generate_metadata, job_id, script, title, niche)
+            from .pipeline.render import get_duration
+            try:
+                dur = get_duration(Path(job["video_path"]))
+            except Exception:
+                dur = None
+            metadata = await asyncio.to_thread(generate_metadata, job_id, script, title, niche, dur)
+        # Miniatura elegida por el usuario (A/B/C); por defecto la principal
+        import re as _re
+        thumb_name = thumbnail if (thumbnail and _re.match(r'^[\w\-\.]+$', thumbnail)) else "thumbnail.jpg"
+        thumb_path = Path(job["video_path"]).parent / thumb_name
+        if not thumb_path.exists():
+            thumb_path = Path(job["video_path"]).parent / "thumbnail.jpg"
         result = await asyncio.to_thread(
             upload_to_youtube, job_id, Path(job["video_path"]),
-            Path(job["video_path"]).parent / "thumbnail.jpg",
+            thumb_path,
             title, metadata, channel_id
         )
         youtube_url, studio_url = result if isinstance(result, tuple) else (result, None)
@@ -578,9 +590,14 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
             pass
 
         # ── Paso 8: Metadata ──────────────────────────────────────
-        emit("upload", "running", "Generando descripción y metadatos...", 92)
+        emit("upload", "running", "Generando descripción y capítulos sincronizados...", 92)
         from .pipeline.upload import generate_metadata
-        metadata = await asyncio.to_thread(generate_metadata, job_id, script, req.title, req.niche)
+        from .pipeline.render import get_duration
+        try:
+            audio_dur = get_duration(final_path)  # final.mp4 (narration.mp3 ya borrado)
+        except Exception:
+            audio_dur = None
+        metadata = await asyncio.to_thread(generate_metadata, job_id, script, req.title, req.niche, audio_dur)
 
         # Guardar metadatos en archivo para la subida manual posterior
         import json as _json

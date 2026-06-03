@@ -7,26 +7,39 @@ from google.oauth2.credentials import Credentials
 from ..database import add_step, get_conn
 
 
-def generate_metadata(job_id: str, script: str, title: str, niche: str) -> dict:
-    """Genera descripción con capítulos, hashtags SEO y tags optimizados."""
+def generate_metadata(job_id: str, script: str, title: str, niche: str,
+                      audio_duration: float = None) -> dict:
+    """
+    Genera descripción + capítulos SINCRONIZADOS con el audio real + hashtags + tags.
+    Si se pasa audio_duration, los timestamps de los capítulos se calculan
+    proporcionalmente a la duración real del vídeo (no inventados).
+    """
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     msg = client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=900,
+        max_tokens=1100,
         messages=[{
             "role": "user",
             "content": f"""Título del vídeo: {title}
 Nicho: {niche}
 
+GUIÓN COMPLETO (para ubicar los capítulos):
+{script[:6000]}
+
 Genera metadatos optimizados para YouTube SEO:
 
 DESCRIPCION:
 Escribe 3-4 párrafos atractivos con palabras clave naturales sobre el tema.
-Incluye al final: "📌 SUSCRÍBETE para más contenido sobre {niche}: [enlace]"
+Incluye al final: "📌 SUSCRÍBETE para más contenido sobre {niche}"
 
 CAPITULOS:
-Escribe 8 capítulos con timestamps en formato "MM:SS Nombre del capítulo".
-Empieza siempre con "00:00 Introducción".
+Escribe 8 capítulos. Para cada uno indica el PORCENTAJE del guión donde empieza
+(0 a 100) y el nombre, en formato "PORCENTAJE|Nombre del capítulo".
+El primero SIEMPRE es "0|Introducción". Ejemplo:
+0|Introducción
+12|El origen del misterio
+...
+Basa el porcentaje en dónde aparece ese contenido dentro del guión de arriba.
 
 HASHTAGS:
 Exactamente 15 hashtags relevantes separados por espacio. Empieza cada uno con #.
@@ -40,9 +53,11 @@ Usa exactamente esas cuatro etiquetas en mayúsculas."""
     )
     text = msg.content[0].text
     desc = _extract_between(text, "DESCRIPCION:", "CAPITULOS:").strip()
-    chapters = _extract_between(text, "CAPITULOS:", "HASHTAGS:").strip()
+    chapters_raw = _extract_between(text, "CAPITULOS:", "HASHTAGS:").strip()
     hashtags = _extract_between(text, "HASHTAGS:", "TAGS:").strip()
     tags_raw = _extract_after(text, "TAGS:").strip()
+
+    chapters = _build_chapters(chapters_raw, audio_duration)
 
     # Combinar descripción con capítulos (YouTube los indexa automáticamente)
     full_description = f"{desc}\n\n📖 CONTENIDO DEL VÍDEO:\n{chapters}\n\n{hashtags}"
@@ -53,6 +68,44 @@ Usa exactamente esas cuatro etiquetas en mayúsculas."""
         "hashtags": hashtags,
         "tags": tags_list,
     }
+
+
+def _build_chapters(chapters_raw: str, audio_duration: float = None) -> str:
+    """
+    Convierte 'PORCENTAJE|Nombre' a timestamps MM:SS reales usando la duración
+    del audio. Si no hay duración o el formato falla, usa el texto tal cual.
+    YouTube exige: primer capítulo en 00:00 y mínimo 3 capítulos crecientes.
+    """
+    lines = [l.strip() for l in chapters_raw.splitlines() if l.strip()]
+    parsed = []
+    for l in lines:
+        if "|" in l:
+            pct_str, name = l.split("|", 1)
+            try:
+                pct = max(0.0, min(100.0, float(pct_str.strip().replace("%", ""))))
+                parsed.append((pct, name.strip()))
+            except ValueError:
+                continue
+
+    # Sin duración o sin datos parseables → devolver tal cual (limpiando el "|")
+    if not parsed or not audio_duration or audio_duration <= 0:
+        return "\n".join(l.replace("|", " ", 1).strip() for l in lines) or chapters_raw
+
+    # Asegurar que empieza en 0 y es creciente
+    parsed.sort(key=lambda x: x[0])
+    if parsed[0][0] != 0:
+        parsed.insert(0, (0.0, "Introducción"))
+
+    out = []
+    last_sec = -1
+    for pct, name in parsed:
+        sec = int(pct / 100.0 * audio_duration)
+        if sec <= last_sec:           # garantizar timestamps estrictamente crecientes
+            sec = last_sec + 1
+        last_sec = sec
+        m, s = divmod(sec, 60)
+        out.append(f"{m:02d}:{s:02d} {name}")
+    return "\n".join(out)
 
 
 def upload_to_youtube(

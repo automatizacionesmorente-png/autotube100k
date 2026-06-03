@@ -431,11 +431,10 @@ def cleanup_after_upload(job_dir: Path) -> float:
     Devuelve MB liberados.
     """
     freed = 0.0
+    # Conservar las 3 miniaturas (A/B testing) — pesan poco y son útiles.
     targets = [
         job_dir / "final.mp4",
         job_dir / "short.mp4",
-        job_dir / "thumbnail_b.jpg",
-        job_dir / "thumbnail_c.jpg",
     ]
     for t in targets:
         try:
