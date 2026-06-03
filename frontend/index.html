@@ -1586,7 +1586,7 @@ async function loadFinance() {
       const units = s.units > 0 ? `${Math.round(s.units).toLocaleString()} uds` : '';
       const isLast = i === activeSvc.length - 1;
       return `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 0;${isLast?'':'border-bottom:1px solid var(--border);}">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 0;${isLast?'':'border-bottom:1px solid var(--border);'}">
         <div style="min-width:0;">
           <span style="font-size:12px;font-weight:600;color:var(--ink);">${svcName}</span>
           ${svcDetail ? `<span style="font-size:10px;color:var(--muted);margin-left:6px;">${svcDetail}</span>` : ''}
