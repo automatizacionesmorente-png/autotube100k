@@ -32,6 +32,10 @@ def _pick_music(tone: str) -> Path | None:
     all_mp3s = list(MUSIC_DIR.rglob("*.mp3"))
     return random.choice(all_mp3s) if all_mp3s else None
 
+# ── Resolución de salida ────────────────────────────────────────────────────
+OUT_W, OUT_H = 1920, 1080   # 1080p Full HD — calidad profesional YouTube
+OUT_RES = f"{OUT_W}x{OUT_H}"
+
 MAX_KB_DURATION = 8.0  # Ken Burns máx 8s por sub-clip — evita bug de zoompan con d>300
 KB_WORKERS = 12        # ffmpeg Ken Burns en paralelo
 FADE_SEC = 0.35        # fundido entre imágenes (segundos)
@@ -157,8 +161,8 @@ def render_video(
         for k, v in enumerate(valid_hook_vids):
             t_out = tmp / f"hvtrim_{k:02d}.mp4"
             _ffmpeg("-i", str(v), "-t", f"{clip_len:.2f}",
-                    "-vf", "scale=1280:720:force_original_aspect_ratio=increase,"
-                           "crop=1280:720,fade=t=in:st=0:d=0.3,"
+                    "-vf", "scale=1920:1080:force_original_aspect_ratio=increase,"
+                           "crop=1920:1080,fade=t=in:st=0:d=0.3,"
                            f"fade=t=out:st={max(0,clip_len-0.3):.2f}:d=0.3",
                     "-c:v", "libx264", "-preset", "ultrafast", "-an", "-r", "25",
                     str(t_out))
@@ -227,14 +231,14 @@ def render_video(
             f"subtitles='{esc}',"
             f"{grade},"
             f"drawtext=text='¡SUSCRÍBETE Y ACTIVA LA CAMPANITA!':"
-            f"fontcolor=white:fontsize=36:box=1:boxcolor=red@0.88:boxborderw=14:"
+            f"fontcolor=white:fontsize=52:box=1:boxcolor=red@0.88:boxborderw=20:"
             f"x=(w-text_w)/2:y=h*0.06:enable='between(t,{cta_start:.1f},{audio_dur:.1f})'"
         )
     else:
         vf = (
             f"{grade},"
             f"drawtext=text='¡SUSCRÍBETE Y ACTIVA LA CAMPANITA!':"
-            f"fontcolor=white:fontsize=36:box=1:boxcolor=red@0.88:boxborderw=14:"
+            f"fontcolor=white:fontsize=52:box=1:boxcolor=red@0.88:boxborderw=20:"
             f"x=(w-text_w)/2:y=h*0.06:enable='between(t,{cta_start:.1f},{audio_dur:.1f})'"
         )
 
@@ -257,7 +261,7 @@ def render_video(
             ),
             "-map", "0:v", "-map", "[aout]",
             "-vf", vf,
-            "-c:v", "libx264", "-preset", "fast", "-crf", "26",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "22",
             "-c:a", "aac", "-b:a", "128k",
             "-movflags", "+faststart",
             "-shortest",
@@ -268,7 +272,7 @@ def render_video(
             "-i", str(full_mp4),
             "-i", str(audio_path),
             "-vf", vf,
-            "-c:v", "libx264", "-preset", "fast", "-crf", "26",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "22",
             "-c:a", "aac", "-b:a", "128k",
             "-movflags", "+faststart",
             "-shortest",
@@ -322,17 +326,15 @@ def _generate_short(video_path: Path, output_path: Path, total_dur: float):
         seg1_end = short_dur
         seg2_start = seg2_end = seg3_start = seg3_end = 0
 
-    # Filtro: escala 16:9 → recorte centro → 720×1280 (9:16)
-    # scale=-1:1280 → 2275×1280, luego crop=720:1280 centro
+    # Short vertical 1080p: 1080×1920 (9:16 Full HD)
     vf_short = (
-        "scale=-1:1280,"
-        "crop=720:1280,"
+        "scale=-1:1920,crop=1080:1920,"
         "drawtext=text='¡SUSCRÍBETE!':"
-        "fontcolor=white:fontsize=52:box=1:boxcolor=black@0.7:boxborderw=10:"
+        "fontcolor=white:fontsize=72:box=1:boxcolor=black@0.7:boxborderw=14:"
         "x=(w-text_w)/2:y=h*0.88:"
         f"enable='between(t,{max(0,actual_dur-6):.0f},{actual_dur:.0f})'"
         if total_dur > 120 else
-        "scale=-1:1280,crop=720:1280"
+        "scale=-1:1920,crop=1080:1920"
     )
 
     if total_dur > 120:
@@ -354,7 +356,7 @@ def _generate_short(video_path: Path, output_path: Path, total_dur: float):
             _ffmpeg(
                 "-ss", f"{ss:.2f}", "-to", f"{se:.2f}",
                 "-i", str(video_path),
-                "-vf", "scale=-1:1280,crop=720:1280",
+                "-vf", "scale=-1:1920,crop=1080:1920",
                 "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac",
                 str(seg_out)
             )
@@ -367,7 +369,7 @@ def _generate_short(video_path: Path, output_path: Path, total_dur: float):
             "-vf", "drawtext=text='¡SUSCRÍBETE!':"
                    "fontcolor=white:fontsize=52:box=1:boxcolor=black@0.7:boxborderw=10:"
                    "x=(w-text_w)/2:y=h*0.88",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "26",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "22",
             "-c:a", "aac", "-b:a", "128k",
             "-movflags", "+faststart",
             str(output_path)
@@ -380,8 +382,8 @@ def _generate_short(video_path: Path, output_path: Path, total_dur: float):
         _ffmpeg(
             "-i", str(video_path),
             "-t", f"{short_dur:.2f}",
-            "-vf", "scale=-1:1280,crop=720:1280",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "26",
+            "-vf", "scale=-1:1920,crop=1080:1920",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "22",
             "-c:a", "aac", "-b:a", "128k",
             "-movflags", "+faststart",
             str(output_path)
@@ -490,7 +492,7 @@ def _build_ass(groups: list) -> str:
     de YouTube. Pop de entrada con \\fad.
     """
     header = (
-        "[Script Info]\nScriptType: v4.00+\nPlayResX: 1280\nPlayResY: 720\n"
+        "[Script Info]\nScriptType: v4.00+\nPlayResX: 1920\nPlayResY: 1080\n"
         "ScaledBorderAndShadow: yes\n\n"
         "[V4+ Styles]\n"
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
@@ -499,8 +501,9 @@ def _build_ass(groups: list) -> str:
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
         # PrimaryColour = AMARILLO (palabra activa) · SecondaryColour = BLANCO (resto)
         # Fuente grande, contorno negro grueso, sombra. MarginV=180 = más arriba.
-        "Style: TikTok,Arial Black,70,&H0000F0FF,&H00FFFFFF,&H00000000,&H96000000,"
-        "-1,0,0,0,100,100,0.5,0,1,5,3,2,40,40,180,1\n\n"
+        # 1080p: fuente 90px, contorno 6px, sombra 4px, margen inferior 240px
+        "Style: TikTok,Arial Black,90,&H0000F0FF,&H00FFFFFF,&H00000000,&H96000000,"
+        "-1,0,0,0,100,100,0.5,0,1,6,4,2,60,60,240,1\n\n"
         "[Events]\nFormat: Layer, Start, End, Style, Name, "
         "MarginL, MarginR, MarginV, Effect, Text\n"
     )
@@ -541,17 +544,17 @@ def _ken_burns(idx: int, dur: float) -> str:
     """12 efectos distintos. dur limitado a MAX_KB_DURATION por _image_to_clips."""
     d = max(1, int(dur * 25))
     fx = [
-        f"scale=1920:1080,zoompan=z='min(zoom+0.001,1.3)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={d}:s=1280x720",
-        f"scale=1440:810,zoompan=z=1.2:x='iw/2-(iw/zoom/2)+((iw/zoom/4)*on/{d})':y='ih/2-(ih/zoom/2)':d={d}:s=1280x720",
-        f"scale=1920:1080,zoompan=z='max(1.3-0.001*on,1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={d}:s=1280x720",
-        f"scale=1440:810,zoompan=z=1.2:x='iw/2-(iw/zoom/2)-((iw/zoom/4)*on/{d})':y='ih/2-(ih/zoom/2)':d={d}:s=1280x720",
-        f"scale=1920:1080,zoompan=z='min(zoom+0.0008,1.25)':x='iw/2-(iw/zoom/2)':y='ih-(ih/zoom)':d={d}:s=1280x720",
-        f"scale=1440:810,zoompan=z=1.2:x='iw/2-(iw/zoom/2)':y='ih/zoom*(0.9-0.4*on/{d})':d={d}:s=1280x720",
-        f"scale=1920:1080,zoompan=z='min(zoom+0.001,1.3)':x='iw*0.1':y='ih*0.1':d={d}:s=1280x720",
-        f"scale=1440:810,zoompan=z=1.2:x='(iw/zoom/2)*(0.6+0.8*on/{d})':y='(ih/zoom/2)*(0.6+0.8*on/{d})':d={d}:s=1280x720",
-        f"scale=1920:1080,zoompan=z='1.1+0.1*sin(3.14*on/{d})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={d}:s=1280x720",
-        f"scale=1440:810,zoompan=z=1.2:x='iw/2-(iw/zoom/2)':y='ih/zoom*(0.5+0.4*on/{d})':d={d}:s=1280x720",
-        f"scale=1920:1080,zoompan=z='min(zoom+0.001,1.3)':x='iw*0.7':y='ih*0.7':d={d}:s=1280x720",
-        f"scale=1920:1080,zoompan=z='max(1.2-0.0005*on,1.05)':x='iw/2-(iw/zoom/2)+((iw/zoom/6)*on/{d})':y='ih/2-(ih/zoom/2)':d={d}:s=1280x720",
+        f"scale=2880:1620,zoompan=z='min(zoom+0.001,1.3)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={d}:s=1920x1080",
+        f"scale=2160:1215,zoompan=z=1.2:x='iw/2-(iw/zoom/2)+((iw/zoom/4)*on/{d})':y='ih/2-(ih/zoom/2)':d={d}:s=1920x1080",
+        f"scale=2880:1620,zoompan=z='max(1.3-0.001*on,1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={d}:s=1920x1080",
+        f"scale=2160:1215,zoompan=z=1.2:x='iw/2-(iw/zoom/2)-((iw/zoom/4)*on/{d})':y='ih/2-(ih/zoom/2)':d={d}:s=1920x1080",
+        f"scale=2880:1620,zoompan=z='min(zoom+0.0008,1.25)':x='iw/2-(iw/zoom/2)':y='ih-(ih/zoom)':d={d}:s=1920x1080",
+        f"scale=2160:1215,zoompan=z=1.2:x='iw/2-(iw/zoom/2)':y='ih/zoom*(0.9-0.4*on/{d})':d={d}:s=1920x1080",
+        f"scale=2880:1620,zoompan=z='min(zoom+0.001,1.3)':x='iw*0.1':y='ih*0.1':d={d}:s=1920x1080",
+        f"scale=2160:1215,zoompan=z=1.2:x='(iw/zoom/2)*(0.6+0.8*on/{d})':y='(ih/zoom/2)*(0.6+0.8*on/{d})':d={d}:s=1920x1080",
+        f"scale=2880:1620,zoompan=z='1.1+0.1*sin(3.14*on/{d})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={d}:s=1920x1080",
+        f"scale=2160:1215,zoompan=z=1.2:x='iw/2-(iw/zoom/2)':y='ih/zoom*(0.5+0.4*on/{d})':d={d}:s=1920x1080",
+        f"scale=2880:1620,zoompan=z='min(zoom+0.001,1.3)':x='iw*0.7':y='ih*0.7':d={d}:s=1920x1080",
+        f"scale=2880:1620,zoompan=z='max(1.2-0.0005*on,1.05)':x='iw/2-(iw/zoom/2)+((iw/zoom/6)*on/{d})':y='ih/2-(ih/zoom/2)':d={d}:s=1920x1080",
     ]
     return fx[idx % len(fx)]
