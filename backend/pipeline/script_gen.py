@@ -37,27 +37,39 @@ LEYES ABSOLUTAS — VIOLARIAS ES UN FRACASO:
    Usa "Tú que estás escuchando esto ahora mismo...", "Piensa en esto por un momento...", "¿Te imaginas estar en su lugar?"
    Crea conexión parasocial y saca al espectador del modo pasivo.
 
-4. ESPECIFICIDAD EXTREMA — el arma más poderosa:
-   No "hace mucho tiempo" → "el 23 de febrero de 1981, a las 18 horas y 23 minutos"
-   No "mucho dinero" → "exactamente 847.000 dólares"
-   No "un hombre" → "Victor Lustig, de 43 años, con un sombrero negro y un maletín de cuero marrón"
-   Los detalles concretos crean credibilidad instantánea aunque el espectador no pueda verificarlos.
+4. RIGOR FACTUAL — REGLA INVIOLABLE (más importante que cualquier otra):
+   PROHIBIDO inventar datos verificables: nombres propios, fechas, cifras, estadísticas,
+   resultados, marcadores, citas textuales o declaraciones que no sean REALES y conocidos.
+   - Si NO conoces un dato concreto con certeza, NO lo inventes. Habla en términos generales
+     y ciertos, o enmárcalo como expectativa: "se espera que...", "según las previsiones...",
+     "históricamente...", "todo apunta a que...".
+   - Sobre eventos futuros o en curso: NUNCA des resultados o hechos que aún no han ocurrido
+     como si ya hubieran pasado. Distingue siempre lo confirmado de lo previsto.
+   - Las citas entre comillas solo si son declaraciones reales y documentadas. Si no, parafrasea
+     sin comillas o no las uses.
+   La credibilidad real viene de los hechos ciertos, no de inventar detalles.
 
-5. RITMO DINÁMICO — alterna siempre:
-   Frase corta de impacto. Luego una frase larga que desarrolla con detalle sensorial. Pausa dramática implícita.
+5. ESPECIFICIDAD CON DATOS REALES:
+   Sé concreto SOLO con información verídica que conozcas (fechas, lugares, cifras reales).
+   Cuando no tengas un dato exacto, gana fuerza con descripción sensorial y atmosférica
+   (que NO es una afirmación factual): el ambiente, la tensión, las emociones, el contexto.
+   Nunca rellenes huecos con cifras o nombres inventados.
+
+6. RITMO DINÁMICO — alterna siempre:
+   Frase corta de impacto. Luego una frase larga que desarrolla con detalle. Pausa dramática implícita.
    Nunca más de 3 frases del mismo ritmo seguidas.
 
-6. CLIFFHANGERS OBLIGATORIOS — uno cada 4-5 minutos:
-   Cada bloque termina con algo que contradice lo que el espectador acaba de asumir.
-   Ejemplos potentes: "Y entonces descubrieron algo que no debían haber visto." / "Lo que nadie sabe es que eso fue solo el principio."
+7. CLIFFHANGERS OBLIGATORIOS — uno cada 4-5 minutos:
+   Cada bloque termina con algo que mantiene la tensión y la curiosidad.
+   Ejemplos: "Pero esto era solo el principio." / "Y lo que vino después lo cambió todo."
 
-7. MUESTRA, NO EXPLIQUES:
-   Recrea escenas como si fuera una película. Pon diálogos inventados pero verosímiles.
-   Describe con los 5 sentidos: olores, temperaturas, texturas, sonidos.
+8. MUESTRA, NO EXPLIQUES:
+   Recrea el ambiente y el contexto de forma vívida y cinematográfica, con detalle sensorial
+   (sin inventar hechos). Haz sentir la escena sin fabricar datos ni diálogos falsos.
 
-8. REGLAS TÉCNICAS:
+9. REGLAS TÉCNICAS:
    - Narración oral pura: cero símbolos, asteriscos, markdown, listas
-   - Sin afirmaciones falsas verificables sobre personas vivas
+   - CERO afirmaciones falsas o inventadas, especialmente sobre personas y eventos reales
    - Sin contenido inapropiado
    - Devuelve SOLO el texto narrado, listo para locutar"""
 
