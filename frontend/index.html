@@ -1552,30 +1552,21 @@ async function loadFinance() {
     provEl.innerHTML = '<div class="empty" style="padding:16px 0;"><div class="empty-title">Sin gastos este mes</div></div>';
   } else {
     const maxP = Math.max(...activeProv.map(p=>p.total), 0.001);
-    provEl.innerHTML = activeProv.map(p => {
+    provEl.innerHTML = activeProv.map((p, i) => {
       const m = PROVIDER_META[p.provider] || {color:'#c49b27',icon:'○',label:p.provider};
       const pct = f.total_cost > 0 ? (p.total / f.total_cost * 100) : 0;
-      // Nombre limpio sin dominio
       const provName = m.label.split(' — ')[0];
-      const provDomain = m.label.split(' — ')[1] || '';
+      const isLast = i === activeProv.length - 1;
       return `
-      <div style="display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);">
-        <div style="width:36px;height:36px;border-radius:10px;background:${m.color}20;
-          display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">${m.icon}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px;">
-            <div>
-              <span style="font-size:13px;font-weight:700;color:var(--ink);">${provName}</span>
-              ${provDomain ? `<span style="font-size:10px;color:var(--muted);margin-left:6px;">${provDomain}</span>` : ''}
-            </div>
-            <div style="text-align:right;">
-              <span style="font-size:14px;font-weight:700;color:var(--ink);">${p.total.toFixed(3)}€</span>
-              <span style="font-size:10px;color:var(--muted);margin-left:4px;">${pct.toFixed(0)}%</span>
-            </div>
-          </div>
-          <div style="height:6px;background:var(--cream2);border-radius:4px;overflow:hidden;">
-            <div style="height:6px;background:linear-gradient(90deg,${m.color}cc,${m.color});border-radius:4px;width:${pct.toFixed(0)}%;transition:width .4s ease;"></div>
-          </div>
+      <div style="display:flex;align-items:center;gap:16px;padding:16px 0;${isLast?'':'border-bottom:1px solid var(--border);'}">
+        <div style="width:38px;height:38px;border-radius:10px;background:var(--cream2);
+          display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">${m.icon}</div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;color:var(--ink);">${provName}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${pct.toFixed(0)}% del gasto</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:18px;font-weight:700;color:var(--gold);letter-spacing:-0.5px;">${p.total.toFixed(3)}<span style="font-size:12px;">€</span></div>
         </div>
       </div>`;
     }).join('');
@@ -1588,29 +1579,20 @@ async function loadFinance() {
     brkEl.innerHTML = '<div class="empty" style="padding:16px 0;"><div class="empty-title">Sin datos</div></div>';
   } else {
     const maxS = Math.max(...activeSvc.map(s=>s.total), 0.001);
-    brkEl.innerHTML = activeSvc.map(s => {
+    brkEl.innerHTML = activeSvc.map((s, i) => {
       const label = SVC_LABELS[s.service] || s.service;
       const svcName = label.split(' — ')[0] || label;
       const svcDetail = label.split(' — ')[1] || '';
       const units = s.units > 0 ? `${Math.round(s.units).toLocaleString()} uds` : '';
-      const barPct = (s.total/maxS*100).toFixed(0);
+      const isLast = i === activeSvc.length - 1;
       return `
-      <div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);">
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-            <div>
-              <span style="font-size:12px;font-weight:600;color:var(--ink);">${svcName}</span>
-              ${svcDetail ? `<span style="font-size:10px;color:var(--muted);margin-left:5px;">${svcDetail}</span>` : ''}
-            </div>
-            <div style="display:flex;align-items:baseline;gap:8px;">
-              ${units ? `<span style="font-size:10px;color:var(--muted);">${units}</span>` : ''}
-              <span style="font-size:13px;font-weight:700;color:var(--ink);">${s.total.toFixed(3)}€</span>
-            </div>
-          </div>
-          <div style="height:4px;background:var(--cream2);border-radius:3px;overflow:hidden;">
-            <div style="height:4px;background:var(--gold);border-radius:3px;width:${barPct}%;opacity:0.75;transition:width .4s ease;"></div>
-          </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 0;${isLast?'':'border-bottom:1px solid var(--border);}">
+        <div style="min-width:0;">
+          <span style="font-size:12px;font-weight:600;color:var(--ink);">${svcName}</span>
+          ${svcDetail ? `<span style="font-size:10px;color:var(--muted);margin-left:6px;">${svcDetail}</span>` : ''}
+          ${units ? `<div style="font-size:10px;color:var(--muted);margin-top:2px;">${units}</div>` : ''}
         </div>
+        <span style="font-size:13px;font-weight:700;color:var(--ink);flex-shrink:0;margin-left:16px;">${s.total.toFixed(3)}€</span>
       </div>`;
     }).join('');
   }
