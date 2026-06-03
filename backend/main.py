@@ -514,13 +514,25 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
             })
 
         emit("images", "running", "Generando 40 imágenes + 8 hook + thumbnail en paralelo…", 37)
+        from .pipeline.hook_videos import generate_hook_prompts as gen_hookvid_prompts, generate_hook_videos
+        hook_vids_dir = job_dir / "hook_videos"
+
+        def _hook_videos_task():
+            # Footage real de Pexels para el hook (gratis). Si no hay key, devuelve [].
+            queries = gen_hookvid_prompts(job_id, script, req.niche, 5)
+            return generate_hook_videos(job_id, queries, hook_vids_dir)
+
         body_task  = asyncio.to_thread(generate_images, job_id, img_prompts, images_dir, on_img_progress)
         hook_task  = asyncio.to_thread(generate_hook_images, job_id, req.niche, script[:800], hook_imgs_dir)
         thumb_task = asyncio.to_thread(generate_thumbnail, job_id, req.title, req.niche, job_dir, req.tone)
-        body_images, hook_images, thumbnail_path = await asyncio.gather(body_task, hook_task, thumb_task)
+        hookvid_task = asyncio.to_thread(_hook_videos_task)
+        body_images, hook_images, thumbnail_path, hook_clips = await asyncio.gather(
+            body_task, hook_task, thumb_task, hookvid_task
+        )
 
         emit("images",    "done", f"{len(body_images)} imágenes del cuerpo listas", 60)
-        emit("hook_videos","done", f"{len(hook_images)} imágenes hook listas", 62)
+        hook_src = f"{len(hook_clips)} clips vídeo Pexels" if hook_clips else f"{len(hook_images)} imágenes"
+        emit("hook_videos","done", f"Hook: {hook_src}", 62)
         emit("thumbnail", "done", "Miniatura con título lista", 64)
         check_cancelled()
 
@@ -530,7 +542,7 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
         final_path = job_dir / "final.mp4"
         await asyncio.to_thread(
             render_video, job_id,
-            [],
+            hook_clips,
             body_images, audio_path, final_path, req.title,
             hook_images, req.tone
         )

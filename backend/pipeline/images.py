@@ -275,75 +275,217 @@ def generate_hook_images(job_id: str, niche: str, script_hook: str,
     return paths
 
 
+# Queries Pexels por tono — busca caras humanas reales con la emoción correcta
+THUMB_PEXELS_QUERY = {
+    "misterio":     "shocked surprised man dark dramatic portrait",
+    "drama":        "sad emotional woman dramatic portrait close up",
+    "motivacional": "confident powerful man portrait determination",
+    "documental":   "serious professional woman documentary portrait",
+    "humor":        "funny surprised face laughing portrait",
+    "neutro":       "serious man portrait dramatic lighting",
+    "truecrime":    "worried anxious woman dark portrait",
+    "historia":     "dramatic man historical serious portrait",
+    "conspiracion": "suspicious paranoid man dark portrait shadows",
+    "ciencia":      "amazed scientist woman discovery portrait",
+}
+
+
 def generate_thumbnail(job_id: str, title: str, niche: str, output_dir: Path,
                         tone: str = "neutro") -> Path:
-    add_step(job_id, "thumbnail", "running",
-             "Generando miniatura viral con Ideogram v2 (texto integrado)…")
     output_dir.mkdir(parents=True, exist_ok=True)
-    key = os.environ.get("FAL_API_KEY", "")
-    final = output_dir / "thumbnail.jpg"
+    final   = output_dir / "thumbnail.jpg"
+    base    = output_dir / "thumbnail_base.jpg"
+    fal_key = os.environ.get("FAL_API_KEY", "")
+    pexels_key = os.environ.get("PEXELS_API_KEY", "")
 
-    if key:
+    # ── Opción A: Cara humana real de Pexels + PIL (GRATIS, aspecto 100% humano) ─
+    if pexels_key:
         try:
+            add_step(job_id, "thumbnail", "running",
+                     "Buscando cara humana real en Pexels para miniatura…")
+            with httpx.Client(timeout=30) as client:
+                face = _pexels_portrait(client, pexels_key, tone, niche)
+            if face:
+                face.save(str(base), "JPEG", quality=95)
+                _compose_thumbnail(base, title, tone, final)
+                _variant_red(base, title, output_dir / "thumbnail_b.jpg")
+                _variant_minimal(base, title, output_dir / "thumbnail_c.jpg")
+                add_step(job_id, "thumbnail", "done",
+                         "Miniatura con cara humana real + PIL · 0.00€", 0)
+                return final
+        except Exception as e:
+            add_step(job_id, "thumbnail", "running",
+                     f"Pexels falló ({str(e)[:50]}), usando Ideogram…")
+
+    # ── Opción B: Ideogram v2 Turbo (genera texto integrado, $0.05) ──────────────
+    if fal_key:
+        try:
+            add_step(job_id, "thumbnail", "running",
+                     "Generando miniatura con Ideogram v2 Turbo…")
             thumb_text, ideogram_prompt = _build_ideogram_prompt(job_id, title, niche, tone)
             with httpx.Client(timeout=180) as client:
                 r = client.post(
                     FAL_IDEOGRAM,
-                    headers={"Authorization": f"Key {key}",
+                    headers={"Authorization": f"Key {fal_key}",
                              "Content-Type": "application/json"},
-                    json={
-                        "prompt": ideogram_prompt,
-                        "aspect_ratio": "16:9",
-                        "style_type": "DESIGN",
-                        "magic_prompt_option": "OFF",
-                    },
+                    json={"prompt": ideogram_prompt, "aspect_ratio": "16:9",
+                          "style_type": "DESIGN", "magic_prompt_option": "OFF"},
                     timeout=120,
                 )
                 if r.status_code == 200:
                     imgs = r.json().get("images", [])
                     if imgs:
-                        img_url = imgs[0]["url"]
-                        _download(client, img_url, final)
+                        _download(client, imgs[0]["url"], base)
                         cost_eur = FAL_IDEOGRAM_PRICE_USD * EUR_RATE
                         add_cost_event(job_id, "ideogram_thumbnail", 1,
                                        FAL_IDEOGRAM_PRICE_USD, round(cost_eur, 6))
+                        _compose_thumbnail(base, title, tone, final)
+                        _variant_red(base, title, output_dir / "thumbnail_b.jpg")
+                        _variant_minimal(base, title, output_dir / "thumbnail_c.jpg")
                         add_step(job_id, "thumbnail", "done",
-                                 f"Miniatura Ideogram lista · {cost_eur:.4f}€", cost_eur)
+                                 f"Miniatura Ideogram · {cost_eur:.4f}€", cost_eur)
                         return final
         except Exception:
             pass
 
-    # Fallback: Flux Schnell + PIL si Ideogram falla
-    add_step(job_id, "thumbnail", "running", "Fallback: Flux + PIL…")
+    # ── Opción C: Flux Schnell + PIL (fallback final) ─────────────────────────────
+    add_step(job_id, "thumbnail", "running", "Fallback: Flux Schnell + PIL…")
     prompt_flux = (
-        f"YouTube thumbnail viral, epic cinematic, {niche} topic, "
-        "dramatic god rays lighting, high contrast, vivid colors, "
-        "dark moody background, 16:9, 4K, no text, no logos, photorealistic"
+        f"dramatic cinematic portrait face shocked expression, {niche}, "
+        "dark moody background, studio lighting, high contrast, 16:9, photorealistic, no text"
     )
-    base = output_dir / "thumbnail_base.jpg"
     with httpx.Client(timeout=200) as client:
-        if key:
+        if fal_key:
             try:
-                url, cost_eur = _fal(client, prompt_flux, key)
+                url, cost_eur = _fal(client, prompt_flux, fal_key)
                 _download(client, url, base)
-                add_cost_event(job_id, "fal_flux_thumbnail", 1,
-                               FAL_UNIT_PRICE_USD, round(cost_eur, 6))
+                add_cost_event(job_id, "fal_flux_thumbnail", 1, FAL_UNIT_PRICE_USD, round(cost_eur, 6))
             except Exception:
                 _pollinations(client, prompt_flux, base)
         else:
             _pollinations(client, prompt_flux, base)
 
     if base.exists():
-        _add_title_text(base, title, final)
-        # Generar 2 variantes gratis con PIL (distintos estilos visuales)
+        _compose_thumbnail(base, title, tone, final)
         _variant_red(base, title, output_dir / "thumbnail_b.jpg")
         _variant_minimal(base, title, output_dir / "thumbnail_c.jpg")
     else:
         _solid_thumbnail(title, final)
 
-    add_step(job_id, "thumbnail", "done", "Miniatura (fallback PIL) lista",
-             FAL_UNIT_PRICE_USD * EUR_RATE)
+    add_step(job_id, "thumbnail", "done", "Miniatura (fallback PIL) lista", 0)
     return final
+
+
+def _pexels_portrait(client: httpx.Client, api_key: str, tone: str, niche: str):
+    """Busca una foto de persona real en Pexels. Devuelve imagen PIL o None."""
+    query = THUMB_PEXELS_QUERY.get(tone, f"dramatic portrait {niche}")
+    r = client.get(
+        "https://api.pexels.com/v1/search",
+        headers={"Authorization": api_key},
+        params={"query": query, "per_page": 8, "orientation": "landscape"},
+        timeout=20,
+    )
+    if r.status_code != 200:
+        return None
+    photos = r.json().get("photos", [])
+    if not photos:
+        return None
+
+    import random
+    from PIL import Image as PILImage
+    import io
+    photo = random.choice(photos[:5])
+    img_url = photo["src"].get("large2x") or photo["src"]["large"]
+    img_resp = client.get(img_url, timeout=30)
+    img_resp.raise_for_status()
+    img = PILImage.open(io.BytesIO(img_resp.content)).convert("RGB")
+    # Recortar a 16:9
+    w, h = img.size
+    target_h = int(w * 9 / 16)
+    if target_h <= h:
+        top = (h - target_h) // 2
+        img = img.crop((0, top, w, top + target_h))
+    img = img.resize((1280, 720), PILImage.LANCZOS)
+    return img
+
+
+def _compose_thumbnail(base: Path, title: str, tone: str, out: Path):
+    """
+    Compone la miniatura profesional:
+    - Gradiente oscuro izquierda (donde va el texto)
+    - Texto grande, bold, blanco con sombra negra gruesa
+    - Acento de color según el tono
+    """
+    try:
+        from PIL import Image, ImageDraw, ImageFilter
+        img = Image.open(base).convert("RGB").resize((1280, 720), Image.LANCZOS)
+        overlay = Image.new("RGBA", (1280, 720), (0, 0, 0, 0))
+        ov = ImageDraw.Draw(overlay)
+
+        # Gradiente izquierdo (55% del ancho) para que el texto sea legible
+        for x in range(700):
+            alpha = int(210 * max(0, 1 - (x / 650) ** 0.6))
+            ov.line([(x, 0), (x, 720)], fill=(0, 0, 0, alpha))
+
+        # Borde inferior oscuro
+        for y in range(600, 720):
+            alpha = int(160 * ((y - 600) / 120))
+            ov.line([(0, y), (1280, y)], fill=(0, 0, 0, alpha))
+
+        img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
+        draw = ImageDraw.Draw(img)
+
+        # Color de acento por tono
+        accent = {
+            "misterio": (100, 140, 255), "drama": (200, 60, 60),
+            "motivacional": (255, 180, 0), "documental": (60, 180, 120),
+            "humor": (255, 120, 0), "neutro": (200, 200, 200),
+        }.get(tone, (255, 255, 255))
+
+        # Barra de acento vertical izquierda
+        draw.rectangle([(0, 0), (10, 720)], fill=accent)
+
+        # Seleccionar palabras clave del título (máx 3 líneas cortas)
+        words = title.upper().split()
+        # Eliminar palabras poco impactantes
+        skip = {"DE", "DEL", "LA", "EL", "LOS", "LAS", "UN", "UNA", "QUE",
+                 "POR", "EN", "CON", "SIN", "Y", "O", "A", "AL"}
+        imp_words = [w for w in words if w not in skip] or words
+        lines, cur = [], ""
+        for w in imp_words:
+            test = (cur + " " + w).strip()
+            if len(test) <= 14:
+                cur = test
+            else:
+                if cur:
+                    lines.append(cur)
+                cur = w
+        if cur:
+            lines.append(cur)
+        lines = lines[:3]
+
+        fsize = 96 if len(lines) == 1 else (80 if len(lines) == 2 else 66)
+        font_big  = _load_font(fsize)
+        font_sub  = _load_font(28)
+
+        total_h = len(lines) * (fsize + 8)
+        y = (720 - total_h) // 2 - 20
+
+        for line in lines:
+            x = 28
+            # Sombra múltiple para máximo contraste
+            for dx, dy in [(-4,-4),(4,-4),(-4,4),(4,4),(0,-4),(0,4),(-4,0),(4,0)]:
+                draw.text((x+dx, y+dy), line, font=font_big, fill=(0,0,0,220))
+            draw.text((x, y), line, font=font_big, fill=(255,255,255))
+            y += fsize + 8
+
+        # Sub-texto con el nicho/canal
+        draw.text((28, y + 8), "▶ MÁS EN EL CANAL", font=font_sub, fill=(*accent, 200))
+
+        img.save(out, "JPEG", quality=95)
+    except Exception:
+        import shutil
+        shutil.copy2(base, out)
 
 
 def _build_ideogram_prompt(job_id: str, title: str, niche: str, tone: str) -> tuple[str, str]:

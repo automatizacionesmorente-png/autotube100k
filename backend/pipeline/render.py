@@ -151,10 +151,21 @@ def render_video(
     valid_hook_imgs = [i for i in (hook_images or []) if i.exists() and i.stat().st_size > 5000]
 
     if valid_hook_vids:
+        # Recortar cada clip de Pexels a ~clip_len s para que el hook total ≈ hook_dur
+        clip_len = max(3.5, min(6.0, hook_dur / max(1, len(valid_hook_vids))))
+        trimmed = []
+        for k, v in enumerate(valid_hook_vids):
+            t_out = tmp / f"hvtrim_{k:02d}.mp4"
+            _ffmpeg("-i", str(v), "-t", f"{clip_len:.2f}",
+                    "-vf", "scale=1280:720:force_original_aspect_ratio=increase,"
+                           "crop=1280:720,fade=t=in:st=0:d=0.3,"
+                           f"fade=t=out:st={max(0,clip_len-0.3):.2f}:d=0.3",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-an", "-r", "25",
+                    str(t_out))
+            trimmed.append(t_out)
         lst = tmp / "hv_list.txt"
-        lst.write_text("\n".join(f"file '{v.resolve()}'" for v in valid_hook_vids))
+        lst.write_text("\n".join(f"file '{v.resolve()}'" for v in trimmed))
         _ffmpeg("-f", "concat", "-safe", "0", "-i", str(lst),
-                "-vf", "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720",
                 "-c:v", "libx264", "-preset", "ultrafast", "-an", str(hook_concat))
     elif valid_hook_imgs:
         per_img = hook_dur / len(valid_hook_imgs)
@@ -228,13 +239,22 @@ def render_video(
         )
 
     if has_music:
-        # Mezcla: narración al 100% + música a -22dB de fondo (barely noticeable, cinematic)
+        # Mezcla profesional con DUCKING automático (sidechaincompress):
+        # la música baja sola cuando hay narración y sube en los silencios.
+        # voice al 100% · música base 0.18 · ducking dispara con la voz.
         _ffmpeg(
             "-i", str(full_mp4),
             "-i", str(audio_path),
             "-stream_loop", "-1", "-i", str(music_path),
             "-filter_complex",
-            f"[1:a]volume=1.0[voice];[2:a]volume=0.08,atrim=0:duration={audio_dur:.2f},afade=t=out:st={max(0,audio_dur-3):.1f}:d=3[music];[voice][music]amix=inputs=2:duration=first[aout]",
+            (
+                f"[1:a]volume=1.0,asplit=2[voice][sc];"
+                f"[2:a]volume=0.18,atrim=0:duration={audio_dur:.2f},"
+                f"afade=t=in:st=0:d=4,afade=t=out:st={max(0,audio_dur-4):.1f}:d=4[musicraw];"
+                # Ducking: la música (musicraw) se comprime usando la voz (sc) como disparador
+                f"[musicraw][sc]sidechaincompress=threshold=0.03:ratio=8:attack=200:release=600[ducked];"
+                f"[voice][ducked]amix=inputs=2:duration=first:dropout_transition=3[aout]"
+            ),
             "-map", "0:v", "-map", "[aout]",
             "-vf", vf,
             "-c:v", "libx264", "-preset", "fast", "-crf", "26",
@@ -387,18 +407,16 @@ def _whisper_subtitles(audio_path: Path, ass_path: Path) -> bool:
                     if w.word.strip():
                         words.append((w.start, w.end, w.word.strip()))
 
-        # 3 palabras por grupo = más dinámico (TikTok style)
-        groups, chunk, cs, ce = [], [], None, None
+        # Agrupar en bloques de 3 palabras, guardando el timing de CADA palabra
+        # para poder hacer resaltado karaoke (palabra activa en amarillo).
+        groups, chunk = [], []
         for s, e, w in words:
-            if cs is None:
-                cs = s
-            chunk.append(w)
-            ce = e
+            chunk.append((s, e, w))
             if len(chunk) >= 3:
-                groups.append((cs, ce, " ".join(chunk)))
-                chunk, cs, ce = [], None, None
+                groups.append(chunk)
+                chunk = []
         if chunk:
-            groups.append((cs, ce, " ".join(chunk)))
+            groups.append(chunk)
 
         ass_path.write_text(_build_ass(groups), encoding="utf-8")
         return True
@@ -407,6 +425,12 @@ def _whisper_subtitles(audio_path: Path, ass_path: Path) -> bool:
 
 
 def _build_ass(groups: list) -> str:
+    """
+    Subtítulos estilo karaoke: la palabra que se está pronunciando se resalta
+    en amarillo (PrimaryColour) y las demás quedan en blanco (SecondaryColour),
+    usando tags \\k de ASS. Posición elevada para no chocar con los controles
+    de YouTube. Pop de entrada con \\fad.
+    """
     header = (
         "[Script Info]\nScriptType: v4.00+\nPlayResX: 1280\nPlayResY: 720\n"
         "ScaledBorderAndShadow: yes\n\n"
@@ -415,20 +439,35 @@ def _build_ass(groups: list) -> str:
         "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
         "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        # Texto blanco, sombra negra gruesa, fuente grande — estilo True Crime
-        "Style: TikTok,Arial,68,&H00FFFFFF,&H000000FF,&H00000000,&HCC000000,"
-        "-1,0,0,0,100,100,1,0,1,4,2,2,40,40,100,1\n\n"
+        # PrimaryColour = AMARILLO (palabra activa) · SecondaryColour = BLANCO (resto)
+        # Fuente grande, contorno negro grueso, sombra. MarginV=180 = más arriba.
+        "Style: TikTok,Arial Black,70,&H0000F0FF,&H00FFFFFF,&H00000000,&H96000000,"
+        "-1,0,0,0,100,100,0.5,0,1,5,3,2,40,40,180,1\n\n"
         "[Events]\nFormat: Layer, Start, End, Style, Name, "
         "MarginL, MarginR, MarginV, Effect, Text\n"
     )
     lines = []
-    for s, e, text in groups:
-        text = text.replace("{", "").replace("}", "").replace("\\n", " ").strip()
-        if not text:
+    for group in groups:
+        # group = lista de (start, end, word)
+        if not group:
             continue
+        gs = group[0][0]
+        ge = group[-1][1]
+        # Construir texto con tags \k (centisegundos por palabra)
+        parts = []
+        for (ws, we, w) in group:
+            w_clean = w.replace("{", "").replace("}", "").replace("\\", "").strip().upper()
+            if not w_clean:
+                continue
+            k_cs = max(1, int((we - ws) * 100))  # duración de la palabra en centiseg
+            parts.append(f"{{\\k{k_cs}}}{w_clean} ")
+        if not parts:
+            continue
+        karaoke = "".join(parts).strip()
+        # \an2 = abajo-centro · \fad(80,80) = pop de entrada/salida suave
         lines.append(
-            f"Dialogue: 0,{_t(s)},{_t(e+0.05)},TikTok,,0,0,0,,"
-            f"{{\\an2}}{text.upper()}"
+            f"Dialogue: 0,{_t(gs)},{_t(ge+0.08)},TikTok,,0,0,0,,"
+            f"{{\\an2\\fad(80,80)}}{karaoke}"
         )
     return header + "\n".join(lines) + "\n"
 

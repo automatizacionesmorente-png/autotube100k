@@ -50,15 +50,18 @@ def generate_audio(job_id: str, script: str, tone: str, output_path: Path) -> Pa
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # ── Intentar XTTS v2 primero (calidad narrador profesional, gratis) ───────
+    raw_path = output_path.with_suffix(".raw.mp3")
     if _xtts_available():
         try:
             voice_profile = XTTS_VOICE_MAP.get(tone, "neutro_profesional")
             ref_wav = f"{VOICES_DIR}/{voice_profile}.wav"
             add_step(job_id, "tts", "running",
                      f"Generando voz con XTTS v2 · perfil '{voice_profile}' · gratis…")
-            _xtts_generate(script, output_path, ref_wav)
-            size_mb = output_path.stat().st_size / 1024 / 1024
+            _xtts_generate(script, raw_path, ref_wav)
             add_cost_event(job_id, "xtts_v2", len(script), 0, 0)
+            _postprocess_audio(raw_path, output_path, tone)
+            raw_path.unlink(missing_ok=True)
+            size_mb = output_path.stat().st_size / 1024 / 1024
             add_step(job_id, "tts", "done",
                      f"Audio XTTS v2: {size_mb:.1f} MB · {voice_profile} · 0.00€", 0)
             return output_path
@@ -71,7 +74,9 @@ def generate_audio(job_id: str, script: str, tone: str, output_path: Path) -> Pa
     rate  = RATE_MAP.get(tone, "-5%")
     add_step(job_id, "tts", "running",
              f"Voz Edge TTS {voice.split('-')[2]} · español nativo · gratis…")
-    asyncio.run(_edge_tts(script, voice, rate, output_path))
+    asyncio.run(_edge_tts(script, voice, rate, raw_path))
+    _postprocess_audio(raw_path, output_path, tone)
+    raw_path.unlink(missing_ok=True)
     size_mb = output_path.stat().st_size / 1024 / 1024
     add_cost_event(job_id, "edge_tts", len(script), 0, 0)
     add_step(job_id, "tts", "done",
@@ -86,58 +91,42 @@ def _xtts_available() -> bool:
 
 
 def _xtts_generate(script: str, output_path: Path, ref_wav: str = None):
-    """Genera audio con XTTS v2 dividiendo en chunks y concatenando con ffmpeg."""
-    import subprocess, shutil
+    """
+    Genera audio con XTTS v2 en UNA sola llamada al subproceso.
+    El script xtts_generate.py carga el modelo una vez, divide el guion
+    completo en frases internamente y concatena. Mucho más rápido y fiable
+    que recargar el modelo de 2GB por cada fragmento.
+    """
+    import subprocess
 
-    chunks = _split_text(script, max_chars=1200)
     tmp_dir = output_path.parent / "_xtts_tmp"
     tmp_dir.mkdir(exist_ok=True)
-    wav_files = []
+    txt = tmp_dir / "full_script.txt"
+    wav = tmp_dir / "full.wav"
+    txt.write_text(script, encoding="utf-8")
 
     ref = ref_wav if ref_wav and Path(ref_wav).exists() else None
+    cmd = [XTTS_VENV, XTTS_SCRIPT, str(txt), str(wav)]
+    if ref:
+        cmd.append(ref)
 
+    # Timeout generoso: 32 min de audio a RTF 2.2 ≈ 70 min + margen
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
+    if result.returncode != 0 or not wav.exists():
+        raise RuntimeError(f"XTTS falló: {result.stderr[-300:]}")
+
+    # Convertir el WAV final a MP3 de calidad
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", str(wav),
+         "-c:a", "libmp3lame", "-b:a", "192k", str(output_path)],
+        check=True, capture_output=True
+    )
+
+    import shutil
     try:
-        for i, chunk in enumerate(chunks):
-            txt = tmp_dir / f"chunk_{i}.txt"
-            wav = tmp_dir / f"chunk_{i}.wav"
-            txt.write_text(chunk, encoding="utf-8")
-
-            cmd = [XTTS_VENV, XTTS_SCRIPT, str(txt), str(wav)]
-            if ref:
-                cmd.append(ref)
-
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-            if result.returncode != 0 or not wav.exists():
-                raise RuntimeError(f"XTTS chunk {i} falló: {result.stderr[-200:]}")
-            wav_files.append(wav)
-
-        # Convertir todos los WAV a MP3 y concatenar
-        if len(wav_files) == 1:
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", str(wav_files[0]),
-                 "-c:a", "libmp3lame", "-b:a", "192k", str(output_path)],
-                check=True, capture_output=True
-            )
-        else:
-            # Concatenar con ffmpeg
-            list_file = tmp_dir / "wavlist.txt"
-            list_file.write_text("\n".join(f"file '{w.resolve()}'" for w in wav_files))
-            concat_wav = tmp_dir / "concat.wav"
-            subprocess.run(
-                ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
-                 "-i", str(list_file), str(concat_wav)],
-                check=True, capture_output=True
-            )
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", str(concat_wav),
-                 "-c:a", "libmp3lame", "-b:a", "192k", str(output_path)],
-                check=True, capture_output=True
-            )
-    finally:
-        try:
-            shutil.rmtree(tmp_dir)
-        except Exception:
-            pass
+        shutil.rmtree(tmp_dir)
+    except Exception:
+        pass
 
 
 async def _edge_tts(script: str, voice: str, rate: str, output_path: Path):
@@ -166,6 +155,44 @@ async def _edge_tts(script: str, voice: str, rate: str, output_path: Path):
         lst.unlink(missing_ok=True)
         for f in tmp_files:
             f.unlink(missing_ok=True)
+
+
+def _postprocess_audio(raw: Path, out: Path, tone: str):
+    """
+    Post-procesado de audio profesional con FFmpeg (gratis):
+    1. Normalización a -16 LUFS (estándar YouTube — sin distorsión, sin silencio)
+    2. Compresor dinámico (iguala volumen, elimina picos — voz más uniforme)
+    3. Leve reverb de sala (hace la voz más cálida, menos robótica)
+    4. Filtro de paso alto 80Hz (elimina rumor de fondo)
+    5. Bitrate 192kbps (calidad profesional YouTube)
+    """
+    import subprocess
+
+    # Parámetros de reverb según el tono
+    reverb = {
+        "misterio":     "0.3:0.3:50:0.5:0.3:0.3",   # sala oscura, eco medio
+        "drama":        "0.4:0.4:60:0.5:0.4:0.3",   # sala grande, dramático
+        "motivacional": "0.15:0.15:20:0.4:0.2:0.2", # sala pequeña, íntimo, energético
+        "documental":   "0.2:0.2:30:0.4:0.25:0.2",  # sala neutral
+        "humor":        "0.1:0.1:15:0.3:0.15:0.15", # muy íntimo, cercano
+        "neutro":       "0.2:0.2:25:0.4:0.2:0.2",   # sala estándar
+    }.get(tone, "0.2:0.2:25:0.4:0.2:0.2")
+
+    subprocess.run([
+        "ffmpeg", "-y", "-i", str(raw),
+        "-af", (
+            # 1. Filtro de paso alto (elimina bajas frecuencias de fondo)
+            "highpass=f=80,"
+            # 2. Compresor (voz más uniforme, sin picos)
+            "acompressor=threshold=-18dB:ratio=3:attack=5:release=50:makeup=2dB,"
+            # 3. Reverb ligero de sala (voz más cálida)
+            f"aecho=0.8:0.85:{reverb},"
+            # 4. Normalización a -16 LUFS (estándar YouTube)
+            "loudnorm=I=-16:TP=-1.5:LRA=11"
+        ),
+        "-c:a", "libmp3lame", "-b:a", "192k", "-ar", "44100",
+        str(out)
+    ], check=True, capture_output=True)
 
 
 def _split_text(text: str, max_chars: int = 4000) -> list[str]:
