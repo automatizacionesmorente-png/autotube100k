@@ -290,6 +290,38 @@ THUMB_PEXELS_QUERY = {
 }
 
 
+def _thumbnail_headline(title: str, niche: str, tone: str) -> str:
+    """
+    Genera un titular MUY corto (2-4 palabras) de máxima curiosidad para la
+    miniatura, distinto del título. Es lo que más sube el CTR.
+    Reglas de oro de miniaturas virales:
+    - 2-4 palabras grandes y legibles en móvil
+    - genera una pregunta/incógnita en el cerebro (curiosity gap)
+    - complementa al título, no lo repite
+    """
+    try:
+        client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        msg = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=60,
+            messages=[{"role": "user", "content": f"""Vídeo de YouTube: "{title}" (nicho: {niche}).
+Dame SOLO un titular de MINIATURA de 2 a 4 palabras EN MAYÚSCULAS, en español,
+que genere curiosidad extrema y dé ganas de hacer clic. NO repitas el título.
+Que sea legible en un móvil pequeño. Sin comillas, sin explicación. Solo el texto."""}]
+        )
+        headline = msg.content[0].text.strip().strip('"').upper()
+        # Seguridad: máximo 4 palabras
+        words = headline.split()
+        if 1 <= len(words) <= 5:
+            return " ".join(words[:4])
+    except Exception:
+        pass
+    # Fallback: palabras clave del título
+    skip = {"DE","DEL","LA","EL","LOS","LAS","UN","UNA","QUE","POR","EN","CON","SIN","Y","O","A","AL"}
+    words = [w for w in title.upper().split() if w not in skip]
+    return " ".join(words[:3]) if words else title.upper()[:20]
+
+
 def generate_thumbnail(job_id: str, title: str, niche: str, output_dir: Path,
                         tone: str = "neutro") -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -297,6 +329,9 @@ def generate_thumbnail(job_id: str, title: str, niche: str, output_dir: Path,
     base    = output_dir / "thumbnail_base.jpg"
     fal_key = os.environ.get("FAL_API_KEY", "")
     pexels_key = os.environ.get("PEXELS_API_KEY", "")
+
+    # Titular viral corto — se usa en TODAS las variantes (caras reales incluidas)
+    headline = _thumbnail_headline(title, niche, tone)
 
     # ── Opción A: Cara humana real de Pexels + PIL (GRATIS, aspecto 100% humano) ─
     if pexels_key:
@@ -307,11 +342,11 @@ def generate_thumbnail(job_id: str, title: str, niche: str, output_dir: Path,
                 face = _pexels_portrait(client, pexels_key, tone, niche)
             if face:
                 face.save(str(base), "JPEG", quality=95)
-                _compose_thumbnail(base, title, tone, final)
-                _variant_red(base, title, output_dir / "thumbnail_b.jpg")
-                _variant_minimal(base, title, output_dir / "thumbnail_c.jpg")
+                _compose_thumbnail(base, title, tone, final, headline=headline)
+                _variant_red(base, headline, output_dir / "thumbnail_b.jpg")
+                _variant_minimal(base, headline, output_dir / "thumbnail_c.jpg")
                 add_step(job_id, "thumbnail", "done",
-                         "Miniatura con cara humana real + PIL · 0.00€", 0)
+                         f"Miniatura cara real + titular '{headline}' · 0.00€", 0)
                 return final
         except Exception as e:
             add_step(job_id, "thumbnail", "running",
@@ -339,9 +374,11 @@ def generate_thumbnail(job_id: str, title: str, niche: str, output_dir: Path,
                         cost_eur = FAL_IDEOGRAM_PRICE_USD * EUR_RATE
                         add_cost_event(job_id, "ideogram_thumbnail", 1,
                                        FAL_IDEOGRAM_PRICE_USD, round(cost_eur, 6))
-                        _compose_thumbnail(base, title, tone, final)
-                        _variant_red(base, title, output_dir / "thumbnail_b.jpg")
-                        _variant_minimal(base, title, output_dir / "thumbnail_c.jpg")
+                        # Ideogram ya integra el texto en la imagen — no recomponer
+                        import shutil as _sh
+                        _sh.copy2(base, final)
+                        _variant_red(base, headline, output_dir / "thumbnail_b.jpg")
+                        _variant_minimal(base, headline, output_dir / "thumbnail_c.jpg")
                         add_step(job_id, "thumbnail", "done",
                                  f"Miniatura Ideogram · {cost_eur:.4f}€", cost_eur)
                         return final
@@ -366,9 +403,9 @@ def generate_thumbnail(job_id: str, title: str, niche: str, output_dir: Path,
             _pollinations(client, prompt_flux, base)
 
     if base.exists():
-        _compose_thumbnail(base, title, tone, final)
-        _variant_red(base, title, output_dir / "thumbnail_b.jpg")
-        _variant_minimal(base, title, output_dir / "thumbnail_c.jpg")
+        _compose_thumbnail(base, title, tone, final, headline=headline)
+        _variant_red(base, headline, output_dir / "thumbnail_b.jpg")
+        _variant_minimal(base, headline, output_dir / "thumbnail_c.jpg")
     else:
         _solid_thumbnail(title, final)
 
@@ -409,12 +446,13 @@ def _pexels_portrait(client: httpx.Client, api_key: str, tone: str, niche: str):
     return img
 
 
-def _compose_thumbnail(base: Path, title: str, tone: str, out: Path):
+def _compose_thumbnail(base: Path, title: str, tone: str, out: Path, headline: str = None):
     """
     Compone la miniatura profesional:
     - Gradiente oscuro izquierda (donde va el texto)
     - Texto grande, bold, blanco con sombra negra gruesa
     - Acento de color según el tono
+    Si se pasa `headline`, se usa ese titular corto viral en vez del título.
     """
     try:
         from PIL import Image, ImageDraw, ImageFilter
@@ -445,12 +483,14 @@ def _compose_thumbnail(base: Path, title: str, tone: str, out: Path):
         # Barra de acento vertical izquierda
         draw.rectangle([(0, 0), (10, 720)], fill=accent)
 
-        # Seleccionar palabras clave del título (máx 3 líneas cortas)
-        words = title.upper().split()
-        # Eliminar palabras poco impactantes
-        skip = {"DE", "DEL", "LA", "EL", "LOS", "LAS", "UN", "UNA", "QUE",
-                 "POR", "EN", "CON", "SIN", "Y", "O", "A", "AL"}
-        imp_words = [w for w in words if w not in skip] or words
+        # Usar el titular viral corto si está disponible; si no, palabras del título
+        if headline:
+            imp_words = headline.upper().split()
+        else:
+            words = title.upper().split()
+            skip = {"DE", "DEL", "LA", "EL", "LOS", "LAS", "UN", "UNA", "QUE",
+                     "POR", "EN", "CON", "SIN", "Y", "O", "A", "AL"}
+            imp_words = [w for w in words if w not in skip] or words
         lines, cur = [], ""
         for w in imp_words:
             test = (cur + " " + w).strip()
