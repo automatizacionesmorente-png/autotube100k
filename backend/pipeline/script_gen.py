@@ -60,10 +60,52 @@ HOOK_STRATEGY = {
     "motivacional": """ESTRATEGIA (MOTIVACIÓN/SUPERACIÓN):
 Habla directo al alma del espectador y a su momento de hoy. Hazle sentir VISTO.
 Apertura tipo: señálalo ("Si este vídeo ha llegado a ti hoy, no es casualidad..."), nombra su dolor o su lucha silenciosa, y promete una transformación concreta. Crea sensación de destino y urgencia emocional. Tono: cercano, con peso, pausas. Es un mensaje personal, no una clase.""",
-    "misterio": """ESTRATEGIA (MISTERIO/INTRIGA):
-Abre con la escena o el dato más perturbador e inexplicable de toda la historia, como si el espectador acabara de entrar en una habitación a oscuras. Una imagen sensorial inquietante o una pregunta sin respuesta aparente. Luego insinúa que lo que va a descubrir cambia todo. Tono: grave, lento, tensión que sube.""",
-    "drama": """ESTRATEGIA (DRAMA/HISTORIA HUMANA):
-Abre en el instante de máximo impacto emocional de la historia (la pérdida, la decisión imposible, el segundo que lo cambió todo), con un protagonista concreto. Haz que el espectador SIENTA antes de entender. Luego abre el bucle: "para entender cómo se llega aquí, hay que volver atrás".""",
+    "misterio": """ESTRATEGIA TRUE CRIME / MISTERIO — ESTRUCTURA EXACTA EN 5 ACTOS:
+
+ACTO 1 — LA BOMBA (primeras 2-3 frases, ~15 segundos):
+Lanza el hecho más perturbador de toda la historia. Sin contexto, sin fecha previa, sin presentación.
+Habla en PRESENTE HISTÓRICO (más inmediato y cinematográfico).
+Ejemplo de nivel: "Tres niñas caminan hacia casa. Es una tarde de noviembre normal. No van a llegar."
+Prohibido: "Hoy os voy a hablar de...", "En el año...", "Este vídeo trata sobre..."
+
+ACTO 2 — EL AMPLIFICADOR (2-3 frases, ~20 segundos):
+Añade un detalle sensorial o un dato que hace LA BOMBA todavía más perturbador.
+Usa frío, oscuridad, silencio, olores, temperatura. El espectador debe sentir algo físico.
+Ejemplo: "Hacía frío. Uno de esos fríos que se meten en los huesos. Los agentes que llegaron primero dijeron que ese olor nunca lo olvidarían."
+
+ACTO 3 — EL LOOP (3-4 frases, ~25 segundos):
+Crea el bucle narrativo: menciona que para entender el desenlace hay que ir atrás.
+FÓRMULA EXACTA: "Pero para entender lo que ocurrió [aquí/ese día/en ese momento], tengo que llevarte [X tiempo] atrás. A un [día/momento] que parecía completamente normal."
+Este bucle hace IMPOSIBLE cerrar el vídeo.
+
+ACTO 4 — LA PROMESA PROHIBIDA (2-3 frases, ~20 segundos):
+Garantiza al espectador que va a descubrir algo que los medios ocultaron o que nadie ha contado.
+FÓRMULA: "En los próximos [X] minutos vas a descubrir [algo específico y concreto]. Lo que [los medios / la versión oficial / los documentos oficiales] nunca quisieron que supieras."
+Sé específico. "Lo que nadie sabe" es genérico. Di exactamente qué van a descubrir.
+
+ACTO 5 — EL ANZUELO FINAL (1-2 frases, ~10 segundos):
+Una frase tan perturbadora que cerrar el vídeo resulta psicológicamente imposible.
+Que quede suspendida en el aire. Sin resolver. Que duela.
+Ejemplo de nivel: "Y lo más perturbador de todo es que hay alguien que sabe exactamente lo que pasó. Y lleva treinta años caminando libre."
+
+REGLAS ADICIONALES:
+- Frases cortas. Punto. Pausa implícita. Otra frase corta. Funciona como una película.
+- Mínimo 2 veces dirigirse directamente al espectador: "Tú que estás escuchando esto..."
+- Tono: grave, pausado, como alguien que te va a contar un secreto que cambia todo.""",
+
+    "drama": """ESTRATEGIA (DRAMA/HISTORIA HUMANA) — ESTRUCTURA EN 5 ACTOS:
+
+ACTO 1 — EL INSTANTE CUMBRE: Abre directamente en el segundo exacto de máximo impacto emocional. Una pérdida, una traición, la decisión imposible. Con UN protagonista concreto (nombre real si lo sabes, o "una mujer", "un hombre de 43 años"). Presente histórico.
+
+ACTO 2 — EL DETALLE HUMANO: Un detalle pequeño y concreto que hace al protagonista real: qué llevaba puesto, qué pensaba en ese momento, qué había desayunado esa mañana. Lo mundano antes del desastre es devastador.
+
+ACTO 3 — EL LOOP: "Para entender cómo [el protagonista] llegó a ese momento, tengo que llevarte [X tiempo] atrás."
+
+ACTO 4 — LA PROMESA EMOCIONAL: Qué va a sentir el espectador al final. No solo qué va a saber, sino cómo va a sentirse diferente después de este vídeo.
+
+ACTO 5 — EL ANZUELO: Una pregunta al espectador que le implica personalmente. "¿Tú qué habrías hecho en su lugar?"
+
+Tono: íntimo, emocional, pausado. Como si le hablaras al oído a una sola persona.""",
     "documental": """ESTRATEGIA (DOCUMENTAL/DIVULGACIÓN):
 Abre con el dato o hecho más asombroso y contraintuitivo del tema, uno que rompa lo que el espectador creía saber. "Lo que estás a punto de descubrir contradice todo lo que te contaron." Aporta credibilidad inmediata y promete revelar lo que casi nadie sabe.""",
     "humor": """ESTRATEGIA (HUMOR/CERCANO):
