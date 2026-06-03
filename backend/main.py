@@ -641,7 +641,7 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
             _cv = Path("/root/autotube100k/voices/custom.wav")
             if _cv.exists():
                 custom_voice_ref = str(_cv)
-        audio_task   = asyncio.to_thread(generate_audio, job_id, script, req.tone, audio_path, custom_voice_ref)
+        audio_task   = asyncio.to_thread(generate_audio, job_id, script, req.tone, audio_path, custom_voice_ref, req.title, req.niche)
         prompts_task = asyncio.to_thread(generate_image_prompts, job_id, script, req.niche, 40)
         audio_result, img_prompts = await asyncio.gather(audio_task, prompts_task)
         emit("tts", "done", "Audio con pausas dramáticas listo", 35)

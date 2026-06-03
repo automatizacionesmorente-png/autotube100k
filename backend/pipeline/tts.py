@@ -30,24 +30,102 @@ XTTS_VENV   = "/root/tts-venv/bin/python"
 XTTS_SCRIPT = "/root/autotube100k/xtts_generate.py"
 VOICES_DIR  = "/root/autotube100k/voices"
 
-# Mapa tono → perfil de voz de referencia (generado con Edge TTS, clonado por XTTS v2)
-XTTS_VOICE_MAP = {
-    "misterio":     "misterio_masculino",
-    "drama":        "drama_masculino",
-    "motivacional": "motivacional_masculino",
-    "documental":   "documental_femenino",
+# ── 18 perfiles de voz disponibles ──────────────────────────────────────────
+# Arquetipos (por contenido — auto-detectados por título+nicho):
+#   locutor_deportivo      → Manolo Lama style: fútbol, deportes, hazañas
+#   narrador_misterio_iker → Iker Jiménez style: misterios, OVNIS, fenómenos
+#   cronista_truecrime     → True crime: crímenes, casos, investigaciones
+#   locutor_historico      → History Channel: historia, guerras, imperios
+#   coach_motivacional     → Tony Robbins ES: éxito, dinero, superación
+#   divulgador_ciencia     → Carl Sagan ES: ciencia, tecnología, IA
+#   narrador_conspiracion  → Conspiraciones, secretos, poder oculto
+#   narrador_drama_humano  → Dramas, tragedias, historias personales
+#
+# Perfiles originales (por tono seleccionado en UI):
+#   misterio_masculino, drama_masculino, motivacional_masculino,
+#   documental_femenino, humor_femenino, neutro_profesional,
+#   truecrime_femenino, historia_masculino, conspiracion_masculino, ciencia_femenino
+
+# Mapa tono UI → perfil base (fallback si la auto-detección falla)
+XTTS_TONE_MAP = {
+    "misterio":     "narrador_misterio_iker",
+    "drama":        "narrador_drama_humano",
+    "motivacional": "coach_motivacional",
+    "documental":   "locutor_historico",
     "humor":        "humor_femenino",
     "neutro":       "neutro_profesional",
-    # Tonos extra disponibles (asignar manualmente si creas nuevos canales):
-    # "truecrime":    "truecrime_femenino",
-    # "historia":     "historia_masculino",
-    # "conspiracion": "conspiracion_masculino",
-    # "ciencia":      "ciencia_femenino",
+}
+
+# Keywords para auto-detección del mejor arquetipo narrador
+ARCHETYPE_KEYWORDS = {
+    "locutor_deportivo": [
+        "fútbol", "mundial", "champions", "liga", "deportes", "gol", "selección",
+        "balón", "entrenador", "partido", "copa", "euro", "atleta", "campeón",
+        "la roja", "real madrid", "barça", "barcelona", "equipo"
+    ],
+    "narrador_misterio_iker": [
+        "misterio", "inexplicable", "fenómeno", "extraño", "ovni", "ufo",
+        "sobrenatural", "paranormal", "enigma", "secreto", "oculto", "desaparecido",
+        "fantasma", "maldición", "profecía", "cuarto milenio"
+    ],
+    "cronista_truecrime": [
+        "crimen", "asesinato", "caso", "víctima", "asesino", "detective",
+        "investigación", "desaparición", "secuestro", "serial", "criminal",
+        "alcàsser", "matar", "homicidio", "forense", "sospechoso", "juicio"
+    ],
+    "locutor_historico": [
+        "historia", "guerra", "imperio", "civilización", "antiguo", "medieval",
+        "siglo", "batalla", "rey", "conquistador", "revolución", "roma", "egipto",
+        "segunda guerra", "nazi", "soviético", "urss", "chernóbil", "hitler"
+    ],
+    "coach_motivacional": [
+        "éxito", "millonario", "rico", "dinero", "motivación", "superar",
+        "lograr", "emprender", "empresario", "hábito", "mentalidad", "cambia",
+        "transformar", "sueño", "meta", "objetivo", "productividad"
+    ],
+    "divulgador_ciencia": [
+        "ciencia", "universo", "física", "tecnología", "ia", "inteligencia artificial",
+        "robot", "descubrimiento", "investigación científica", "nasa", "espacio",
+        "quantum", "cerebro", "evolución", "biología", "química", "algoritmo"
+    ],
+    "narrador_conspiracion": [
+        "conspiración", "illuminati", "gobierno", "ocultan", "verdad prohibida",
+        "censurado", "silenciado", "deep state", "control", "manipulación",
+        "élite", "nuevos orden", "vigilancia", "resetear", "agenda oculta"
+    ],
+    "narrador_drama_humano": [
+        "drama", "tragedia", "vida", "familia", "amor", "pérdida", "superación",
+        "enfermedad", "muerte", "suicidio", "divorci", "abandono", "soledad",
+        "historia real", "testimonio", "sobreviviente"
+    ],
 }
 
 
+def detect_best_archetype(title: str, niche: str, tone: str) -> str:
+    """
+    Detecta automáticamente el mejor arquetipo narrador para el contenido.
+    Analiza título + nicho con keywords. Fallback al mapa de tono.
+    """
+    text = (title + " " + niche).lower()
+    scores = {}
+    for archetype, keywords in ARCHETYPE_KEYWORDS.items():
+        score = sum(1 for kw in keywords if kw in text)
+        if score > 0:
+            scores[archetype] = score
+
+    if scores:
+        best = max(scores, key=scores.get)
+        # Solo usar si hay match claro (score >= 1)
+        wav = Path(VOICES_DIR) / f"{best}.wav"
+        if wav.exists():
+            return best
+
+    # Fallback al mapa de tono
+    return XTTS_TONE_MAP.get(tone, "neutro_profesional")
+
+
 def generate_audio(job_id: str, script: str, tone: str, output_path: Path,
-                   custom_ref: str = None) -> Path:
+                   custom_ref: str = None, title: str = "", niche: str = "") -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     raw_path = output_path.with_suffix(".raw.mp3")
 
@@ -70,12 +148,17 @@ def generate_audio(job_id: str, script: str, tone: str, output_path: Path,
     # ── Intentar XTTS v2 primero (calidad narrador profesional, gratis) ───────
     if _xtts_available():
         try:
-            # Voz personalizada subida por el usuario tiene prioridad sobre el perfil del tono
+            # 1. Voz personalizada del usuario (máxima prioridad)
+            # 2. Auto-detección por título+nicho (narrador perfecto para el contenido)
+            # 3. Fallback al mapa de tono UI
             if custom_ref and Path(custom_ref).exists():
                 voice_profile = "voz personalizada (clonada)"
                 ref_wav = custom_ref
+            elif title or niche:
+                voice_profile = detect_best_archetype(title, niche, tone)
+                ref_wav = f"{VOICES_DIR}/{voice_profile}.wav"
             else:
-                voice_profile = XTTS_VOICE_MAP.get(tone, "neutro_profesional")
+                voice_profile = XTTS_TONE_MAP.get(tone, "neutro_profesional")
                 ref_wav = f"{VOICES_DIR}/{voice_profile}.wav"
             add_step(job_id, "tts", "running",
                      f"Generando voz con XTTS v2 · perfil '{voice_profile}' · gratis…")
