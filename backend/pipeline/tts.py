@@ -290,15 +290,16 @@ def _postprocess_audio(raw: Path, out: Path, tone: str):
     subprocess.run([
         "ffmpeg", "-y", "-i", str(raw),
         "-af", (
-            "highpass=f=85,"
-            # quitar barro/cajón (~300 Hz) que enturbia la voz
-            "equalizer=f=300:t=q:w=1.1:g=-2.5,"
-            # realce de presencia/inteligibilidad (~3.2 kHz) — voz nítida y al frente
-            "equalizer=f=3200:t=q:w=1.4:g=3,"
-            # leve aire/brillo (~9 kHz)
-            "equalizer=f=9000:t=q:w=1.0:g=1.5,"
-            # de-esser suave (sibilancias controladas)
-            "deesser=i=0.4,"
+            "highpass=f=90,"
+            # quitar barro/cajón (~280 Hz) que enturbia la voz
+            "equalizer=f=280:t=q:w=1.2:g=-2,"
+            # realce de presencia/inteligibilidad (~3.5 kHz) — consonantes nítidas
+            "equalizer=f=3500:t=q:w=1.3:g=3,"
+            # EXCITADOR ARMÓNICO — genera agudos que XTTS no produce (24kHz apagado).
+            # Es lo que convierte la voz "borrosa" en NÍTIDA y cristalina.
+            "aexciter=amount=2.5:blend=2:freq=7000,"
+            # realce de agudos/aire (brillo y claridad)
+            "treble=g=3:f=8000,"
             # compresor (voz uniforme, sin picos)
             "acompressor=threshold=-18dB:ratio=3:attack=5:release=80:makeup=2dB,"
             # normalización estándar YouTube
