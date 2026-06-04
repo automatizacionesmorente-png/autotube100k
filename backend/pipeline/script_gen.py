@@ -11,9 +11,17 @@ TONES = {
     "neutro":       "narrador profesional, claro, conversacional, fácil de entender",
 }
 
-MODEL = "claude-opus-4-8"   # Opus: máxima calidad narrativa para el guion (decisión del usuario)
-MODEL_IN_PRICE  = 15   # USD/M tokens input (Opus)
-MODEL_OUT_PRICE = 75   # USD/M tokens output (Opus)
+# HÍBRIDO ÓPTIMO (calidad máxima al mínimo coste):
+#   HOOK → Opus (decide la retención, es corto = barato)
+#   CUERPO → Sonnet (5x más barato, prosa casi idéntica para narrar largo)
+# Resultado: calidad ~Opus a ~0.46-0.50€/vídeo en vez de ~0.85€.
+MODEL = "claude-sonnet-4-6"   # cuerpo del guion (el grueso de palabras)
+MODEL_IN_PRICE  = 3
+MODEL_OUT_PRICE = 15
+
+HOOK_MODEL = "claude-opus-4-8"   # solo el hook — máxima calidad donde más importa
+HOOK_IN_PRICE  = 15
+HOOK_OUT_PRICE = 75
 EUR_RATE = 0.92
 
 TARGET_WORDS = 5200   # ~34-36 min a 145 pal/min — SIEMPRE +30 min (con margen)
@@ -126,7 +134,7 @@ Escribe SOLO el HOOK (los primeros 75-90 segundos, 170-220 palabras).
 Recuerda: la PRIMERA frase debe detener el scroll. Háblale al espectador. Suelta algo especial. Abre un bucle. Acaba en tensión máxima.
 Devuelve solo el texto narrado del hook, nada más."""
     msg = client.messages.create(
-        model=MODEL, max_tokens=600,
+        model=HOOK_MODEL, max_tokens=600,
         system=HOOK_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user}],
     )
@@ -153,7 +161,7 @@ Mantén: mismo tema, mismos hechos (no inventes datos), 170-220 palabras, solo t
 Devuelve SOLO el hook final, nada más."""
     try:
         msg2 = client.messages.create(
-            model=MODEL, max_tokens=600,
+            model=HOOK_MODEL, max_tokens=600,
             system=HOOK_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": refine}],
         )
@@ -246,10 +254,10 @@ habla en términos generales ciertos o como expectativa ("se espera", "según la
     # ════════ ETAPA 1: HOOK DEDICADO (los 30s que deciden todo) ════════
     add_step(job_id, "script", "running", "✍️ Escribiendo el HOOK (los 30 segundos que deciden todo)…")
     hook_text, hook_usage = generate_hook(client, niche, title, tone, context_block)
-    hook_cost = (hook_usage.input_tokens * MODEL_IN_PRICE +
-                 hook_usage.output_tokens * MODEL_OUT_PRICE) / 1_000_000 * EUR_RATE
-    add_cost_event(job_id, "claude_opus_script", hook_usage.output_tokens,
-                   MODEL_OUT_PRICE / 1_000_000, hook_cost)
+    hook_cost = (hook_usage.input_tokens * HOOK_IN_PRICE +
+                 hook_usage.output_tokens * HOOK_OUT_PRICE) / 1_000_000 * EUR_RATE
+    add_cost_event(job_id, "claude_opus_hook", hook_usage.output_tokens,
+                   HOOK_OUT_PRICE / 1_000_000, hook_cost)
     hook_words = len(hook_text.split())
 
     # ════════ ETAPA 2: CUERPO que continúa el hook sin repetirlo ════════
@@ -326,7 +334,7 @@ IMPORTANTE: SOLO el texto narrado. Sin títulos de sección. Sin corchetes. Sin 
 
     body_cost = (msg.usage.input_tokens * MODEL_IN_PRICE +
                  msg.usage.output_tokens * MODEL_OUT_PRICE) / 1_000_000 * EUR_RATE
-    add_cost_event(job_id, "claude_opus_script", msg.usage.output_tokens,
+    add_cost_event(job_id, "claude_sonnet_body", msg.usage.output_tokens,
                    MODEL_OUT_PRICE / 1_000_000, body_cost)
     cost_eur = hook_cost + body_cost
 
@@ -348,7 +356,7 @@ IMPORTANTE: SOLO el texto narrado. Sin títulos de sección. Sin corchetes. Sin 
         word_count = len(script.split())
         ext_cost = (ext_msg.usage.input_tokens * MODEL_IN_PRICE +
                     ext_msg.usage.output_tokens * MODEL_OUT_PRICE) / 1_000_000 * EUR_RATE
-        add_cost_event(job_id, "claude_opus_ext", ext_msg.usage.output_tokens,
+        add_cost_event(job_id, "claude_sonnet_ext", ext_msg.usage.output_tokens,
                        MODEL_OUT_PRICE / 1_000_000, ext_cost)
 
     estimated_mins = round(word_count / 130)
