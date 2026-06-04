@@ -924,8 +924,10 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
         emit("script", "done", f"Guión listo: {wcount} palabras (~{wcount//130} min)", 18)
         check_cancelled()
 
-        # ── Pasos 2+3 en PARALELO: TTS + prompts de imagen ─────────
-        emit("tts", "running", "Convirtiendo a voz neural expresiva (Edge TTS + SSML)…", 20)
+        # ── VOZ en SEGUNDO PLANO (CPU, ~50min) mientras se generan las imágenes ──
+        # La voz no depende de las imágenes ni viceversa. La voz usa CPU; las imágenes
+        # usan red (fal.ai/Pexels). Solapándolas se ahorran ~10 min SIN perder calidad.
+        emit("tts", "running", "Generando voz (en paralelo con las imágenes)…", 20)
         emit("images", "running", "Generando prompts de imagen con IA…", 20)
         from .pipeline.tts import generate_audio
         from .pipeline.images import (generate_image_prompts, generate_images,
@@ -936,18 +938,20 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
             _cv = Path("/root/autotube100k/voices/custom.wav")
             if _cv.exists():
                 custom_voice_ref = str(_cv)
-        audio_task   = asyncio.to_thread(generate_audio, job_id, script, req.tone, audio_path, custom_voice_ref, req.title, req.niche)
-        prompts_task = asyncio.to_thread(generate_image_prompts, job_id, script, req.niche, 40)
-        audio_result, img_prompts = await asyncio.gather(audio_task, prompts_task)
-        emit("tts", "done", "Audio con pausas dramáticas listo", 35)
-        check_cancelled()
+        # Lanzar la voz YA, en segundo plano (es el cuello de botella). No la esperamos aún.
+        audio_task = asyncio.create_task(
+            asyncio.to_thread(generate_audio, job_id, script, req.tone, audio_path,
+                              custom_voice_ref, req.title, req.niche)
+        )
 
-        # ── Pasos 4+5+6 en PARALELO: imágenes cuerpo + hook + thumbnail ──
+        # Mientras la voz se genera, hacemos TODO lo visual (no depende del audio):
+        img_prompts = await asyncio.to_thread(generate_image_prompts, job_id, script, req.niche, 40)
+
         images_dir   = job_dir / "images"
         hook_imgs_dir = job_dir / "hook_images"
 
         def on_img_progress(done: int, total: int, fal_cost: float):
-            pct = 40 + int(done / total * 15)
+            pct = 25 + int(done / total * 25)
             _job_events.setdefault(job_id, []).append({
                 "type": "step", "step": "images", "status": "running",
                 "message": f"Imagen {done}/{total}",
@@ -955,7 +959,7 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
                 "sub_pct": round(done / total * 100, 1),
             })
 
-        emit("images", "running", "Generando 60 imágenes + 8 hook + B-roll vídeo + thumbnail en paralelo…", 37)
+        emit("images", "running", "Generando 60 imágenes + 8 hook + B-roll vídeo + thumbnail (durante la voz)…", 30)
         from .pipeline.hook_videos import (generate_hook_prompts as gen_hookvid_prompts,
                                            generate_hook_videos, generate_body_videos)
         hook_vids_dir = job_dir / "hook_videos"
@@ -974,10 +978,15 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
             body_task, hook_task, thumb_task, hookvid_task, bodyvid_task
         )
 
-        emit("images",    "done", f"{len(body_images)} imágenes + {len(body_clips)} clips vídeo (cuerpo dinámico)", 60)
+        emit("images",    "done", f"{len(body_images)} imágenes + {len(body_clips)} clips vídeo (cuerpo dinámico)", 55)
         hook_src = f"{len(hook_clips)} clips vídeo Pexels" if hook_clips else f"{len(hook_images)} imágenes"
-        emit("hook_videos","done", f"Hook: {hook_src}", 62)
-        emit("thumbnail", "done", "Miniatura con título lista", 64)
+        emit("hook_videos","done", f"Hook: {hook_src}", 58)
+        emit("thumbnail", "done", "Miniatura con título lista", 60)
+
+        # Ahora esperamos a que la voz (que iba en paralelo) termine, antes de montar
+        emit("tts", "running", "Esperando a que termine la voz (se generó en paralelo)…", 62)
+        audio_result = await audio_task
+        emit("tts", "done", "Audio listo", 64)
         check_cancelled()
 
         # ── Paso 7: Render FFmpeg ─────────────────────────────────
