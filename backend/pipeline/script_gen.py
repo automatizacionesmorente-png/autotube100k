@@ -123,59 +123,83 @@ Abre con una afirmación audaz o una pregunta que despierte curiosidad inmediata
 }
 
 
+HOOK_ANGLES = [
+    "ÁNGULO DE APERTURA: abre con el HECHO o DATO más impactante, perturbador o inesperado de toda la historia. Shock puro en la primera frase. Que el espectador piense '¿qué acaba de decir?'.",
+    "ÁNGULO DE APERTURA: abre INTERPELANDO directamente al espectador, tocando una emoción, un miedo o una creencia suya. Que sienta que le hablas a ÉL, que sabes algo de él. Ej: 'Lo diste por muerto. Reconócelo.'",
+    "ÁNGULO DE APERTURA: abre con una ESCENA cinematográfica vívida en PRESENTE, como el primer plano de una película. Detalle sensorial inmediato (frío, silencio, un gesto). Que el espectador VEA la escena.",
+]
+
+
 def generate_hook(client, niche: str, title: str, tone: str, context_block: str = "") -> str:
-    """Genera SOLO el hook (los 30-40s críticos) con foco total. Devuelve ~200 palabras."""
+    """
+    Hook 10/10 por método 'mejor de 3 + juez':
+    1) Genera 3 hooks con ángulos de apertura distintos (Opus, temperatura alta = variedad).
+    2) Un juez Opus forja el DEFINITIVO: mejor primera frase + lo mejor de los tres.
+    Devuelve (texto, usage acumulado).
+    """
     strategy = HOOK_STRATEGY.get(tone, HOOK_STRATEGY["neutro"])
-    user = f"""TEMA DEL VÍDEO: {title}
+    base = f"""TEMA DEL VÍDEO: {title}
 NICHO: {niche}
 {strategy}{context_block}
 
 Escribe SOLO el HOOK (los primeros 75-90 segundos, 170-220 palabras).
-Recuerda: la PRIMERA frase debe detener el scroll. Háblale al espectador. Suelta algo especial. Abre un bucle. Acaba en tensión máxima.
-Devuelve solo el texto narrado del hook, nada más."""
-    msg = client.messages.create(
-        model=HOOK_MODEL, max_tokens=600,
-        system=HOOK_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user}],
-    )
-    draft = msg.content[0].text.strip()
-    in_tok = msg.usage.input_tokens
-    out_tok = msg.usage.output_tokens
+La PRIMERA frase debe detener el scroll. Háblale al espectador. Suelta algo especial. Abre un bucle imposible de ignorar. Acaba en tensión máxima. Solo texto narrado."""
 
-    # ── 2ª PASADA: editor de hooks DESPIADADO. Critica y reescribe a 10/10. ──
-    # Es la diferencia entre un hook "bueno" y uno que retiene el 90% como MrBeast.
-    refine = f"""Eres el editor de hooks más exigente de YouTube. Aquí tienes un borrador de hook:
+    in_tok = out_tok = 0
+    drafts = []
+    for ang in HOOK_ANGLES:
+        try:
+            m = client.messages.create(
+                model=HOOK_MODEL, max_tokens=600, temperature=1.0,
+                system=HOOK_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": base + "\n\n" + ang}],
+            )
+            t = m.content[0].text.strip()
+            if len(t.split()) >= 60:
+                drafts.append(t)
+            in_tok += m.usage.input_tokens
+            out_tok += m.usage.output_tokens
+        except Exception:
+            pass
 
-«{draft}»
+    if not drafts:  # fallback total: una generación simple
+        m = client.messages.create(model=HOOK_MODEL, max_tokens=600,
+                                    system=HOOK_SYSTEM_PROMPT,
+                                    messages=[{"role": "user", "content": base}])
+        result = m.content[0].text.strip()
+        class _U: pass
+        u = _U(); u.input_tokens = m.usage.input_tokens; u.output_tokens = m.usage.output_tokens
+        return result, u
 
-Analízalo sin piedad contra estos criterios de los mejores hooks del mundo:
-1. PATTERN INTERRUPT en los primeros 5 segundos (lo más importante: la 1ª frase rompe el patrón, sorprende, incomoda o impacta). +23% de retención si está bien.
-2. La premisa central queda clara en los primeros 3-8 segundos.
-3. Bucle de curiosidad imposible de ignorar.
-4. Conexión emocional inmediata con el espectador (le habla a ÉL).
-5. Cero relleno: cada frase gana su sitio.
-6. Termina en tensión máxima.
+    # ── JUEZ + FORJADOR: el mejor hook posible a partir de los 3 ──
+    numbered = "\n\n".join(f"━━ HOOK {i+1} ━━\n{d}" for i, d in enumerate(drafts))
+    judge = f"""Eres el mayor experto del mundo en retención de YouTube (nivel MrBeast: 90% de retención en los primeros 30 segundos). Aquí tienes {len(drafts)} hooks distintos para EL MISMO vídeo:
 
-Si el borrador ya es un 10/10, devuélvelo igual. Si no, REESCRÍBELO para que sea un 10/10 absoluto — especialmente la primera frase (que sea un golpe imposible de ignorar).
-Mantén: mismo tema, mismos hechos (no inventes datos), 170-220 palabras, solo texto narrado.
-Devuelve SOLO el hook final, nada más."""
+{numbered}
+
+Tu tarea: crear EL HOOK DEFINITIVO, el mejor de la historia para este vídeo. No elijas uno sin más: FÓRJALO.
+- PRIMERA FRASE: coge la más demoledora de los tres o crea una aún mejor. Tiene que ser un golpe imposible de ignorar en los primeros 5 segundos (un pattern interrupt = +23% de retención).
+- Combina las mejores frases, imágenes e ideas de los tres hooks en uno solo, coherente y con ritmo de película.
+- Aplica sin piedad las 6 leyes del hook perfecto. Elimina TODO el relleno.
+- Mismo tema, mismos hechos (no inventes datos). 170-220 palabras. Solo texto narrado, sin comillas ni acotaciones.
+
+Devuelve SOLO el hook definitivo."""
     try:
-        msg2 = client.messages.create(
+        mj = client.messages.create(
             model=HOOK_MODEL, max_tokens=600,
             system=HOOK_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": refine}],
+            messages=[{"role": "user", "content": judge}],
         )
-        final = msg2.content[0].text.strip()
-        if len(final.split()) >= 80:   # seguridad: si la 2ª pasada salió bien, usarla
-            draft = final
-            in_tok += msg2.usage.input_tokens
-            out_tok += msg2.usage.output_tokens
+        final = mj.content[0].text.strip()
+        in_tok += mj.usage.input_tokens
+        out_tok += mj.usage.output_tokens
+        result = final if len(final.split()) >= 80 else drafts[0]
     except Exception:
-        pass
+        result = drafts[0]
 
     class _U: pass
     u = _U(); u.input_tokens = in_tok; u.output_tokens = out_tok
-    return draft, u
+    return result, u
 
 SYSTEM_PROMPT = """Eres el mejor guionista de YouTube en español. Llevas 10 años creando vídeos virales de 30-35 minutos con retención del 65%+. Tus vídeos han acumulado más de 500 millones de visualizaciones.
 
