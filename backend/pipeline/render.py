@@ -380,23 +380,22 @@ def render_video(
         )
 
     if has_music:
-        # Mezcla cinematográfica: la música SE OYE de verdad y acompaña la narración.
-        # - música base 0.30 (claramente audible, antes 0.14 = inaudible)
-        # - paso-alto 120Hz (deja cuerpo/calidez, solo quita el rumble profundo)
-        # - ducking SUAVE (ratio 5): baja bajo la voz pero NO desaparece; sube notablemente
-        #   en intro, pausas y silencios. La voz sigue mandando, pero la música está presente.
+        # Mezcla cinematográfica que SE OYE (arreglado: antes el ducking la hundía).
+        # Para narración CONTINUA, lo correcto es nivel FIJO audible, no ducking:
+        # - música normalizada a -23 LUFS (la voz está a -16 → música ~7dB debajo = claramente
+        #   audible de fondo, pero la voz manda). loudnorm iguala TODAS las pistas a ese nivel.
+        # - normalize=0 → amix NO divide el volumen a la mitad (era parte del bug).
+        # - alimiter al final → evita saturación al sumar voz + música.
         _ffmpeg(
             "-i", str(full_mp4),
             "-i", str(audio_path),
             "-stream_loop", "-1", "-i", str(music_path),
             "-filter_complex",
             (
-                f"[1:a]volume=1.0,asplit=2[voice][sc];"
-                f"[2:a]volume=0.30,highpass=f=120,atrim=0:duration={audio_dur:.2f},"
-                f"afade=t=in:st=0:d=3,afade=t=out:st={max(0,audio_dur-4):.1f}:d=4[musicraw];"
-                # Ducking suave: baja la música ~6dB bajo la voz, pero se mantiene audible
-                f"[musicraw][sc]sidechaincompress=threshold=0.05:ratio=5:attack=120:release=400[ducked];"
-                f"[voice][ducked]amix=inputs=2:duration=first:dropout_transition=2[aout]"
+                f"[2:a]loudnorm=I=-23:TP=-3,highpass=f=100,atrim=0:duration={audio_dur:.2f},"
+                f"afade=t=in:st=0:d=3,afade=t=out:st={max(0,audio_dur-4):.1f}:d=4[music];"
+                f"[1:a][music]amix=inputs=2:normalize=0[mx];"
+                f"[mx]alimiter=limit=0.97[aout]"
             ),
             "-map", "0:v", "-map", "[aout]",
             "-vf", vf,
