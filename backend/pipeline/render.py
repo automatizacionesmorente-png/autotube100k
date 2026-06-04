@@ -240,15 +240,20 @@ def render_video(
     valid_hook_imgs = [i for i in (hook_images or []) if i.exists() and i.stat().st_size > 5000]
 
     if valid_hook_vids:
-        # Recortar cada clip de Pexels a ~clip_len s para que el hook total ≈ hook_dur
-        clip_len = max(3.5, min(6.0, hook_dur / max(1, len(valid_hook_vids))))
+        # HOOK tipo tráiler: cortes RÁPIDOS (~3s) para máximo dinamismo y enganche.
+        # Si hay pocos clips, se reciclan para llenar el hook con cortes frecuentes.
+        clip_len = max(2.5, min(3.5, hook_dur / max(1, len(valid_hook_vids))))
+        n_needed = max(len(valid_hook_vids), int(hook_dur / clip_len))
+        src_cycle = (valid_hook_vids * ((n_needed // len(valid_hook_vids)) + 1))[:n_needed]
         trimmed = []
-        for k, v in enumerate(valid_hook_vids):
+        for k, v in enumerate(src_cycle):
             t_out = tmp / f"hvtrim_{k:02d}.mp4"
-            _ffmpeg("-i", str(v), "-t", f"{clip_len:.2f}",
+            # tomar un tramo distinto de cada clip al reciclar (variedad)
+            ss = (k // len(valid_hook_vids)) * clip_len
+            _ffmpeg("-ss", f"{ss:.2f}", "-i", str(v), "-t", f"{clip_len:.2f}",
                     "-vf", "scale=1920:1080:force_original_aspect_ratio=increase,"
-                           "crop=1920:1080,fade=t=in:st=0:d=0.3,"
-                           f"fade=t=out:st={max(0,clip_len-0.3):.2f}:d=0.3",
+                           "crop=1920:1080,fps=25,fade=t=in:st=0:d=0.18,"
+                           f"fade=t=out:st={max(0,clip_len-0.18):.2f}:d=0.18",
                     "-c:v", "libx264", "-preset", "ultrafast", "-an", "-r", "25",
                     "-pix_fmt", "yuv420p", str(t_out))
             trimmed.append(t_out)
@@ -375,12 +380,11 @@ def render_video(
         )
 
     if has_music:
-        # Mezcla profesional: la VOZ siempre manda, la música acompaña sin tapar.
-        # - música base 0.14 (más baja → voz nítida y clara)
-        # - filtro paso-alto 250Hz en la música: le quita los graves que "embarran"
-        #   la voz, dejando hueco en las frecuencias vocales (claridad real)
-        # - ducking fuerte (ratio 12, ataque rápido): la música se aparta al instante
-        #   cuando hay narración y vuelve a subir en los silencios.
+        # Mezcla cinematográfica: la música SE OYE de verdad y acompaña la narración.
+        # - música base 0.30 (claramente audible, antes 0.14 = inaudible)
+        # - paso-alto 120Hz (deja cuerpo/calidez, solo quita el rumble profundo)
+        # - ducking SUAVE (ratio 5): baja bajo la voz pero NO desaparece; sube notablemente
+        #   en intro, pausas y silencios. La voz sigue mandando, pero la música está presente.
         _ffmpeg(
             "-i", str(full_mp4),
             "-i", str(audio_path),
@@ -388,11 +392,11 @@ def render_video(
             "-filter_complex",
             (
                 f"[1:a]volume=1.0,asplit=2[voice][sc];"
-                f"[2:a]volume=0.14,highpass=f=250,atrim=0:duration={audio_dur:.2f},"
-                f"afade=t=in:st=0:d=4,afade=t=out:st={max(0,audio_dur-4):.1f}:d=4[musicraw];"
-                # Ducking: la música (musicraw) se comprime usando la voz (sc) como disparador
-                f"[musicraw][sc]sidechaincompress=threshold=0.025:ratio=12:attack=80:release=500[ducked];"
-                f"[voice][ducked]amix=inputs=2:duration=first:dropout_transition=3[aout]"
+                f"[2:a]volume=0.30,highpass=f=120,atrim=0:duration={audio_dur:.2f},"
+                f"afade=t=in:st=0:d=3,afade=t=out:st={max(0,audio_dur-4):.1f}:d=4[musicraw];"
+                # Ducking suave: baja la música ~6dB bajo la voz, pero se mantiene audible
+                f"[musicraw][sc]sidechaincompress=threshold=0.05:ratio=5:attack=120:release=400[ducked];"
+                f"[voice][ducked]amix=inputs=2:duration=first:dropout_transition=2[aout]"
             ),
             "-map", "0:v", "-map", "[aout]",
             "-vf", vf,

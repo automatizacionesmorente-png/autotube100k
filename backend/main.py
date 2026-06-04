@@ -966,7 +966,7 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
 
         def _hook_videos_task():
             # Footage real de Pexels para el hook (gratis). Si no hay key, devuelve [].
-            queries = gen_hookvid_prompts(job_id, script, req.niche, 5)
+            queries = gen_hookvid_prompts(job_id, script, req.niche, 8)
             return generate_hook_videos(job_id, queries, hook_vids_dir)
 
         body_task  = asyncio.to_thread(generate_images, job_id, img_prompts, images_dir, on_img_progress)

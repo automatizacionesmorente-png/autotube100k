@@ -212,9 +212,16 @@ LEYES ABSOLUTAS — VIOLARIAS ES UN FRACASO:
    (que NO es una afirmación factual): el ambiente, la tensión, las emociones, el contexto.
    Nunca rellenes huecos con cifras o nombres inventados.
 
-6. RITMO DINÁMICO — alterna siempre:
-   Frase corta de impacto. Luego una frase larga que desarrolla con detalle. Pausa dramática implícita.
-   Nunca más de 3 frases del mismo ritmo seguidas.
+6. ESCRIBE PARA LA VOZ — el guion DIRIGE la actuación del narrador (clave para que suene PROFESIONAL):
+   El narrador (voz IA) interpreta según cómo escribas. Usa la puntuación como partitura:
+   - FRASES CORTAS = la voz las lee con FUERZA e impacto. Úsalas en los momentos potentes.
+   - Puntos suspensivos "…" = PAUSA dramática y suspense. Ponlos antes de una revelación.
+   - Frases de UNA o DOS palabras = énfasis máximo. ("Y entonces… silencio. Nada.")
+   - Frase larga y envolvente = para sumergir y bajar el ritmo en los pasajes descriptivos.
+   - Antes del dato más fuerte de cada bloque, una pausa ("…") y luego la frase corta que golpea.
+   - SUBE la intensidad hacia el clímax de cada bloque: frases cada vez más cortas y directas.
+   Alterna SIEMPRE el ritmo: nunca 3 frases seguidas con la misma longitud. Que se lea como lo
+   narraría el mejor contador de historias de YouTube: con subidas, bajadas, pausas y golpes.
 
 7. RETENCIÓN CONTINUA — RE-ENGANCHA SIN PARAR (lo que hace que la gente se quede):
    No basta con cliffhangers cada 4-5 min. Los mejores canales re-enganchan CADA 60-90 SEGUNDOS.
