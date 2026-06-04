@@ -36,16 +36,110 @@ async def startup():
     init_db()
     OUTPUT_DIR.mkdir(exist_ok=True)
     _sweep_orphan_temp()
+    # Auto-recuperar renders interrumpidos por un reinicio del servicio
+    asyncio.create_task(_auto_retry_interrupted_renders())
 
 
 def _sweep_orphan_temp():
-    """Borra carpetas temporales huérfanas (de vídeos que fallaron a medias)."""
+    """Borra carpetas temporales huérfanas (de vídeos fallidos), respetando jobs running."""
     import shutil
     try:
+        # Jobs running en DB: sus tmp dirs pueden seguir siendo válidos o se van a re-crear
+        # Los borramos igual (el retry los recrea), SALVO si tienen final.mp4 (ya terminó)
         for pattern in ("*/tmp_*", "*/_xtts_tmp", "*/_short_tmp"):
             for d in OUTPUT_DIR.glob(pattern):
-                if d.is_dir():
-                    shutil.rmtree(d, ignore_errors=True)
+                if not d.is_dir():
+                    continue
+                # Si el directorio padre tiene final.mp4 el render ya acabó — no tocar
+                if (d.parent / "final.mp4").exists():
+                    continue
+                shutil.rmtree(d, ignore_errors=True)
+    except Exception:
+        pass
+
+
+async def _auto_retry_interrupted_renders():
+    """Al arrancar: re-lanza render en jobs que quedaron running (servicio se reinició a medias)."""
+    await asyncio.sleep(2)  # Esperar a que uvicorn esté listo
+    try:
+        from .database import get_jobs, get_conn as _gc
+        jobs = get_jobs()
+        for job in jobs:
+            if job.get("status") != "running":
+                continue
+            job_id   = job["id"]
+            job_dir  = OUTPUT_DIR / job_id
+            audio    = job_dir / "narration.mp3"
+            if not audio.exists():
+                continue  # Sin audio no se puede recuperar
+            # Verificar que tenga imágenes suficientes
+            imgs = list((job_dir / "images").glob("*.jpg")) if (job_dir / "images").exists() else []
+            if len(imgs) < 3:
+                continue
+            # No re-intentar si ya hay un final.mp4 (el job terminó pero la DB no se actualizó)
+            final = job_dir / "final.mp4"
+            if final.exists():
+                from datetime import datetime
+                update_job(job_id, status="done", progress=100,
+                           video_path=str(final),
+                           finished_at=datetime.utcnow().isoformat())
+                continue
+
+            # Re-lanzar render usando los assets existentes
+            images_dir    = job_dir / "images"
+            hook_imgs_dir = job_dir / "hook_images"
+            hook_vids_dir = job_dir / "hook_videos"
+            body_vids_dir = job_dir / "body_videos"
+            body_images = sorted(images_dir.glob("*.jpg"))    if images_dir.exists()    else []
+            hook_images = sorted(hook_imgs_dir.glob("*.jpg")) if hook_imgs_dir.exists() else []
+            hook_clips  = sorted(hook_vids_dir.glob("*.mp4")) if hook_vids_dir.exists() else []
+            body_clips  = sorted(body_vids_dir.glob("*.mp4")) if body_vids_dir.exists() else []
+
+            _STEP_SVC = {
+                "script":      {"claude_sonnet", "claude_sonnet_ext"},
+                "tts":         {"xtts_v2", "kokoro"},
+                "images":      {"claude_haiku_prompts", "fal_flux_schnell", "fal_flux_dev"},
+                "thumbnail":   {"claude_haiku_thumbnail", "pexels"},
+                "hook_videos": {"claude_haiku_hook", "fal_flux_hook", "pexels_hook"},
+                "render":      set(),
+                "upload":      {"claude_haiku_metadata"},
+            }
+            _step_order = ["script", "tts", "images", "thumbnail", "hook_videos", "render", "upload"]
+            _step_costs: dict[str, float] = {s: 0.0 for s in _step_order}
+            try:
+                _conn = _gc()
+                rows = _conn.execute(
+                    "SELECT service, SUM(total_cost) FROM cost_events WHERE job_id=? GROUP BY service",
+                    (job_id,)
+                ).fetchall()
+                _conn.close()
+                for svc, total in rows:
+                    for step, svcs in _STEP_SVC.items():
+                        if svc in svcs:
+                            _step_costs[step] += (total or 0)
+                            break
+            except Exception:
+                pass
+
+            _cumul = 0.0
+            _cb: dict[str, float] = {}
+            for s in _step_order:
+                _cumul += _step_costs[s]
+                _cb[s] = _cumul
+
+            update_job(job_id, status="running", current_step="render", progress=66, error=None)
+            _job_events[job_id] = [
+                {"type": "step", "step": "script",      "status": "done",    "message": "Guión recuperado",                                        "progress": 18, "cost": _cb["script"]},
+                {"type": "step", "step": "tts",         "status": "done",    "message": f"Audio: {audio.stat().st_size // 1024 // 1024}MB",         "progress": 35, "cost": _cb["tts"]},
+                {"type": "step", "step": "images",      "status": "done",    "message": f"{len(body_images)} imágenes + {len(body_clips)} clips",   "progress": 60, "cost": _cb["images"]},
+                {"type": "step", "step": "hook_videos", "status": "done",    "message": f"Hook: {len(hook_clips)} clips Pexels",                   "progress": 62, "cost": _cb["hook_videos"]},
+                {"type": "step", "step": "thumbnail",   "status": "done",    "message": "Miniatura lista",                                         "progress": 64, "cost": _cb["thumbnail"]},
+                {"type": "step", "step": "render",      "status": "running", "message": "Retomando render (reinicio automático del servicio)…",     "progress": 66, "cost": _cb["render"]},
+            ]
+            asyncio.create_task(_do_retry_render(
+                job_id, job["title"], job["niche"], job.get("tone", "neutro"),
+                hook_clips, body_images, audio, hook_images, body_clips
+            ))
     except Exception:
         pass
 
@@ -113,6 +207,169 @@ async def cancel_job(job_id: str):
         {"type": "error", "message": "Producción cancelada por el usuario"}
     )
     return {"ok": True}
+
+@app.post("/api/jobs/{job_id}/retry-render")
+async def retry_render_endpoint(job_id: str, background_tasks: BackgroundTasks):
+    """Relanza solo el render FFmpeg reutilizando los assets ya generados (audio, imágenes, clips)."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job no encontrado")
+
+    job_dir    = OUTPUT_DIR / job_id
+    audio_path = job_dir / "narration.mp3"
+
+    if not audio_path.exists():
+        raise HTTPException(400, "Audio no encontrado — imposible recuperar este job")
+
+    images_dir    = job_dir / "images"
+    hook_imgs_dir = job_dir / "hook_images"
+    hook_vids_dir = job_dir / "hook_videos"
+    body_vids_dir = job_dir / "body_videos"
+
+    body_images = sorted(images_dir.glob("*.jpg"))    if images_dir.exists()    else []
+    hook_images = sorted(hook_imgs_dir.glob("*.jpg")) if hook_imgs_dir.exists() else []
+    hook_clips  = sorted(hook_vids_dir.glob("*.mp4")) if hook_vids_dir.exists() else []
+    body_clips  = sorted(body_vids_dir.glob("*.mp4")) if body_vids_dir.exists() else []
+
+    if len(body_images) < 3:
+        raise HTTPException(400, f"Solo {len(body_images)} imágenes — insuficiente para render")
+
+    # Calcular costes acumulados reales por paso desde la DB de cost_events
+    # El frontend calcula coste_paso = cost_acumulado_actual - cost_acumulado_anterior
+    # así que hay que pasar el acumulado correcto en cada evento, no el total en todos.
+    _STEP_SERVICES = {
+        "script":      {"claude_sonnet", "claude_sonnet_ext"},
+        "tts":         {"xtts_v2", "kokoro"},
+        "images":      {"claude_haiku_prompts", "fal_flux_schnell", "fal_flux_dev"},
+        "thumbnail":   {"claude_haiku_thumbnail", "pexels"},
+        "hook_videos": {"claude_haiku_hook", "fal_flux_hook", "pexels_hook"},
+        "render":      set(),
+        "upload":      {"claude_haiku_metadata"},
+    }
+    from .database import get_conn as _get_conn
+    _step_order = ["script", "tts", "images", "thumbnail", "hook_videos", "render", "upload"]
+    _step_costs: dict[str, float] = {s: 0.0 for s in _step_order}
+    try:
+        _conn = _get_conn()
+        rows = _conn.execute(
+            "SELECT service, SUM(total_cost) FROM cost_events WHERE job_id=? GROUP BY service",
+            (job_id,)
+        ).fetchall()
+        _conn.close()
+        for svc, total in rows:
+            for step, svcs in _STEP_SERVICES.items():
+                if svc in svcs:
+                    _step_costs[step] += (total or 0)
+                    break
+    except Exception:
+        pass  # Si falla la consulta, usamos 0 por paso (el total sigue correcto en el chip)
+
+    # Convertir a costes ACUMULADOS para que el frontend calcule bien el incremental
+    _cumul = 0.0
+    _cumul_by_step: dict[str, float] = {}
+    for s in _step_order:
+        _cumul += _step_costs[s]
+        _cumul_by_step[s] = _cumul
+
+    update_job(job_id, status="running", current_step="render", progress=66, error=None)
+    _job_events[job_id] = [
+        {"type": "step", "step": "script",      "status": "done",    "message": "Guión recuperado del disco",                             "progress": 18, "cost": _cumul_by_step["script"]},
+        {"type": "step", "step": "tts",         "status": "done",    "message": f"Audio: {audio_path.stat().st_size // 1024 // 1024}MB",  "progress": 35, "cost": _cumul_by_step["tts"]},
+        {"type": "step", "step": "images",      "status": "done",    "message": f"{len(body_images)} imágenes + {len(body_clips)} clips", "progress": 60, "cost": _cumul_by_step["images"]},
+        {"type": "step", "step": "hook_videos", "status": "done",    "message": f"Hook: {len(hook_clips)} clips Pexels",                 "progress": 62, "cost": _cumul_by_step["hook_videos"]},
+        {"type": "step", "step": "thumbnail",   "status": "done",    "message": "Miniatura lista",                                       "progress": 64, "cost": _cumul_by_step["thumbnail"]},
+        {"type": "step", "step": "render",      "status": "running", "message": "Retomando render FFmpeg con todos los assets…",         "progress": 66, "cost": _cumul_by_step["render"]},
+    ]
+
+    background_tasks.add_task(
+        _do_retry_render,
+        job_id, job["title"], job["niche"], job.get("tone", "neutro"),
+        hook_clips, body_images, audio_path, hook_images, body_clips
+    )
+
+    return {"ok": True, "assets": {
+        "body_images": len(body_images),
+        "hook_images": len(hook_images),
+        "hook_clips":  len(hook_clips),
+        "body_clips":  len(body_clips),
+        "audio_mb":    audio_path.stat().st_size // 1024 // 1024,
+    }}
+
+
+async def _do_retry_render(
+    job_id: str, title: str, niche: str, tone: str,
+    hook_clips, body_images, audio_path, hook_images, body_clips
+):
+    job_dir    = OUTPUT_DIR / job_id
+    final_path = job_dir / "final.mp4"
+
+    def _emit(step, status, message, progress):
+        job_data  = get_job(job_id)
+        real_cost = job_data["cost_total"] if job_data else 0
+        _job_events.setdefault(job_id, []).append(
+            {"type": "step", "step": step, "status": status,
+             "message": message, "progress": progress, "cost": real_cost}
+        )
+        update_job(job_id, current_step=step, progress=progress)
+
+    try:
+        from .pipeline.render import render_video, cleanup_intermediates, get_duration
+        await asyncio.to_thread(
+            render_video, job_id,
+            hook_clips, body_images, audio_path, final_path, title,
+            hook_images, tone, body_clips
+        )
+
+        try:
+            freed = cleanup_intermediates(job_dir)
+            _emit("render", "done",
+                  f"Vídeo montado · {freed:.0f}MB de temporales liberados" if freed > 5 else "Vídeo montado completamente",
+                  90)
+        except Exception:
+            _emit("render", "done", "Vídeo montado completamente", 90)
+
+        _emit("upload", "running", "Generando descripción y capítulos sincronizados...", 92)
+        from .pipeline.upload import generate_metadata
+        job_data = get_job(job_id)
+        script   = job_data.get("script") or ""
+        try:
+            audio_dur = get_duration(final_path)
+        except Exception:
+            audio_dur = None
+
+        metadata  = await asyncio.to_thread(generate_metadata, job_id, script, title, niche, audio_dur)
+        import json as _json
+        meta_path = job_dir / "metadata.json"
+        meta_path.write_text(_json.dumps(
+            {"title": title, "niche": niche, "channel_id": job_data.get("channel_id"), **metadata},
+            ensure_ascii=False
+        ))
+
+        _emit("upload", "done", "✅ Vídeo listo — revísalo antes de subir a YouTube", 100)
+
+        from datetime import datetime
+        update_job(
+            job_id, status="done", progress=100,
+            video_path=str(final_path),
+            youtube_url=None,
+            finished_at=datetime.utcnow().isoformat()
+        )
+        _job_events.setdefault(job_id, []).append({"type": "end", "job": get_job(job_id)})
+
+    except Exception as e:
+        import traceback
+        tb        = traceback.format_exc()
+        job_data  = get_job(job_id)
+        real_cost = job_data["cost_total"] if job_data else 0
+        update_job(job_id, status="error", error=str(e))
+        _job_events.setdefault(job_id, []).append({
+            "type": "step", "step": "render", "status": "error",
+            "message": f"❌ Error render: {str(e)[:120]}", "progress": 0, "cost": real_cost
+        })
+        _job_events.setdefault(job_id, []).append(
+            {"type": "error", "message": str(e), "detail": tb}
+        )
+
 
 @app.get("/api/jobs/{job_id}/video")
 async def stream_video(job_id: str):
