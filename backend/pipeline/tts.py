@@ -273,36 +273,35 @@ async def _edge_tts(script: str, voice: str, rate: str, output_path: Path):
 
 def _postprocess_audio(raw: Path, out: Path, tone: str):
     """
-    Post-procesado de audio profesional con FFmpeg (gratis):
-    1. Normalización a -16 LUFS (estándar YouTube — sin distorsión, sin silencio)
-    2. Compresor dinámico (iguala volumen, elimina picos — voz más uniforme)
-    3. Leve reverb de sala (hace la voz más cálida, menos robótica)
-    4. Filtro de paso alto 80Hz (elimina rumor de fondo)
-    5. Bitrate 192kbps (calidad profesional YouTube)
+    Post-procesado de audio LIMPIO Y CLARO con FFmpeg (gratis).
+    SIN reverb — el reverb (aecho) era lo que hacía que la voz sonara "borrosa".
+    Cadena de locución profesional (broadcast):
+    1. Paso alto 85Hz — quita rumble/graves de fondo
+    2. EQ corta el "barro" (~300Hz) que emborrona la voz
+    3. EQ realza la PRESENCIA (~3.2kHz) → cada palabra se entiende nítida
+    4. EQ leve de "aire" (~9kHz) → claridad y brillo
+    5. De-esser suave (controla sibilancias swithout harshness)
+    6. Compresor suave (voz uniforme, sin picos)
+    7. Normalización -16 LUFS (estándar YouTube)
+    8. Bitrate 192kbps
     """
     import subprocess
-
-    # Reverb por tono — formato CORRECTO de aecho: delays(ms):decays(0-1)
-    # aecho completo = in_gain:out_gain:delays:decays (4 parámetros)
-    reverb = {
-        "misterio":     "55:0.30",   # sala oscura, eco medio
-        "drama":        "70:0.35",   # sala grande, dramático
-        "motivacional": "25:0.18",   # sala pequeña, íntimo, energético
-        "documental":   "35:0.25",   # sala neutral
-        "humor":        "18:0.16",   # muy íntimo, cercano
-        "neutro":       "30:0.22",   # sala estándar
-    }.get(tone, "30:0.22")
 
     subprocess.run([
         "ffmpeg", "-y", "-i", str(raw),
         "-af", (
-            # 1. Filtro de paso alto (elimina bajas frecuencias de fondo)
-            "highpass=f=80,"
-            # 2. Compresor (voz más uniforme, sin picos)
-            "acompressor=threshold=-18dB:ratio=3:attack=5:release=50:makeup=2dB,"
-            # 3. Reverb ligero de sala (voz más cálida) — aecho=in:out:delays:decays
-            f"aecho=0.8:0.88:{reverb},"
-            # 4. Normalización a -16 LUFS (estándar YouTube)
+            "highpass=f=85,"
+            # quitar barro/cajón (~300 Hz) que enturbia la voz
+            "equalizer=f=300:t=q:w=1.1:g=-2.5,"
+            # realce de presencia/inteligibilidad (~3.2 kHz) — voz nítida y al frente
+            "equalizer=f=3200:t=q:w=1.4:g=3,"
+            # leve aire/brillo (~9 kHz)
+            "equalizer=f=9000:t=q:w=1.0:g=1.5,"
+            # de-esser suave (sibilancias controladas)
+            "deesser=i=0.4,"
+            # compresor (voz uniforme, sin picos)
+            "acompressor=threshold=-18dB:ratio=3:attack=5:release=80:makeup=2dB,"
+            # normalización estándar YouTube
             "loudnorm=I=-16:TP=-1.5:LRA=11"
         ),
         "-c:a", "libmp3lame", "-b:a", "192k", "-ar", "44100",

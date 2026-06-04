@@ -375,9 +375,12 @@ def render_video(
         )
 
     if has_music:
-        # Mezcla profesional con DUCKING automático (sidechaincompress):
-        # la música baja sola cuando hay narración y sube en los silencios.
-        # voice al 100% · música base 0.18 · ducking dispara con la voz.
+        # Mezcla profesional: la VOZ siempre manda, la música acompaña sin tapar.
+        # - música base 0.14 (más baja → voz nítida y clara)
+        # - filtro paso-alto 250Hz en la música: le quita los graves que "embarran"
+        #   la voz, dejando hueco en las frecuencias vocales (claridad real)
+        # - ducking fuerte (ratio 12, ataque rápido): la música se aparta al instante
+        #   cuando hay narración y vuelve a subir en los silencios.
         _ffmpeg(
             "-i", str(full_mp4),
             "-i", str(audio_path),
@@ -385,10 +388,10 @@ def render_video(
             "-filter_complex",
             (
                 f"[1:a]volume=1.0,asplit=2[voice][sc];"
-                f"[2:a]volume=0.18,atrim=0:duration={audio_dur:.2f},"
+                f"[2:a]volume=0.14,highpass=f=250,atrim=0:duration={audio_dur:.2f},"
                 f"afade=t=in:st=0:d=4,afade=t=out:st={max(0,audio_dur-4):.1f}:d=4[musicraw];"
                 # Ducking: la música (musicraw) se comprime usando la voz (sc) como disparador
-                f"[musicraw][sc]sidechaincompress=threshold=0.03:ratio=8:attack=200:release=600[ducked];"
+                f"[musicraw][sc]sidechaincompress=threshold=0.025:ratio=12:attack=80:release=500[ducked];"
                 f"[voice][ducked]amix=inputs=2:duration=first:dropout_transition=3[aout]"
             ),
             "-map", "0:v", "-map", "[aout]",

@@ -130,76 +130,45 @@ HOOK_ANGLES = [
 ]
 
 
+# CONCEPTO de los hooks de mayor retención (inspirado en la competencia analizada:
+# vídeos tipo "lo que nadie te cuenta / 4 cosas que nunca debes...").
+HOOK_CONCEPT = """CONCEPTO CLAVE — el patrón de los hooks que más retienen (úsalo SIEMPRE, integrado con naturalidad):
+Haz sentir al espectador que está a punto de acceder a algo que CASI NADIE sabe: un secreto, una verdad incómoda, "lo que no te han contado", "lo que ocultaron", "lo que el 99% nunca entiende".
+- Lanza una promesa CONCRETA y específica de lo que va a descubrir (mejor si es contraintuitivo o suena casi prohibido).
+- Transmite que quedarse le da una VENTAJA o un conocimiento que los demás no tienen.
+- Interpélalo directamente: que sienta que le hablas a ÉL, justo hoy.
+Patrones de ejemplo (adáptalos al tema, NO los copies literal):
+"Hay algo sobre esto que el 99% de la gente nunca llega a entender."
+"Durante años nos contaron una versión. La verdad es muy distinta."
+"Lo que voy a contarte cambió por completo cómo veo esto, y casi nadie lo sabe."
+"""
+
+
 def generate_hook(client, niche: str, title: str, tone: str, context_block: str = "") -> str:
     """
-    Hook 10/10 por método 'mejor de 3 + juez':
-    1) Genera 3 hooks con ángulos de apertura distintos (Opus, temperatura alta = variedad).
-    2) Un juez Opus forja el DEFINITIVO: mejor primera frase + lo mejor de los tres.
-    Devuelve (texto, usage acumulado).
+    Hook de máxima calidad en UNA sola llamada Opus (sin método de 3 — más barato,
+    ~0.06€/vídeo menos). Integra el concepto de los hooks de mayor retención de la
+    competencia + la estrategia por género. Devuelve (texto, usage).
     """
     strategy = HOOK_STRATEGY.get(tone, HOOK_STRATEGY["neutro"])
-    base = f"""TEMA DEL VÍDEO: {title}
+    user = f"""TEMA DEL VÍDEO: {title}
 NICHO: {niche}
 {strategy}{context_block}
 
+{HOOK_CONCEPT}
+
 Escribe SOLO el HOOK (los primeros 75-90 segundos, 170-220 palabras).
-La PRIMERA frase debe detener el scroll. Háblale al espectador. Suelta algo especial. Abre un bucle imposible de ignorar. Acaba en tensión máxima. Solo texto narrado."""
-
-    in_tok = out_tok = 0
-    drafts = []
-    for ang in HOOK_ANGLES:
-        try:
-            m = client.messages.create(
-                model=HOOK_MODEL, max_tokens=600, temperature=1.0,
-                system=HOOK_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": base + "\n\n" + ang}],
-            )
-            t = m.content[0].text.strip()
-            if len(t.split()) >= 60:
-                drafts.append(t)
-            in_tok += m.usage.input_tokens
-            out_tok += m.usage.output_tokens
-        except Exception:
-            pass
-
-    if not drafts:  # fallback total: una generación simple
-        m = client.messages.create(model=HOOK_MODEL, max_tokens=600,
-                                    system=HOOK_SYSTEM_PROMPT,
-                                    messages=[{"role": "user", "content": base}])
-        result = m.content[0].text.strip()
-        class _U: pass
-        u = _U(); u.input_tokens = m.usage.input_tokens; u.output_tokens = m.usage.output_tokens
-        return result, u
-
-    # ── JUEZ + FORJADOR: el mejor hook posible a partir de los 3 ──
-    numbered = "\n\n".join(f"━━ HOOK {i+1} ━━\n{d}" for i, d in enumerate(drafts))
-    judge = f"""Eres el mayor experto del mundo en retención de YouTube (nivel MrBeast: 90% de retención en los primeros 30 segundos). Aquí tienes {len(drafts)} hooks distintos para EL MISMO vídeo:
-
-{numbered}
-
-Tu tarea: crear EL HOOK DEFINITIVO, el mejor de la historia para este vídeo. No elijas uno sin más: FÓRJALO.
-- PRIMERA FRASE: coge la más demoledora de los tres o crea una aún mejor. Tiene que ser un golpe imposible de ignorar en los primeros 5 segundos (un pattern interrupt = +23% de retención).
-- Combina las mejores frases, imágenes e ideas de los tres hooks en uno solo, coherente y con ritmo de película.
-- Aplica sin piedad las 6 leyes del hook perfecto. Elimina TODO el relleno.
-- Mismo tema, mismos hechos (no inventes datos). 170-220 palabras. Solo texto narrado, sin comillas ni acotaciones.
-
-Devuelve SOLO el hook definitivo."""
-    try:
-        mj = client.messages.create(
-            model=HOOK_MODEL, max_tokens=600,
-            system=HOOK_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": judge}],
-        )
-        final = mj.content[0].text.strip()
-        in_tok += mj.usage.input_tokens
-        out_tok += mj.usage.output_tokens
-        result = final if len(final.split()) >= 80 else drafts[0]
-    except Exception:
-        result = drafts[0]
-
-    class _U: pass
-    u = _U(); u.input_tokens = in_tok; u.output_tokens = out_tok
-    return result, u
+- La PRIMERA frase es un PATTERN INTERRUPT que detiene el scroll en los primeros 5 segundos (un golpe imposible de ignorar). +23% de retención si está bien.
+- La premisa central queda clara en los primeros 3-8 segundos.
+- Háblale directamente al espectador (a TI). Suelta algo que se sienta como un secreto o conocimiento prohibido.
+- Abre un bucle imposible de cerrar y acaba en máxima tensión.
+Aplica sin piedad las 6 leyes del hook perfecto. Cero relleno. Solo texto narrado, sin comillas ni acotaciones."""
+    m = client.messages.create(
+        model=HOOK_MODEL, max_tokens=600,
+        system=HOOK_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user}],
+    )
+    return m.content[0].text.strip(), m.usage
 
 SYSTEM_PROMPT = """Eres el mejor guionista de YouTube en español. Llevas 10 años creando vídeos virales de 30-35 minutos con retención del 65%+. Tus vídeos han acumulado más de 500 millones de visualizaciones.
 

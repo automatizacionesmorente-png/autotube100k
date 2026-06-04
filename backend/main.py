@@ -590,19 +590,18 @@ async def _do_upload(job_id: str, channel_id: str, thumbnail: str = None):
             except Exception:
                 dur = None
             metadata = await asyncio.to_thread(generate_metadata, job_id, script, title, niche, dur)
-        # Miniatura: prioridad a la PROPIA del usuario (custom_thumbnail.jpg) si existe.
+        # Miniatura: si el usuario subió la SUYA (custom_thumbnail.jpg), se usa SÍ O SÍ.
+        # Si no, se usa la variante elegida (A/B/C); por defecto la A.
         import re as _re
         job_d = Path(job["video_path"]).parent
-        thumb_name = thumbnail if (thumbnail and _re.match(r'^[\w\-\.]+$', thumbnail)) else None
         custom = job_d / "custom_thumbnail.jpg"
-        if thumb_name:
-            thumb_path = job_d / thumb_name
-        elif custom.exists():
-            thumb_path = custom            # sin selección explícita → usar la propia si existe
+        if custom.exists():
+            thumb_path = custom            # PRIORIDAD ABSOLUTA: tu foto siempre gana
         else:
-            thumb_path = job_d / "thumbnail.jpg"
-        if not thumb_path.exists():
-            thumb_path = custom if custom.exists() else (job_d / "thumbnail.jpg")
+            thumb_name = thumbnail if (thumbnail and _re.match(r'^[\w\-\.]+$', thumbnail)) else "thumbnail.jpg"
+            thumb_path = job_d / thumb_name
+            if not thumb_path.exists():
+                thumb_path = job_d / "thumbnail.jpg"
         result = await asyncio.to_thread(
             upload_to_youtube, job_id, Path(job["video_path"]),
             thumb_path,
