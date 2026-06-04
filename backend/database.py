@@ -173,6 +173,8 @@ def get_finance_summary():
         "claude_haiku_hook":   "anthropic",
         "claude_sonnet":       "anthropic",
         "claude_sonnet_ext":   "anthropic",
+        "claude_opus_script":  "anthropic",
+        "claude_opus_ext":     "anthropic",
         # OpenAI
         "openai_tts":          "openai",
         # Gratis

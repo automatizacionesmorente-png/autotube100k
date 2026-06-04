@@ -11,9 +11,9 @@ TONES = {
     "neutro":       "narrador profesional, claro, conversacional, fácil de entender",
 }
 
-MODEL = "claude-sonnet-4-6"
-MODEL_IN_PRICE  = 3    # USD/M tokens input
-MODEL_OUT_PRICE = 15   # USD/M tokens output
+MODEL = "claude-opus-4-8"   # Opus: máxima calidad narrativa para el guion (decisión del usuario)
+MODEL_IN_PRICE  = 15   # USD/M tokens input (Opus)
+MODEL_OUT_PRICE = 75   # USD/M tokens output (Opus)
 EUR_RATE = 0.92
 
 TARGET_WORDS = 5200   # ~34-36 min a 145 pal/min — SIEMPRE +30 min (con margen)
@@ -248,7 +248,7 @@ habla en términos generales ciertos o como expectativa ("se espera", "según la
     hook_text, hook_usage = generate_hook(client, niche, title, tone, context_block)
     hook_cost = (hook_usage.input_tokens * MODEL_IN_PRICE +
                  hook_usage.output_tokens * MODEL_OUT_PRICE) / 1_000_000 * EUR_RATE
-    add_cost_event(job_id, "claude_sonnet", hook_usage.output_tokens,
+    add_cost_event(job_id, "claude_opus_script", hook_usage.output_tokens,
                    MODEL_OUT_PRICE / 1_000_000, hook_cost)
     hook_words = len(hook_text.split())
 
@@ -326,7 +326,7 @@ IMPORTANTE: SOLO el texto narrado. Sin títulos de sección. Sin corchetes. Sin 
 
     body_cost = (msg.usage.input_tokens * MODEL_IN_PRICE +
                  msg.usage.output_tokens * MODEL_OUT_PRICE) / 1_000_000 * EUR_RATE
-    add_cost_event(job_id, "claude_sonnet", msg.usage.output_tokens,
+    add_cost_event(job_id, "claude_opus_script", msg.usage.output_tokens,
                    MODEL_OUT_PRICE / 1_000_000, body_cost)
     cost_eur = hook_cost + body_cost
 
@@ -348,7 +348,7 @@ IMPORTANTE: SOLO el texto narrado. Sin títulos de sección. Sin corchetes. Sin 
         word_count = len(script.split())
         ext_cost = (ext_msg.usage.input_tokens * MODEL_IN_PRICE +
                     ext_msg.usage.output_tokens * MODEL_OUT_PRICE) / 1_000_000 * EUR_RATE
-        add_cost_event(job_id, "claude_sonnet_ext", ext_msg.usage.output_tokens,
+        add_cost_event(job_id, "claude_opus_ext", ext_msg.usage.output_tokens,
                        MODEL_OUT_PRICE / 1_000_000, ext_cost)
 
     estimated_mins = round(word_count / 130)
