@@ -168,6 +168,7 @@ def get_finance_summary():
         "claude_haiku":        "anthropic",
         "claude_haiku_ext":    "anthropic",
         "claude_haiku_prompts":"anthropic",
+        "claude_sonnet_prompts":"anthropic",
         "claude_haiku_thumb":  "anthropic",
         "claude_haiku_hook":   "anthropic",
         "claude_sonnet":       "anthropic",

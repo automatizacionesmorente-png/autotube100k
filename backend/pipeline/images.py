@@ -42,7 +42,7 @@ def generate_image_prompts(job_id: str, script: str, niche: str,
         )
 
         msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model="claude-sonnet-4-6",  # Sonnet entiende el guion mucho mejor → imágenes 100% acordes
             max_tokens=6000,
             messages=[{"role": "user", "content": f"""Eres el director de fotografía del mejor documental cinematográfico del mundo. Para cada fragmento de guión, creas el plano visual EXACTO que hace que el espectador no pueda apartar los ojos de la pantalla.
 
@@ -88,8 +88,8 @@ FRAGMENTOS DEL GUIÓN (cada uno necesita su imagen perfecta):
                 f"cinematic documentary scene, {niche}, dramatic lighting, 16:9, 4K, photorealistic"
             )
 
-        cost = (msg.usage.input_tokens * 0.8 + msg.usage.output_tokens * 4) / 1_000_000 * EUR_RATE
-        add_cost_event(job_id, "claude_haiku_prompts", msg.usage.output_tokens, 4/1_000_000, cost)
+        cost = (msg.usage.input_tokens * 3 + msg.usage.output_tokens * 15) / 1_000_000 * EUR_RATE
+        add_cost_event(job_id, "claude_sonnet_prompts", msg.usage.output_tokens, 15/1_000_000, cost)
         return prompts
 
     except Exception:

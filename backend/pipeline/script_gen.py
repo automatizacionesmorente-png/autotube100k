@@ -130,7 +130,44 @@ Devuelve solo el texto narrado del hook, nada más."""
         system=HOOK_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user}],
     )
-    return msg.content[0].text.strip(), msg.usage
+    draft = msg.content[0].text.strip()
+    in_tok = msg.usage.input_tokens
+    out_tok = msg.usage.output_tokens
+
+    # ── 2ª PASADA: editor de hooks DESPIADADO. Critica y reescribe a 10/10. ──
+    # Es la diferencia entre un hook "bueno" y uno que retiene el 90% como MrBeast.
+    refine = f"""Eres el editor de hooks más exigente de YouTube. Aquí tienes un borrador de hook:
+
+«{draft}»
+
+Analízalo sin piedad contra estos criterios de los mejores hooks del mundo:
+1. PATTERN INTERRUPT en los primeros 5 segundos (lo más importante: la 1ª frase rompe el patrón, sorprende, incomoda o impacta). +23% de retención si está bien.
+2. La premisa central queda clara en los primeros 3-8 segundos.
+3. Bucle de curiosidad imposible de ignorar.
+4. Conexión emocional inmediata con el espectador (le habla a ÉL).
+5. Cero relleno: cada frase gana su sitio.
+6. Termina en tensión máxima.
+
+Si el borrador ya es un 10/10, devuélvelo igual. Si no, REESCRÍBELO para que sea un 10/10 absoluto — especialmente la primera frase (que sea un golpe imposible de ignorar).
+Mantén: mismo tema, mismos hechos (no inventes datos), 170-220 palabras, solo texto narrado.
+Devuelve SOLO el hook final, nada más."""
+    try:
+        msg2 = client.messages.create(
+            model=MODEL, max_tokens=600,
+            system=HOOK_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": refine}],
+        )
+        final = msg2.content[0].text.strip()
+        if len(final.split()) >= 80:   # seguridad: si la 2ª pasada salió bien, usarla
+            draft = final
+            in_tok += msg2.usage.input_tokens
+            out_tok += msg2.usage.output_tokens
+    except Exception:
+        pass
+
+    class _U: pass
+    u = _U(); u.input_tokens = in_tok; u.output_tokens = out_tok
+    return draft, u
 
 SYSTEM_PROMPT = """Eres el mejor guionista de YouTube en español. Llevas 10 años creando vídeos virales de 30-35 minutos con retención del 65%+. Tus vídeos han acumulado más de 500 millones de visualizaciones.
 
