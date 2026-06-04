@@ -216,9 +216,17 @@ LEYES ABSOLUTAS — VIOLARIAS ES UN FRACASO:
    Frase corta de impacto. Luego una frase larga que desarrolla con detalle. Pausa dramática implícita.
    Nunca más de 3 frases del mismo ritmo seguidas.
 
-7. CLIFFHANGERS OBLIGATORIOS — uno cada 4-5 minutos:
-   Cada bloque termina con algo que mantiene la tensión y la curiosidad.
-   Ejemplos: "Pero esto era solo el principio." / "Y lo que vino después lo cambió todo."
+7. RETENCIÓN CONTINUA — RE-ENGANCHA SIN PARAR (lo que hace que la gente se quede):
+   No basta con cliffhangers cada 4-5 min. Los mejores canales re-enganchan CADA 60-90 SEGUNDOS.
+   - CLIFFHANGER GRANDE al final de cada bloque ("Pero esto era solo el principio.").
+   - MICRO-BUCLES en CADA párrafo: deja una pregunta abierta, una promesa o un anzuelo que se
+     resuelve más adelante. Ejemplos: "Y aquí es donde todo se tuerce.", "Pero había un detalle
+     que nadie vio.", "Lo que descubrieron después no tiene sentido... todavía.", "Guarda esto en
+     la memoria, porque vuelve al final."
+   - ADELANTOS (forward references): siembra cosas que prometes contar luego ("En unos minutos
+     entenderás por qué esto lo cambia todo"). El cerebro no puede irse con un bucle abierto.
+   - CURIOSIDAD ENCADENADA: que cada respuesta abra una nueva pregunta. Nunca cierres todo a la vez.
+   El objetivo: que en NINGÚN momento de los 30+ minutos el espectador sienta que "ya puede irse".
 
 8. MUESTRA, NO EXPLIQUES:
    Recrea el ambiente y el contexto de forma vívida y cinematográfica, con detalle sensorial
