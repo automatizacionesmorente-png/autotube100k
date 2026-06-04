@@ -1144,7 +1144,16 @@ function startStatusPolling(jobId) {
 function stopStatusPolling() {
   if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
 }
+function _clearStepTimers() {
+  if (!window._stepTimers) return;
+  for (const k in window._stepTimers) {
+    if (window._stepTimers[k]) clearInterval(window._stepTimers[k]);
+  }
+  window._stepTimers = {};
+}
+
 function showJobError(errorMsg) {
+  _clearStepTimers();
   document.getElementById('btn-generate').disabled = false;
   document.getElementById('btn-cancel').style.display = 'none';
   document.getElementById('btn-retry-render').style.display = 'none';
@@ -1181,6 +1190,7 @@ async function startGeneration() {
   document.getElementById('cost-display').textContent = '0.000';
   totalCost = 0;
   prevStepTotal = 0;
+  _clearStepTimers();
 
   Object.entries(STEPS_META).forEach(([key, meta]) => {
     document.getElementById('step-list').insertAdjacentHTML('beforeend', `
@@ -1194,7 +1204,10 @@ async function startGeneration() {
             <span class="step-subbar-pct" id="subbar-pct-${key}">0%</span>
           </div>
         </div>
-        <div class="step-cost" id="scost-${key}"></div>
+        <div style="text-align:right;">
+          <div class="step-elapsed" id="elapsed-${key}" style="font-size:10px;color:var(--gold);font-variant-numeric:tabular-nums;"></div>
+          <div class="step-cost" id="scost-${key}"></div>
+        </div>
       </div>`);
   });
 
@@ -1255,6 +1268,27 @@ function onStep({step, status, message, progress, cost, realtime, sub_pct, eta_s
   }
   if (msg) msg.textContent = message;
 
+  // ── Cronómetro en vivo por paso (dato 100% real: tiempo transcurrido) ──────
+  if (status === 'running') {
+    if (!window._stepTimers) window._stepTimers = {};
+    if (!window._stepTimers[step]) {   // arranca solo la primera vez que entra en running
+      const t0 = Date.now();
+      const el = document.getElementById('elapsed-' + step);
+      const tick = () => {
+        if (!el) return;
+        const s = Math.floor((Date.now() - t0) / 1000);
+        el.textContent = '⏱ ' + Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+      };
+      tick();
+      window._stepTimers[step] = setInterval(tick, 1000);
+    }
+  } else if ((status === 'done' || status === 'error') && window._stepTimers && window._stepTimers[step]) {
+    clearInterval(window._stepTimers[step]);
+    window._stepTimers[step] = null;
+    const el = document.getElementById('elapsed-' + step);   // dejar el tiempo final fijo (✓)
+    if (el && el.textContent) el.textContent = el.textContent.replace('⏱', '✓');
+  }
+
   // Coste: solo en eventos de paso completo (no en fal.ai realtime ni en is_progress)
   if (cost > 0) {
     if (realtime) {
@@ -1312,6 +1346,7 @@ function onStep({step, status, message, progress, cost, realtime, sub_pct, eta_s
 
 function onEnd({job}) {
   stopStatusPolling();
+  _clearStepTimers();
   document.getElementById('btn-generate').disabled = false;
   document.getElementById('btn-cancel').style.display = 'none';
   document.getElementById('btn-retry-render').style.display = 'none';
@@ -1406,7 +1441,10 @@ async function openJobDetail(jobId) {
             <span class="step-subbar-pct" id="subbar-pct-${key}">0%</span>
           </div>
         </div>
-        <div class="step-cost" id="scost-${key}"></div>
+        <div style="text-align:right;">
+          <div class="step-elapsed" id="elapsed-${key}" style="font-size:10px;color:var(--gold);font-variant-numeric:tabular-nums;"></div>
+          <div class="step-cost" id="scost-${key}"></div>
+        </div>
       </div>`);
   });
 

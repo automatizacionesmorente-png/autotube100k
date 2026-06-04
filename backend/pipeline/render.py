@@ -128,26 +128,16 @@ def _image_to_clips_batch(images: list[Path], img_dur: float,
 def _video_to_shot(video: Path, dur: float, out: Path, idx: int = 0):
     """
     Convierte un clip de Pexels en un plano de `dur`s a 1920x1080, 25fps.
-    Añade zoom-in sutil (1.0→1.08) para dinamismo — igual que Ken Burns en imágenes.
+    SIN zoompan: el vídeo YA tiene movimiento propio — aplicarle zoompan era absurdo
+    y lentísimo (era el gran cuello de botella). Solo escala+recorta+fundidos = rapidísimo.
     """
     try:
         vdur = get_duration(video)
     except Exception:
         vdur = 0
 
-    # Zoom sutil que varía según el índice (alternamos zoom-in / zoom-out)
-    zoom_effects = [
-        "zoompan=z='min(zoom+0.0003,1.08)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'",
-        "zoompan=z='max(1.08-0.0003*on,1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'",
-        "zoompan=z='min(zoom+0.0002,1.06)':x='iw/2-(iw/zoom/2)+1':y='ih/2-(ih/zoom/2)'",
-        "zoompan=z=1.05:x='iw/2-(iw/zoom/2)+on*0.3':y='ih/2-(ih/zoom/2)'",
-    ]
-    zoom = zoom_effects[idx % len(zoom_effects)]
-    d_frames = max(1, int(dur * 25))
-
     vf = (
-        f"scale=2880:1620:force_original_aspect_ratio=increase,crop=2880:1620,fps=25,"
-        f"{zoom}:d={d_frames}:s=1920x1080,"
+        f"scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,fps=25,"
         f"fade=t=in:st=0:d={FADE_SEC},fade=t=out:st={max(0,dur-FADE_SEC):.2f}:d={FADE_SEC}"
     )
 
