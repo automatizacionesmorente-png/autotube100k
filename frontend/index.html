@@ -414,6 +414,11 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
 .step-name { font-size: 12px; font-weight: 500; color: var(--ink2); }
 .step-msg  { font-size: 11px; color: var(--muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .step-cost { font-family: 'Playfair Display', serif; font-size: 13px; font-weight: 500; color: var(--green); flex-shrink: 0; padding-top: 3px; }
+/* Barra de progreso real por paso (solo cuando hay datos reales) */
+.step-subbar { display:none; align-items:center; gap:6px; margin-top:5px; }
+.step-subbar-track { flex:1; height:3px; background:var(--border2); border-radius:2px; overflow:hidden; }
+.step-subbar-fill  { height:100%; background:var(--gold); border-radius:2px; width:0%; transition:width 0.8s ease; }
+.step-subbar-pct   { font-size:10px; color:var(--muted); min-width:28px; text-align:right; }
 
 /* result */
 .result-ok {
@@ -677,7 +682,10 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
           <div class="progress-track">
             <div class="progress-fill" id="progress-fill" style="width:0%"></div>
           </div>
-          <div id="progress-pct">0%</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div id="progress-pct">0%</div>
+            <span id="eta-display" style="display:none;font-size:10px;color:var(--muted);white-space:nowrap;"></span>
+          </div>
         </div>
         <div class="steps" id="step-list"></div>
         <div id="final-result"></div>
@@ -1133,6 +1141,8 @@ function showJobError(errorMsg) {
   document.getElementById('btn-generate').disabled = false;
   document.getElementById('btn-cancel').style.display = 'none';
   document.getElementById('btn-retry-render').style.display = 'none';
+  document.getElementById('eta-display').style.display = 'none';
+  document.querySelectorAll('.step-subbar').forEach(el => el.style.display = 'none');
   document.getElementById('pipeline-lbl').textContent = '❌ Error en la producción';
   document.getElementById('final-result').innerHTML = `
     <div style="margin:12px 20px;padding:14px 16px;background:#fdf1f1;border:1px solid #f5c6c6;border-radius:10px;">
@@ -1172,6 +1182,10 @@ async function startGeneration() {
         <div class="step-body">
           <div class="step-name">${meta.label}</div>
           <div class="step-msg text-muted" id="msg-${key}">Esperando…</div>
+          <div class="step-subbar" id="subbar-${key}">
+            <div class="step-subbar-track"><div class="step-subbar-fill" id="subbar-fill-${key}"></div></div>
+            <span class="step-subbar-pct" id="subbar-pct-${key}">0%</span>
+          </div>
         </div>
         <div class="step-cost" id="scost-${key}"></div>
       </div>`);
@@ -1211,28 +1225,35 @@ async function startGeneration() {
 
 let falCostAccum = 0;
 
-function onStep({step, status, message, progress, cost, realtime}) {
+function fmtEta(secs) {
+  secs = Math.round(secs);
+  if (secs <= 0) return '';
+  if (secs < 60) return `~${secs}s restantes`;
+  const m = Math.round(secs / 60);
+  if (m < 60) return `~${m} min restantes`;
+  const h = Math.floor(m / 60), rm = m % 60;
+  return rm ? `~${h}h ${rm}min restantes` : `~${h}h restantes`;
+}
+
+function onStep({step, status, message, progress, cost, realtime, sub_pct, eta_seconds, is_progress}) {
   const dot = document.getElementById('dot-' + step);
   const msg = document.getElementById('msg-' + step);
   const sc  = document.getElementById('scost-' + step);
   if (!dot) return;
 
-  // Actualizar dot/estado solo si no es un evento de progreso intermedio
-  if (!realtime) {
+  // Dot: no cambiar si es evento de progreso interno (realtime fal.ai o render progress)
+  if (!realtime && !is_progress) {
     dot.className = 'step-icon ' + status;
   }
   if (msg) msg.textContent = message;
 
-  // Actualizar coste acumulado
+  // Coste: solo en eventos de paso completo (no en fal.ai realtime ni en is_progress)
   if (cost > 0) {
     if (realtime) {
-      // Evento en tiempo real de fal.ai — cost es solo el coste fal.ai acumulado del paso
       falCostAccum = cost;
       document.getElementById('cost-fal').style.display = 'inline';
       document.getElementById('cost-fal-val').textContent = falCostAccum.toFixed(4);
-      // Actualizar coste total leyendo el acumulado real del DB via polling
-    } else {
-      // Evento de paso completo — cost = total real acumulado en DB
+    } else if (!is_progress) {
       const stepCost = cost - prevStepTotal;
       prevStepTotal = cost;
       totalCost = cost;
@@ -1243,9 +1264,35 @@ function onStep({step, status, message, progress, cost, realtime}) {
     }
   }
 
+  // Barra global
   if (progress > 0) {
     document.getElementById('progress-fill').style.width = progress + '%';
     document.getElementById('progress-pct').textContent = progress + '%';
+  }
+
+  // ── Barra real por paso (solo cuando hay datos reales del backend) ──────────
+  if (sub_pct !== undefined) {
+    const subbar  = document.getElementById('subbar-' + step);
+    const subfill = document.getElementById('subbar-fill-' + step);
+    const subpct  = document.getElementById('subbar-pct-' + step);
+    if (subbar) {
+      if (status === 'done' || status === 'error') {
+        subbar.style.display = 'none';   // ocultar al terminar
+      } else {
+        subbar.style.display = 'flex';
+        if (subfill) subfill.style.width = sub_pct + '%';
+        if (subpct)  subpct.textContent  = Math.round(sub_pct) + '%';
+      }
+    }
+  }
+
+  // ── ETA real en header (solo si > 30s para no mostrar valores insignificantes) ─
+  if (eta_seconds !== undefined && eta_seconds > 30) {
+    const etaEl = document.getElementById('eta-display');
+    if (etaEl) { etaEl.style.display = 'inline'; etaEl.textContent = fmtEta(eta_seconds); }
+  } else if (status === 'done' || status === 'error') {
+    const etaEl = document.getElementById('eta-display');
+    if (etaEl) etaEl.style.display = 'none';
   }
 
   if (status === 'error') {
@@ -1260,6 +1307,8 @@ function onEnd({job}) {
   document.getElementById('btn-generate').disabled = false;
   document.getElementById('btn-cancel').style.display = 'none';
   document.getElementById('btn-retry-render').style.display = 'none';
+  document.getElementById('eta-display').style.display = 'none';
+  document.querySelectorAll('.step-subbar').forEach(el => el.style.display = 'none');
   document.getElementById('pipeline-lbl').textContent = '✅ Vídeo listo para revisión';
   eventSource.close();
 
@@ -1344,6 +1393,10 @@ async function openJobDetail(jobId) {
         <div class="step-body">
           <div class="step-name">${meta.label}</div>
           <div class="step-msg text-muted" id="msg-${key}">${isCurrent ? 'En curso…' : stepDone ? 'Completado' : 'Esperando…'}</div>
+          <div class="step-subbar" id="subbar-${key}">
+            <div class="step-subbar-track"><div class="step-subbar-fill" id="subbar-fill-${key}"></div></div>
+            <span class="step-subbar-pct" id="subbar-pct-${key}">0%</span>
+          </div>
         </div>
         <div class="step-cost" id="scost-${key}"></div>
       </div>`);

@@ -31,6 +31,43 @@ _job_events: dict[str, list] = {}
 # Jobs cancelados (para que el pipeline los detecte y pare)
 _cancelled_jobs: set[str] = set()
 
+
+def _fmt_eta(secs: float) -> str:
+    """Formatea segundos restantes en texto legible. Solo datos reales."""
+    secs = int(max(0, secs))
+    if secs <= 0:   return ""
+    if secs < 60:   return f"~{secs}s restantes"
+    m = round(secs / 60)
+    if m < 60:      return f"~{m} min restantes"
+    h = m // 60;    rm = m % 60
+    return f"~{h}h {rm}min restantes" if rm else f"~{h}h restantes"
+
+
+def _make_render_progress_cb(job_id: str):
+    """Devuelve un callback que convierte el % real del render a eventos SSE."""
+    def cb(pct: float, eta_secs: float, done: int, total: int, phase: str):
+        # Mapeo honesto: render 0-100% → barra global 66-90%
+        global_pct = int(66 + min(pct, 100) * 24 / 100)
+        if phase == "clips":
+            eta_str = _fmt_eta(eta_secs)
+            msg = f"Clip {done}/{total}" + (f" · {eta_str}" if eta_str else "")
+        elif phase == "encode":
+            msg = "Codificando vídeo final con subtítulos y música…"
+        else:
+            msg = "Finalizando render…"
+
+        event = {
+            "type": "step", "step": "render", "status": "running",
+            "message": msg, "progress": global_pct,
+            "cost": 0,                           # sin coste: ya se mostrará al terminar
+            "sub_pct": round(min(pct, 100), 1),
+            "eta_seconds": int(eta_secs) if phase == "clips" else 0,
+            "is_progress": True,
+        }
+        _job_events.setdefault(job_id, []).append(event)
+        update_job(job_id, current_step="render", progress=global_pct)
+    return cb
+
 @app.on_event("startup")
 async def startup():
     init_db()
@@ -317,7 +354,8 @@ async def _do_retry_render(
         await asyncio.to_thread(
             render_video, job_id,
             hook_clips, body_images, audio_path, final_path, title,
-            hook_images, tone, body_clips
+            hook_images, tone, body_clips,
+            _make_render_progress_cb(job_id),
         )
 
         try:
@@ -912,8 +950,9 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
             pct = 40 + int(done / total * 15)
             _job_events.setdefault(job_id, []).append({
                 "type": "step", "step": "images", "status": "running",
-                "message": f"Imagen {done}/{total} · fal.ai acumulado: {fal_cost:.4f}€",
+                "message": f"Imagen {done}/{total}",
                 "progress": pct, "cost": fal_cost, "realtime": True,
+                "sub_pct": round(done / total * 100, 1),
             })
 
         emit("images", "running", "Generando 60 imágenes + 8 hook + B-roll vídeo + thumbnail en paralelo…", 37)
@@ -949,7 +988,8 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
             render_video, job_id,
             hook_clips,
             body_images, audio_path, final_path, req.title,
-            hook_images, req.tone, body_clips
+            hook_images, req.tone, body_clips,
+            _make_render_progress_cb(job_id),
         )
         emit("render", "done", "Vídeo montado completamente", 90)
 

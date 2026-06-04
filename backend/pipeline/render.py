@@ -3,6 +3,8 @@ import json
 import math
 import shutil
 import random
+import threading
+import time as _time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from ..database import add_step
@@ -209,6 +211,7 @@ def render_video(
     hook_images: list[Path] = None,
     tone: str = "neutro",
     body_videos: list[Path] = None,
+    progress_cb=None,   # callable(pct, eta_secs, done, total, phase) — datos 100% reales
 ) -> Path:
     add_step(job_id, "render", "running",
              f"Iniciando montaje — tono: {tone} · {KB_WORKERS} workers Ken Burns…")
@@ -277,6 +280,48 @@ def render_video(
              f"Montaje dinámico: {len(valid_body)} imágenes + {len(valid_vids)} clips de vídeo real "
              f"= {total_shots} planos (~{body_dur/max(1,total_shots):.0f}s c/u) · Whisper simultáneo…")
 
+    # ── PROGRESO REAL: cuántos clips Ken Burns se esperan (datos 100% reales) ──
+    # Solo img_*.mp4 + vid_*.mp4 = la parte lenta (Ken Burns paralelo)
+    # hvtrim_*.mp4 (hook Pexels) son rápidos y no se cuentan
+    _per_shot      = body_dur / max(1, total_shots)
+    _n_sub_img     = max(1, math.ceil(_per_shot / MAX_KB_DURATION))
+    _exp_body      = len(valid_body) * _n_sub_img + len(valid_vids)
+    # Hook: solo si usa imágenes (hook con vídeos Pexels no crea img_*.mp4)
+    _exp_hook_img  = 0
+    if not valid_hook_vids:
+        _vh_imgs = valid_hook_imgs if valid_hook_imgs else valid_body[:min(4, len(valid_body))]
+        _ph      = hook_dur / max(1, len(_vh_imgs))
+        _exp_hook_img = len(_vh_imgs) * max(1, math.ceil(_ph / MAX_KB_DURATION))
+    _total_expected = max(1, _exp_body + _exp_hook_img)
+    _render_start   = _time.time()
+    _stop_monitor   = threading.Event()
+
+    def _count_clips() -> int:
+        try:
+            return len(list(tmp.glob("img_*.mp4"))) + len(list(tmp.glob("vid_*.mp4")))
+        except Exception:
+            return 0
+
+    def _monitor_loop():
+        _last_done = 0
+        while not _stop_monitor.wait(20):
+            try:
+                done = _count_clips()
+                if done <= _last_done:
+                    continue
+                _last_done = done
+                pct     = min(85.0, done / _total_expected * 100.0)
+                elapsed = _time.time() - _render_start
+                frac    = pct / 100.0
+                eta     = (elapsed / frac) * (1.0 - frac) if frac > 0.005 else 0.0
+                if progress_cb:
+                    progress_cb(pct, eta, done, _total_expected, "clips")
+            except Exception:
+                pass
+
+    if progress_cb:
+        threading.Thread(target=_monitor_loop, daemon=True).start()
+
     ass_path = tmp / "subs.ass"
 
     # Lanzar Whisper en background MIENTRAS se procesan los planos
@@ -296,6 +341,11 @@ def render_video(
                 "-c:v", "libx264", "-preset", "ultrafast", "-an", str(full_mp4))
 
         subs_ok = whisper_fut.result()
+
+    # ── Fin fase 1 (clip gen) → fase 2 (encode final) ─────────────────────────
+    _stop_monitor.set()   # Para el hilo monitor (daemon, muere solo también)
+    if progress_cb:
+        progress_cb(90.0, 0.0, _total_expected, _total_expected, "encode")
 
     music_path = _pick_music(tone)
     has_music = music_path is not None and music_path.exists()
