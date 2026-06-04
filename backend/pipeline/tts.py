@@ -46,6 +46,12 @@ VOICES_DIR  = "/root/autotube100k/voices"
 #   documental_femenino, humor_femenino, neutro_profesional,
 #   truecrime_femenino, historia_masculino, conspiracion_masculino, ciencia_femenino
 
+# VOZ UNIVERSAL: voz HUMANA REAL (LibriVox, dominio público) elegida por el usuario.
+# Se usa en TODOS los vídeos (las voces de arquetipo eran sintéticas Edge TTS = robóticas).
+# Prioridad: voz subida por el usuario > esta voz universal > arquetipo > tono.
+# Para volver a voces por arquetipo: poner UNIVERSAL_VOICE = None.
+UNIVERSAL_VOICE = "voz_gaspar"
+
 # Mapa tono UI → perfil base (fallback si la auto-detección falla)
 XTTS_TONE_MAP = {
     "misterio":     "narrador_misterio_iker",
@@ -154,6 +160,9 @@ def generate_audio(job_id: str, script: str, tone: str, output_path: Path,
             if custom_ref and Path(custom_ref).exists():
                 voice_profile = "voz personalizada (clonada)"
                 ref_wav = custom_ref
+            elif UNIVERSAL_VOICE and Path(f"{VOICES_DIR}/{UNIVERSAL_VOICE}.wav").exists():
+                voice_profile = UNIVERSAL_VOICE + " (humana real)"
+                ref_wav = f"{VOICES_DIR}/{UNIVERSAL_VOICE}.wav"
             elif title or niche:
                 voice_profile = detect_best_archetype(title, niche, tone)
                 ref_wav = f"{VOICES_DIR}/{voice_profile}.wav"
