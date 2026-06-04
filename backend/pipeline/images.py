@@ -43,24 +43,41 @@ def generate_image_prompts(job_id: str, script: str, niche: str,
 
         msg = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=5000,
-            messages=[{"role": "user", "content": f"""Eres un director de fotografía de documentales. Para cada fragmento de guión, crea el prompt de imagen AI que capture VISUALMENTE y con PRECISIÓN lo que se está narrando.
+            max_tokens=6000,
+            messages=[{"role": "user", "content": f"""Eres el director de fotografía del mejor documental cinematográfico del mundo. Para cada fragmento de guión, creas el plano visual EXACTO que hace que el espectador no pueda apartar los ojos de la pantalla.
 
 NICHO: {niche}
 
-REGLAS ESTRICTAS:
-- Cada prompt debe reflejar EL CONTENIDO ESPECÍFICO de ese fragmento (lugares reales, objetos, acciones, atmósferas descritas)
-- Si habla de una ciudad: pon esa ciudad concreta
-- Si habla de una persona: silhouette o primer plano de manos/ojos (sin rostro reconocible)
-- Si habla de un documento/carta/carta: close-up del objeto
-- Si es un momento de tensión: oscuro, dramático, expresivo
-- Si es informativo: documental natural, periodístico
-- Varía el tipo de plano: gran angular, primer plano, aéreo, detalle, conceptual
-- Siempre: photorealistic, 16:9, 4K, sin texto ni logos
+REGLAS ABSOLUTAS — VIOLAR UNA ES UN FRACASO:
 
-Devuelve SOLO {count} prompts en inglés, uno por línea, sin numeración ni texto extra.
+1. ESPECIFICIDAD TOTAL: Cada prompt debe mostrar EXACTAMENTE lo que se narra.
+   - Narra "Madrid 1982" → aerial shot of Madrid skyline 1982, vintage cinematic
+   - Narra "un soldado en trinchera" → soldier in trench, mud, barbed wire, dramatic lighting
+   - Narra "el momento del gol" → stadium 80,000 people, overhead shot, confetti explosion
+   - Narra "firmaron el documento" → extreme close-up weathered hands signing old document
 
-FRAGMENTOS DEL GUIÓN:
+2. VARIEDAD DE PLANOS OBLIGATORIA (rota en este orden aproximado):
+   - Plano general (wide shot, establishing shot, aerial drone)
+   - Plano medio (medium shot, waist up)
+   - Primer plano (close-up, face detail)
+   - Detalle extremo (extreme close-up: hands, eyes, objects)
+   - Plano conceptual (abstract metaphor of the concept)
+
+3. CINEMATOGRAFÍA PROFESIONAL siempre:
+   - Iluminación dramática (chiaroscuro, golden hour, blue hour, storm light)
+   - Profundidad de campo (bokeh en los detalles, sharp en lo importante)
+   - Composición regla de tercios
+   - Temperatura de color acorde al momento (cálido=positivo, frío=drama, desaturado=pasado)
+
+4. SIN TEXTO, SIN LOGOS, SIN ROSTROS RECONOCIBLES
+   - Personas: silhouettes, hands, backs, partial faces
+   - Famosos: symbolic objects, locations, crowd
+
+5. FORMATO: photorealistic, cinematic, 4K, 16:9, professional photography
+
+Devuelve EXACTAMENTE {count} prompts en inglés, uno por línea, sin numeración ni texto extra.
+
+FRAGMENTOS DEL GUIÓN (cada uno necesita su imagen perfecta):
 {segments_text}"""}]
         )
 

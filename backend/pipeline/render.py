@@ -36,9 +36,9 @@ def _pick_music(tone: str) -> Path | None:
 OUT_W, OUT_H = 1920, 1080   # 1080p Full HD — calidad profesional YouTube
 OUT_RES = f"{OUT_W}x{OUT_H}"
 
-MAX_KB_DURATION = 8.0  # Ken Burns máx 8s por sub-clip — evita bug de zoompan con d>300
+MAX_KB_DURATION = 6.0  # Ken Burns máx 6s por sub-clip — cambio visual más frecuente
 KB_WORKERS = 12        # ffmpeg Ken Burns en paralelo
-FADE_SEC = 0.35        # fundido entre imágenes (segundos)
+FADE_SEC = 0.25        # fundido entre imágenes (segundos) — más rápido = más dinámico
 
 
 def get_duration(path: Path) -> float:
@@ -118,19 +118,36 @@ def _image_to_clips_batch(images: list[Path], img_dur: float,
     return results  # type: ignore
 
 
-def _video_to_shot(video: Path, dur: float, out: Path):
-    """Convierte un clip de Pexels en un plano de `dur`s a 1920x1080, 25fps, con fundidos."""
+def _video_to_shot(video: Path, dur: float, out: Path, idx: int = 0):
+    """
+    Convierte un clip de Pexels en un plano de `dur`s a 1920x1080, 25fps.
+    Añade zoom-in sutil (1.0→1.08) para dinamismo — igual que Ken Burns en imágenes.
+    """
     try:
         vdur = get_duration(video)
     except Exception:
         vdur = 0
-    vf = ("scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,fps=25,"
-          f"fade=t=in:st=0:d=0.3,fade=t=out:st={max(0,dur-0.3):.2f}:d=0.3")
+
+    # Zoom sutil que varía según el índice (alternamos zoom-in / zoom-out)
+    zoom_effects = [
+        "zoompan=z='min(zoom+0.0003,1.08)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'",
+        "zoompan=z='max(1.08-0.0003*on,1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'",
+        "zoompan=z='min(zoom+0.0002,1.06)':x='iw/2-(iw/zoom/2)+1':y='ih/2-(ih/zoom/2)'",
+        "zoompan=z=1.05:x='iw/2-(iw/zoom/2)+on*0.3':y='ih/2-(ih/zoom/2)'",
+    ]
+    zoom = zoom_effects[idx % len(zoom_effects)]
+    d_frames = max(1, int(dur * 25))
+
+    vf = (
+        f"scale=2880:1620:force_original_aspect_ratio=increase,crop=2880:1620,fps=25,"
+        f"{zoom}:d={d_frames}:s=1920x1080,"
+        f"fade=t=in:st=0:d={FADE_SEC},fade=t=out:st={max(0,dur-FADE_SEC):.2f}:d={FADE_SEC}"
+    )
+
     if vdur >= dur:
         _ffmpeg("-ss", "0", "-t", f"{dur:.2f}", "-i", str(video),
                 "-vf", vf, "-c:v", "libx264", "-preset", "ultrafast", "-an", "-r", "25", str(out))
     else:
-        # clip corto → loop hasta cubrir la duración
         _ffmpeg("-stream_loop", "-1", "-t", f"{dur:.2f}", "-i", str(video),
                 "-vf", vf, "-c:v", "libx264", "-preset", "ultrafast", "-an", "-r", "25", str(out))
     return out
@@ -163,7 +180,7 @@ def _build_dynamic_body(images: list[Path], videos: list[Path],
         else:
             out = tmp / f"vid_{idx:03d}.mp4"
             try:
-                _video_to_shot(path, per_shot, out)
+                _video_to_shot(path, per_shot, out, idx)
                 return idx, [out]
             except Exception:
                 # si el vídeo falla, rellenar con una imagen como respaldo
