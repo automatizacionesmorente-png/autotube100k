@@ -169,8 +169,8 @@ async def _auto_retry_interrupted_renders():
                 {"type": "step", "step": "script",      "status": "done",    "message": "Guión recuperado",                                        "progress": 18, "cost": _cb["script"]},
                 {"type": "step", "step": "tts",         "status": "done",    "message": f"Audio: {audio.stat().st_size // 1024 // 1024}MB",         "progress": 35, "cost": _cb["tts"]},
                 {"type": "step", "step": "images",      "status": "done",    "message": f"{len(body_images)} imágenes + {len(body_clips)} clips",   "progress": 60, "cost": _cb["images"]},
-                {"type": "step", "step": "hook_videos", "status": "done",    "message": f"Hook: {len(hook_clips)} clips Pexels",                   "progress": 62, "cost": _cb["hook_videos"]},
-                {"type": "step", "step": "thumbnail",   "status": "done",    "message": "Miniatura lista",                                         "progress": 64, "cost": _cb["thumbnail"]},
+                {"type": "step", "step": "thumbnail",   "status": "done",    "message": "Miniatura lista",                                         "progress": 62, "cost": _cb["thumbnail"]},
+                {"type": "step", "step": "hook_videos", "status": "done",    "message": f"Hook: {len(hook_clips)} clips Pexels",                   "progress": 64, "cost": _cb["hook_videos"]},
                 {"type": "step", "step": "render",      "status": "running", "message": "Retomando render (reinicio automático del servicio)…",     "progress": 66, "cost": _cb["render"]},
             ]
             asyncio.create_task(_do_retry_render(
@@ -195,6 +195,7 @@ class GenerateRequest(BaseModel):
     channel_id: str | None = None
     context: str | None = None  # datos verificados para temas de actualidad (el guion NO inventa)
     use_custom_voice: bool = False  # usar voz clonada subida (voices/custom.wav)
+    quality_render: bool = False  # True = Ken Burns zoompan (lento, calidad máxima) · False = rápido (def)
 
 class ChannelRequest(BaseModel):
     name: str
@@ -313,8 +314,8 @@ async def retry_render_endpoint(job_id: str, background_tasks: BackgroundTasks):
         {"type": "step", "step": "script",      "status": "done",    "message": "Guión recuperado del disco",                             "progress": 18, "cost": _cumul_by_step["script"]},
         {"type": "step", "step": "tts",         "status": "done",    "message": f"Audio: {audio_path.stat().st_size // 1024 // 1024}MB",  "progress": 35, "cost": _cumul_by_step["tts"]},
         {"type": "step", "step": "images",      "status": "done",    "message": f"{len(body_images)} imágenes + {len(body_clips)} clips", "progress": 60, "cost": _cumul_by_step["images"]},
-        {"type": "step", "step": "hook_videos", "status": "done",    "message": f"Hook: {len(hook_clips)} clips Pexels",                 "progress": 62, "cost": _cumul_by_step["hook_videos"]},
-        {"type": "step", "step": "thumbnail",   "status": "done",    "message": "Miniatura lista",                                       "progress": 64, "cost": _cumul_by_step["thumbnail"]},
+        {"type": "step", "step": "thumbnail",   "status": "done",    "message": "Miniatura lista",                                       "progress": 62, "cost": _cumul_by_step["thumbnail"]},
+        {"type": "step", "step": "hook_videos", "status": "done",    "message": f"Hook: {len(hook_clips)} clips Pexels",                 "progress": 64, "cost": _cumul_by_step["hook_videos"]},
         {"type": "step", "step": "render",      "status": "running", "message": "Retomando render FFmpeg con todos los assets…",         "progress": 66, "cost": _cumul_by_step["render"]},
     ]
 
@@ -990,6 +991,7 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
             body_images, audio_path, final_path, req.title,
             hook_images, req.tone, body_clips,
             _make_render_progress_cb(job_id),
+            not getattr(req, "quality_render", False),  # fast_kenburns: rápido por defecto
         )
         emit("render", "done", "Vídeo montado completamente", 90)
 

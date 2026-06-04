@@ -619,6 +619,13 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
             <audio id="voice-test" controls style="display:none;width:100%;margin-top:6px;height:34px;"></audio>
             <div style="font-size:9.5px;color:var(--muted);margin-top:4px;">Sube 15-30s de voz clara (con permiso). XTTS la clona gratis. Escucha la prueba antes de generar.</div>
           </div>
+          <div class="field">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;">
+              <input id="inp-quality" type="checkbox" style="width:auto;">
+              Render calidad máxima (zoom lento, ~10x más tardío)
+            </label>
+            <div style="font-size:9.5px;color:var(--muted);margin-top:4px;">Por defecto: render rápido (paneos, misma nitidez 1080p). Marca esto solo para un vídeo insignia con zooms — tarda mucho más.</div>
+          </div>
           <button class="btn-generate" id="btn-generate" onclick="startGeneration()">
             Generar vídeo automáticamente
           </button>
@@ -1194,7 +1201,8 @@ async function startGeneration() {
   const res = await fetch(`${API}/api/generate`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ niche, title, tone: selectedTone, channel_id, context,
-                           use_custom_voice: !!window._useCustomVoice })
+                           use_custom_voice: !!window._useCustomVoice,
+                           quality_render: document.getElementById('inp-quality').checked })
   });
   const { job_id } = await res.json();
   currentJobId = job_id;

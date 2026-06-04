@@ -42,6 +42,10 @@ MAX_KB_DURATION = 6.0  # Ken Burns máx 6s por sub-clip — cambio visual más f
 KB_WORKERS = 12        # ffmpeg Ken Burns en paralelo
 FADE_SEC = 0.25        # fundido entre imágenes (segundos) — más rápido = más dinámico
 
+# Modo Ken Burns: True = rápido (scale+crop, ~10x veloz, misma calidad visual)
+# False = calidad máxima (zoompan, más lento). render_video lo fija por vídeo.
+KB_FAST = True
+
 
 def get_duration(path: Path) -> float:
     result = subprocess.run(
@@ -81,7 +85,7 @@ def _image_to_clips(img: Path, total_dur: float, tmp_dir: Path,
 
     for j in range(n):
         out = tmp_dir / f"img_{base_idx:03d}_{j}.mp4"
-        kb = _ken_burns(base_idx * 8 + j, clip_dur)
+        kb = (_ken_burns_fast if KB_FAST else _ken_burns)(base_idx * 8 + j, clip_dur)
 
         # Fade in solo en el primer sub-clip, fade out solo en el último
         fade_parts = [kb]
@@ -97,6 +101,7 @@ def _image_to_clips(img: Path, total_dur: float, tmp_dir: Path,
             "-vf", vf,
             "-t", f"{clip_dur:.4f}",
             "-c:v", "libx264", "-preset", "ultrafast", "-an", "-r", "25",
+            "-pix_fmt", "yuv420p",   # formato uniforme → permite concat -c copy (sin re-encode)
             str(out)
         )
         clips.append(out)
@@ -148,10 +153,12 @@ def _video_to_shot(video: Path, dur: float, out: Path, idx: int = 0):
 
     if vdur >= dur:
         _ffmpeg("-ss", "0", "-t", f"{dur:.2f}", "-i", str(video),
-                "-vf", vf, "-c:v", "libx264", "-preset", "ultrafast", "-an", "-r", "25", str(out))
+                "-vf", vf, "-c:v", "libx264", "-preset", "ultrafast", "-an", "-r", "25",
+                "-pix_fmt", "yuv420p", str(out))
     else:
         _ffmpeg("-stream_loop", "-1", "-t", f"{dur:.2f}", "-i", str(video),
-                "-vf", vf, "-c:v", "libx264", "-preset", "ultrafast", "-an", "-r", "25", str(out))
+                "-vf", vf, "-c:v", "libx264", "-preset", "ultrafast", "-an", "-r", "25",
+                "-pix_fmt", "yuv420p", str(out))
     return out
 
 
@@ -212,9 +219,12 @@ def render_video(
     tone: str = "neutro",
     body_videos: list[Path] = None,
     progress_cb=None,   # callable(pct, eta_secs, done, total, phase) — datos 100% reales
+    fast_kenburns: bool = True,  # True = scale+crop rápido (def) · False = zoompan calidad máxima
 ) -> Path:
+    global KB_FAST
+    KB_FAST = fast_kenburns
     add_step(job_id, "render", "running",
-             f"Iniciando montaje — tono: {tone} · {KB_WORKERS} workers Ken Burns…")
+             f"Iniciando montaje — tono: {tone} · Ken Burns {'rápido' if fast_kenburns else 'calidad máxima'} · {KB_WORKERS} workers…")
 
     if not audio_path.exists() or audio_path.stat().st_size == 0:
         raise RuntimeError(f"Audio vacío: {audio_path}")
@@ -250,19 +260,19 @@ def render_video(
                            "crop=1920:1080,fade=t=in:st=0:d=0.3,"
                            f"fade=t=out:st={max(0,clip_len-0.3):.2f}:d=0.3",
                     "-c:v", "libx264", "-preset", "ultrafast", "-an", "-r", "25",
-                    str(t_out))
+                    "-pix_fmt", "yuv420p", str(t_out))
             trimmed.append(t_out)
         lst = tmp / "hv_list.txt"
         lst.write_text("\n".join(f"file '{v.resolve()}'" for v in trimmed))
         _ffmpeg("-f", "concat", "-safe", "0", "-i", str(lst),
-                "-c:v", "libx264", "-preset", "ultrafast", "-an", str(hook_concat))
+                "-c", "copy", str(hook_concat))
     elif valid_hook_imgs:
         per_img = hook_dur / len(valid_hook_imgs)
         hook_clip_groups = _image_to_clips_batch(valid_hook_imgs, per_img, tmp, base_idx=900)
         clips_h = [c for group in hook_clip_groups for c in group]
         _write_concat(tmp / "hi_list.txt", clips_h)
         _ffmpeg("-f", "concat", "-safe", "0", "-i", str(tmp / "hi_list.txt"),
-                "-c:v", "libx264", "-preset", "ultrafast", "-an", str(hook_concat))
+                "-c", "copy", str(hook_concat))
     else:
         n_h = min(4, len(valid_body))
         per_h = hook_dur / n_h
@@ -270,7 +280,7 @@ def render_video(
         clips_h = [c for group in hook_clip_groups for c in group]
         _write_concat(tmp / "hf_list.txt", clips_h)
         _ffmpeg("-f", "concat", "-safe", "0", "-i", str(tmp / "hf_list.txt"),
-                "-c:v", "libx264", "-preset", "ultrafast", "-an", str(hook_concat))
+                "-c", "copy", str(hook_concat))
 
     # ── CUERPO DINÁMICO: imágenes (Ken Burns) + vídeo real Pexels + Whisper ────
     body_dur = audio_dur - hook_dur
@@ -332,13 +342,14 @@ def render_video(
 
         _write_concat(tmp / "body_list.txt", all_body_clips)
         body_mp4 = tmp / "body.mp4"
+        # -c copy: copia directa sin re-encode (todos los clips ya son yuv420p 1080p 25fps)
         _ffmpeg("-f", "concat", "-safe", "0", "-i", str(tmp / "body_list.txt"),
-                "-c:v", "libx264", "-preset", "ultrafast", "-an", str(body_mp4))
+                "-c", "copy", str(body_mp4))
 
         _write_concat(tmp / "full_list.txt", [hook_concat, body_mp4])
         full_mp4 = tmp / "full.mp4"
         _ffmpeg("-f", "concat", "-safe", "0", "-i", str(tmp / "full_list.txt"),
-                "-c:v", "libx264", "-preset", "ultrafast", "-an", str(full_mp4))
+                "-c", "copy", str(full_mp4))
 
         subs_ok = whisper_fut.result()
 
@@ -718,8 +729,33 @@ def _t(seconds: float) -> str:
     return f"{int(h)}:{int(m):02d}:{int(sec):02d}.{int((sec%1)*100):02d}"
 
 
+def _ken_burns_fast(idx: int, dur: float) -> str:
+    """
+    Ken Burns RÁPIDO (scale + crop con expresión de tiempo). ~10-20x más veloz que
+    zoompan porque los paneos son crop puro (sin remuestreo por frame) y los zooms
+    hacen un solo scale final. Misma nitidez 1080p (parte de imagen sobreescalada).
+    Movimientos con margen para no salirse del borde aunque t roce el final.
+    """
+    D = max(0.1, dur)
+    # 9 paneos sobre lienzo 2560x1440 (crop puro tras un único scale = rapidísimo).
+    # Margen de seguridad: x∈[40,600] (máx 640), y∈[20,340] (máx 360). El zoom animado
+    # solo lo hace zoompan (modo calidad), porque crop fija w/h al inicio.
+    fx = [
+        f"scale=2560:1440,crop=1920:1080:x='40+520*t/{D:.3f}':y=180",                 # → derecha
+        f"scale=2560:1440,crop=1920:1080:x='600-520*t/{D:.3f}':y=180",                 # ← izquierda
+        f"scale=2560:1440,crop=1920:1080:x=320:y='300-280*t/{D:.3f}'",                 # ↑ arriba
+        f"scale=2560:1440,crop=1920:1080:x=320:y='40+280*t/{D:.3f}'",                  # ↓ abajo
+        f"scale=2560:1440,crop=1920:1080:x='40+520*t/{D:.3f}':y='30+300*t/{D:.3f}'",   # ↘ diagonal
+        f"scale=2560:1440,crop=1920:1080:x='40+520*t/{D:.3f}':y='330-300*t/{D:.3f}'",  # ↗ diagonal
+        f"scale=2560:1440,crop=1920:1080:x='560-520*t/{D:.3f}':y='30+300*t/{D:.3f}'",  # ↙ diagonal
+        f"scale=2560:1440,crop=1920:1080:x='560-520*t/{D:.3f}':y='330-300*t/{D:.3f}'", # ↖ diagonal
+        f"scale=2560:1440,crop=1920:1080:x='120+340*t/{D:.3f}':y='90+180*t/{D:.3f}'",  # deriva lenta
+    ]
+    return fx[idx % len(fx)]
+
+
 def _ken_burns(idx: int, dur: float) -> str:
-    """12 efectos distintos. dur limitado a MAX_KB_DURATION por _image_to_clips."""
+    """12 efectos distintos (zoompan — CALIDAD MÁXIMA, lento). dur limitado por _image_to_clips."""
     d = max(1, int(dur * 25))
     fx = [
         f"scale=2880:1620,zoompan=z='min(zoom+0.001,1.3)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={d}:s=1920x1080",
