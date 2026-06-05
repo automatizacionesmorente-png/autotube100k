@@ -182,6 +182,9 @@ async def _auto_retry_interrupted_renders():
 
 # ── Frontend ───────────────────────────────────────────────────────
 app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+# Servir archivos de output (imágenes, audio, thumbnails) como estáticos
+OUTPUT_DIR.mkdir(exist_ok=True)
+app.mount("/output", StaticFiles(directory=str(OUTPUT_DIR)), name="output")
 
 @app.get("/")
 async def root():
@@ -236,6 +239,197 @@ async def job_detail(job_id: str):
     if not job:
         raise HTTPException(404, "Job no encontrado")
     return job
+
+# ── NUEVOS: Ver y editar assets de cada paso ──────────────────────
+
+@app.get("/api/jobs/{job_id}/script")
+async def get_script(job_id: str):
+    """Devuelve el guión completo (script.txt en disco, fallback a DB)."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job no encontrado")
+    script_path = OUTPUT_DIR / job_id / "script.txt"
+    if script_path.exists():
+        text = script_path.read_text(encoding="utf-8")
+    elif job.get("script"):
+        text = job["script"]
+    else:
+        raise HTTPException(404, "Guión no disponible aún")
+    # Separar hook (primer bloque) del cuerpo
+    parts = text.split("\n\n", 1)
+    hook = parts[0] if len(parts) > 1 else text[:600]
+    body = parts[1] if len(parts) > 1 else ""
+    return {"script": text, "hook": hook, "body": body,
+            "words": len(text.split()), "hook_words": len(hook.split())}
+
+class ScriptUpdate(BaseModel):
+    script: str
+
+@app.put("/api/jobs/{job_id}/script")
+async def save_script(job_id: str, payload: ScriptUpdate):
+    """Guarda el guión editado en disco."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job no encontrado")
+    script_path = OUTPUT_DIR / job_id / "script.txt"
+    script_path.parent.mkdir(parents=True, exist_ok=True)
+    script_path.write_text(payload.script, encoding="utf-8")
+    update_job(job_id, script=payload.script[:8000])
+    return {"ok": True, "words": len(payload.script.split())}
+
+@app.get("/api/jobs/{job_id}/assets")
+async def get_job_assets(job_id: str):
+    """Lista los assets disponibles de un job: imágenes, audio, thumbnail."""
+    job_dir = OUTPUT_DIR / job_id
+    if not job_dir.exists():
+        raise HTTPException(404, "Job no encontrado")
+
+    images = sorted(
+        [f"/output/{job_id}/images/{f.name}" for f in (job_dir / "images").glob("*.jpg")]
+        if (job_dir / "images").exists() else []
+    )
+    hook_images = sorted(
+        [f"/output/{job_id}/hook_images/{f.name}" for f in (job_dir / "hook_images").glob("*.jpg")]
+        if (job_dir / "hook_images").exists() else []
+    )
+    audio = f"/output/{job_id}/narration.mp3" if (job_dir / "narration.mp3").exists() else None
+
+    thumbnail = None
+    for name in ["thumbnail.jpg","thumbnail_a.jpg","thumbnail_b.jpg","thumbnail_c.jpg","thumbnail_base.jpg"]:
+        if (job_dir / name).exists():
+            thumbnail = f"/output/{job_id}/{name}"
+            break
+
+    has_video = (job_dir / "final.mp4").exists()
+
+    return {
+        "images": images,
+        "hook_images": hook_images,
+        "audio": audio,
+        "thumbnail": thumbnail,
+        "has_video": has_video,
+        "video_url": f"/output/{job_id}/final.mp4" if has_video else None,
+    }
+
+@app.post("/api/jobs/{job_id}/retry-from-tts")
+async def retry_from_tts(job_id: str, background_tasks: BackgroundTasks):
+    """Regenera voz + render usando el script.txt actual (puede estar editado)."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job no encontrado")
+
+    job_dir    = OUTPUT_DIR / job_id
+    script_path = job_dir / "script.txt"
+    if not script_path.exists():
+        raise HTTPException(400, "No hay guión guardado en disco para este job")
+
+    script = script_path.read_text(encoding="utf-8")
+
+    images_dir    = job_dir / "images"
+    hook_imgs_dir = job_dir / "hook_images"
+    hook_vids_dir = job_dir / "hook_videos"
+    body_vids_dir = job_dir / "body_videos"
+
+    body_images = sorted(images_dir.glob("*.jpg"))    if images_dir.exists()    else []
+    hook_images = sorted(hook_imgs_dir.glob("*.jpg")) if hook_imgs_dir.exists() else []
+    hook_clips  = sorted(hook_vids_dir.glob("*.mp4")) if hook_vids_dir.exists() else []
+    body_clips  = sorted(body_vids_dir.glob("*.mp4")) if body_vids_dir.exists() else []
+
+    if len(body_images) < 3:
+        raise HTTPException(400, "Faltan imágenes para el render")
+
+    update_job(job_id, status="running", current_step="tts", progress=20, error=None)
+    _job_events[job_id] = [
+        {"type": "step", "step": "script", "status": "done",
+         "message": "Guión (editado) listo", "progress": 18, "cost": 0},
+        {"type": "step", "step": "tts",    "status": "running",
+         "message": "Regenerando voz con el guión actualizado…", "progress": 20, "cost": 0},
+    ]
+
+    background_tasks.add_task(
+        _do_retry_from_tts,
+        job_id, job["title"], job["niche"], job.get("tone", "neutro"),
+        script, hook_clips, body_images, hook_images, body_clips
+    )
+    return {"ok": True}
+
+
+async def _do_retry_from_tts(
+    job_id: str, title: str, niche: str, tone: str,
+    script: str, hook_clips, body_images, hook_images, body_clips
+):
+    job_dir    = OUTPUT_DIR / job_id
+    audio_path = job_dir / "narration.mp3"
+    final_path = job_dir / "final.mp4"
+
+    def _emit(step, status, message, progress):
+        job_data  = get_job(job_id)
+        real_cost = job_data["cost_total"] if job_data else 0
+        _job_events.setdefault(job_id, []).append(
+            {"type": "step", "step": step, "status": status,
+             "message": message, "progress": progress, "cost": real_cost}
+        )
+        update_job(job_id, current_step=step, progress=progress)
+
+    try:
+        # Borrar audio anterior para forzar regeneración
+        if audio_path.exists():
+            audio_path.unlink()
+        raw = audio_path.with_suffix(".raw.mp3")
+        if raw.exists():
+            raw.unlink()
+
+        from .pipeline.tts import generate_audio
+        _emit("tts", "running", "Generando voz con el guión actualizado (puede tardar ~60 min)…", 22)
+        await asyncio.to_thread(generate_audio, job_id, script, tone, audio_path, None, title, niche)
+        _emit("tts", "done", "Voz regenerada con el nuevo guión", 64)
+
+        _emit("render", "running", "Montando vídeo con la nueva voz…", 66)
+        from .pipeline.render import render_video, cleanup_intermediates, get_duration
+        await asyncio.to_thread(
+            render_video, job_id,
+            hook_clips, body_images, audio_path, final_path, title,
+            hook_images, tone, body_clips,
+            _make_render_progress_cb(job_id),
+        )
+        try:
+            freed = cleanup_intermediates(job_dir)
+            _emit("render", "done",
+                  f"Vídeo montado · {freed:.0f}MB liberados" if freed > 5 else "Vídeo montado completamente", 90)
+        except Exception:
+            _emit("render", "done", "Vídeo montado completamente", 90)
+
+        _emit("upload", "running", "Generando descripción y capítulos…", 92)
+        from .pipeline.upload import generate_metadata
+        try:
+            audio_dur = get_duration(final_path)
+        except Exception:
+            audio_dur = None
+        metadata = await asyncio.to_thread(generate_metadata, job_id, script, title, niche, audio_dur)
+        import json as _json
+        (job_dir / "metadata.json").write_text(_json.dumps(
+            {"title": title, "niche": niche, **metadata}, ensure_ascii=False
+        ))
+        _emit("upload", "done", "✅ Vídeo listo con el guión actualizado", 100)
+
+        from datetime import datetime
+        update_job(job_id, status="done", progress=100,
+                   video_path=str(final_path), finished_at=datetime.utcnow().isoformat())
+        _job_events.setdefault(job_id, []).append({"type": "end", "job": get_job(job_id)})
+
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        update_job(job_id, status="error", error=str(e))
+        _job_events.setdefault(job_id, []).append({
+            "type": "step", "step": "tts", "status": "error",
+            "message": f"❌ Error: {str(e)[:120]}", "progress": 0,
+            "cost": (get_job(job_id) or {}).get("cost_total", 0)
+        })
+        _job_events.setdefault(job_id, []).append(
+            {"type": "error", "message": str(e), "detail": tb}
+        )
+
 
 @app.post("/api/jobs/{job_id}/cancel")
 async def cancel_job(job_id: str):
@@ -919,7 +1113,9 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
         emit("script", "running", "Generando guión con Claude Sonnet 4.6…", 5)
         from .pipeline.script_gen import generate_script
         script = await asyncio.to_thread(generate_script, job_id, req.niche, req.title, req.tone, req.context)
-        update_job(job_id, script=script[:8000])  # guardar más para metadata de calidad
+        update_job(job_id, script=script[:8000])
+        # Guardar guión completo en disco (permite edición desde la UI)
+        (job_dir / "script.txt").write_text(script, encoding="utf-8")
         wcount = len(script.split())
         emit("script", "done", f"Guión listo: {wcount} palabras (~{wcount//130} min)", 18)
         check_cancelled()

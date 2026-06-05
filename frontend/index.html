@@ -420,6 +420,105 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
 .step-subbar-fill  { height:100%; background:var(--gold); border-radius:2px; width:0%; transition:width 0.8s ease; }
 .step-subbar-pct   { font-size:10px; color:var(--muted); min-width:28px; text-align:right; }
 
+/* ─── ASSET DRAWER ─── */
+.step.clickable        { cursor: pointer; transition: background 0.15s; }
+.step.clickable:hover  { background: var(--cream); }
+.step.clickable:hover .step-name { color: var(--gold); }
+.step-peek             { font-size: 10px; color: var(--gold); margin-top: 2px; letter-spacing: 0.03em; }
+
+.drawer-overlay {
+  position: fixed; inset: 0; background: rgba(28,25,20,0.45);
+  z-index: 400; opacity: 0; pointer-events: none; transition: opacity 0.25s;
+}
+.drawer-overlay.open { opacity: 1; pointer-events: auto; }
+
+.asset-drawer {
+  position: fixed; top: 0; right: -720px; width: 720px; max-width: 96vw;
+  height: 100vh; background: var(--white);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 32px rgba(0,0,0,0.08);
+  z-index: 401; display: flex; flex-direction: column;
+  transition: right 0.28s cubic-bezier(0.4,0,0.2,1);
+  overflow: hidden;
+}
+.asset-drawer.open { right: 0; }
+
+.drawer-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 24px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0; background: var(--white);
+}
+.drawer-title  { font-size: 13px; font-weight: 600; color: var(--ink); }
+.drawer-close  {
+  width: 28px; height: 28px; border-radius: 50%; background: var(--cream);
+  border: 1px solid var(--border2); cursor: pointer; font-size: 13px;
+  display: flex; align-items: center; justify-content: center; color: var(--muted);
+  transition: all 0.15s;
+}
+.drawer-close:hover { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+
+.drawer-body   { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+.drawer-section { margin-bottom: 20px; }
+.drawer-section-title {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 8px;
+}
+
+/* Hook / Script textarea */
+.drawer-textarea {
+  width: 100%; min-height: 280px; font-family: 'Inter', sans-serif;
+  font-size: 12.5px; line-height: 1.7; color: var(--ink); background: var(--cream);
+  border: 1px solid var(--border2); border-radius: 8px; padding: 14px 16px;
+  resize: vertical; outline: none; transition: border-color 0.15s;
+}
+.drawer-textarea:focus { border-color: var(--gold); background: var(--white); }
+.drawer-textarea.hook  { min-height: 200px; background: #fffdf5; border-color: #e8d98a; }
+
+.drawer-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.drawer-btn {
+  padding: 8px 16px; border-radius: 7px; font-size: 11.5px; font-weight: 500;
+  cursor: pointer; border: 1px solid var(--border2); background: var(--cream);
+  color: var(--ink2); transition: all 0.15s;
+}
+.drawer-btn:hover { border-color: var(--gold); color: var(--gold); }
+.drawer-btn.primary {
+  background: var(--ink); border-color: var(--ink); color: var(--white);
+}
+.drawer-btn.primary:hover { background: var(--gold2); border-color: var(--gold2); }
+.drawer-btn.danger {
+  background: var(--red-bg); border-color: var(--red); color: var(--red);
+}
+.drawer-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Image grid */
+.img-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 6px; margin-top: 4px;
+}
+.img-grid img {
+  width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px;
+  border: 1px solid var(--border); cursor: pointer; transition: all 0.15s;
+  background: var(--cream);
+}
+.img-grid img:hover { border-color: var(--gold); transform: scale(1.03); }
+
+/* Audio player */
+.drawer-audio { width: 100%; border-radius: 8px; margin-top: 4px; }
+
+/* Thumbnail preview */
+.thumb-preview {
+  width: 100%; border-radius: 10px; border: 1px solid var(--border);
+  display: block; margin-top: 4px;
+}
+
+/* Save feedback */
+.drawer-saved {
+  font-size: 11px; color: var(--green); opacity: 0; transition: opacity 0.3s;
+  margin-left: 6px; align-self: center;
+}
+.drawer-saved.show { opacity: 1; }
+
 /* result */
 .result-ok {
   margin: 0 20px 16px;
@@ -1289,6 +1388,11 @@ function onStep({step, status, message, progress, cost, realtime, sub_pct, eta_s
     if (el && el.textContent) el.textContent = el.textContent.replace('⏱', '✓');
   }
 
+  // Hacer clickable el step cuando termina
+  if (status === 'done' && currentJobId) {
+    _makeStepClickable(step, currentJobId);
+  }
+
   // Coste: solo en eventos de paso completo (no en fal.ai realtime ni en is_progress)
   if (cost > 0) {
     if (realtime) {
@@ -1469,9 +1573,12 @@ async function openJobDetail(jobId) {
       if (d.type === 'error') onError(d);
     };
   } else if (job.status === 'done') {
+    currentJobId = jobId;
     Object.keys(STEPS_META).forEach(key => {
       const dot = document.getElementById('dot-' + key);
       if (dot) dot.className = 'step-icon done';
+      // Activar clickable en todos los steps del job completado
+      _makeStepClickable(key, jobId);
     });
     document.getElementById('pipeline-lbl').textContent = '✅ Vídeo listo para revisión';
     document.getElementById('btn-cancel').style.display = 'none';
@@ -1965,6 +2072,253 @@ async function _checkShort(jobId) {
     }
   } catch(e) {}
 }
+
+// ═══════════════════════════════════════════════════════════════
+// ASSET DRAWER — ver y editar el output de cada paso del pipeline
+// ═══════════════════════════════════════════════════════════════
+
+let _drawerJobId = null;
+let _drawerStep  = null;
+
+function openStepDrawer(jobId, stepKey) {
+  _drawerJobId = jobId;
+  _drawerStep  = stepKey;
+  const meta = STEPS_META[stepKey] || {};
+  document.getElementById('drawer-title').textContent = meta.label || stepKey;
+  document.getElementById('drawer-body').innerHTML =
+    '<div style="text-align:center;padding:40px;color:var(--muted);font-size:12px;">Cargando…</div>';
+  document.getElementById('asset-drawer').classList.add('open');
+  document.getElementById('drawer-overlay').classList.add('open');
+  _loadDrawerContent(jobId, stepKey);
+}
+
+function closeDrawer() {
+  document.getElementById('asset-drawer').classList.remove('open');
+  document.getElementById('drawer-overlay').classList.remove('open');
+}
+
+async function _loadDrawerContent(jobId, stepKey) {
+  const body = document.getElementById('drawer-body');
+  try {
+    if (stepKey === 'script') {
+      const r = await fetch(`${API}/api/jobs/${jobId}/script`);
+      if (!r.ok) { body.innerHTML = '<p style="color:var(--red);padding:20px;">Guión no disponible.</p>'; return; }
+      const d = await r.json();
+      body.innerHTML = `
+        <div class="drawer-section">
+          <div class="drawer-section-title">📊 ${d.words} palabras · ~${Math.round(d.words/130)} min de vídeo</div>
+        </div>
+        <div class="drawer-section">
+          <div class="drawer-section-title">⚡ HOOK (primeros ~90 segundos)</div>
+          <textarea class="drawer-textarea hook" id="drawer-hook">${_esc(d.hook)}</textarea>
+        </div>
+        <div class="drawer-section">
+          <div class="drawer-section-title">📄 CUERPO DEL GUIÓN</div>
+          <textarea class="drawer-textarea" id="drawer-body-text" style="min-height:320px;">${_esc(d.body)}</textarea>
+        </div>
+        <div class="drawer-actions">
+          <button class="drawer-btn primary" onclick="_saveScript('${jobId}')">💾 Guardar cambios</button>
+          <button class="drawer-btn danger"  onclick="_retryFromTTS('${jobId}')" id="btn-retry-tts">🔄 Regenerar voz + vídeo</button>
+          <span class="drawer-saved" id="drawer-saved-lbl">✓ Guardado</span>
+        </div>
+        <div style="margin-top:12px;padding:10px 12px;background:var(--cream);border-radius:6px;font-size:11px;color:var(--muted);line-height:1.6;">
+          <strong style="color:var(--ink2);">Cómo editar:</strong> Modifica el hook o el cuerpo → Guardar cambios → Regenerar voz + vídeo.<br>
+          ⚠ Regenerar voz tarda ~60 min (CPU sin GPU). Solo hazlo si el hook necesita corrección importante.
+        </div>`;
+    }
+    else if (stepKey === 'hook_videos') {
+      // Hook: texto editable + preview de imágenes/clips
+      const [sRes, aRes] = await Promise.all([
+        fetch(`${API}/api/jobs/${jobId}/script`),
+        fetch(`${API}/api/jobs/${jobId}/assets`),
+      ]);
+      const s = sRes.ok ? await sRes.json() : null;
+      const a = aRes.ok ? await aRes.json() : { hook_images: [] };
+      const hookText = s ? s.hook : '(Guión no disponible)';
+      const hookImgs = a.hook_images || [];
+      body.innerHTML = `
+        <div class="drawer-section">
+          <div class="drawer-section-title">⚡ TEXTO DEL HOOK — los primeros ~90 segundos</div>
+          <textarea class="drawer-textarea hook" id="drawer-hook" style="min-height:240px;">${_esc(hookText)}</textarea>
+          <div class="drawer-actions">
+            <button class="drawer-btn primary" onclick="_saveHookOnly('${jobId}')">💾 Guardar hook</button>
+            <button class="drawer-btn danger"  onclick="_retryFromTTS('${jobId}')" id="btn-retry-tts">🔄 Regenerar voz + vídeo con este hook</button>
+            <span class="drawer-saved" id="drawer-saved-lbl">✓ Guardado</span>
+          </div>
+          <div style="margin-top:10px;padding:10px 12px;background:#fffdf5;border:1px solid #e8d98a;border-radius:6px;font-size:11px;color:var(--muted);line-height:1.6;">
+            <strong style="color:var(--ink2);">Este es el texto que narra el hook.</strong> Edítalo si quieres cambiarlo y pulsa Regenerar. El resto del guión no cambia.
+          </div>
+        </div>
+        ${hookImgs.length ? `
+        <div class="drawer-section">
+          <div class="drawer-section-title">🖼 IMÁGENES DEL HOOK (${hookImgs.length})</div>
+          <div class="img-grid">${hookImgs.map(u=>`<img src="${API}${u}" loading="lazy" onclick="window.open('${API}${u}','_blank')">`).join('')}</div>
+        </div>` : ''}`;
+    }
+    else if (stepKey === 'images') {
+      const r = await fetch(`${API}/api/jobs/${jobId}/assets`);
+      if (!r.ok) { body.innerHTML = '<p style="color:var(--red);padding:20px;">Assets no disponibles.</p>'; return; }
+      const d = await r.json();
+      const imgs = d.images || [];
+      if (!imgs.length) { body.innerHTML = '<p style="color:var(--muted);padding:20px;">Imágenes aún no generadas.</p>'; return; }
+      body.innerHTML = `
+        <div class="drawer-section">
+          <div class="drawer-section-title">🖼 ${imgs.length} IMÁGENES GENERADAS</div>
+          <div class="img-grid">${imgs.map(u=>`<img src="${API}${u}" loading="lazy" onclick="window.open('${API}${u}','_blank')">`).join('')}</div>
+        </div>`;
+    }
+    else if (stepKey === 'tts') {
+      const r = await fetch(`${API}/api/jobs/${jobId}/assets`);
+      const d = r.ok ? await r.json() : {};
+      if (!d.audio) { body.innerHTML = '<p style="color:var(--muted);padding:20px;">Audio no disponible aún.</p>'; return; }
+      body.innerHTML = `
+        <div class="drawer-section">
+          <div class="drawer-section-title">🎙 NARRACIÓN — escúchala antes de subir</div>
+          <audio class="drawer-audio" controls preload="metadata" src="${API}${d.audio}"></audio>
+          <div style="margin-top:12px;font-size:11px;color:var(--muted);">
+            Si la narración no te convence, edita el guión desde el paso <strong>Guión Claude</strong> y regenera la voz.
+          </div>
+        </div>`;
+    }
+    else if (stepKey === 'thumbnail') {
+      const r = await fetch(`${API}/api/jobs/${jobId}/assets`);
+      const d = r.ok ? await r.json() : {};
+      if (!d.thumbnail) { body.innerHTML = '<p style="color:var(--muted);padding:20px;">Miniatura no disponible aún.</p>'; return; }
+      body.innerHTML = `
+        <div class="drawer-section">
+          <div class="drawer-section-title">🖼 MINIATURA AUTO-GENERADA</div>
+          <img class="thumb-preview" src="${API}${d.thumbnail}" alt="Miniatura">
+          <div style="margin-top:10px;font-size:11px;color:var(--muted);">
+            Puedes reemplazarla subiendo tu propia miniatura antes de publicar.
+          </div>
+        </div>`;
+    }
+    else if (stepKey === 'render') {
+      const r = await fetch(`${API}/api/jobs/${jobId}/assets`);
+      const d = r.ok ? await r.json() : {};
+      body.innerHTML = `
+        <div class="drawer-section">
+          <div class="drawer-section-title">🎬 VÍDEO FINAL</div>
+          ${d.has_video
+            ? `<video controls style="width:100%;border-radius:8px;border:1px solid var(--border);margin-top:4px;" preload="metadata">
+                 <source src="${API}${d.video_url}" type="video/mp4">
+               </video>
+               <div style="margin-top:10px;">
+                 <a href="${API}${d.video_url}" download style="font-size:11px;color:var(--blue);">⬇ Descargar vídeo</a>
+               </div>`
+            : '<p style="color:var(--muted);padding:20px 0;">Vídeo no disponible. ¿El render ha terminado?</p>'
+          }
+        </div>`;
+    }
+    else {
+      body.innerHTML = '<p style="color:var(--muted);padding:20px;">Sin preview disponible para este paso.</p>';
+    }
+  } catch(e) {
+    body.innerHTML = `<p style="color:var(--red);padding:20px;">Error: ${e.message}</p>`;
+  }
+}
+
+async function _saveScript(jobId) {
+  const hookEl = document.getElementById('drawer-hook');
+  const bodyEl = document.getElementById('drawer-body-text');
+  if (!hookEl) return;
+  const fullScript = hookEl.value + '\n\n' + (bodyEl ? bodyEl.value : '');
+  const btn = document.querySelector('[onclick="_saveScript(\'' + jobId + '\')"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    const r = await fetch(`${API}/api/jobs/${jobId}/script`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ script: fullScript })
+    });
+    const d = await r.json();
+    if (r.ok) {
+      const lbl = document.getElementById('drawer-saved-lbl');
+      if (lbl) { lbl.classList.add('show'); setTimeout(()=>lbl.classList.remove('show'), 2500); }
+      if (btn) { btn.disabled = false; btn.textContent = '💾 Guardar cambios'; }
+    }
+  } catch(e) { if (btn) { btn.disabled=false; btn.textContent='Error'; } }
+}
+
+async function _saveHookOnly(jobId) {
+  const hookEl = document.getElementById('drawer-hook');
+  if (!hookEl) return;
+  const btn = document.querySelector('[onclick="_saveHookOnly(\'' + jobId + '\')"]');
+  if (btn) { btn.disabled=true; btn.textContent='Guardando…'; }
+  try {
+    // Leer guión completo, reemplazar solo el hook
+    const r0 = await fetch(`${API}/api/jobs/${jobId}/script`);
+    const d0 = r0.ok ? await r0.json() : null;
+    const newBody = d0 ? d0.body : '';
+    const newScript = hookEl.value + '\n\n' + newBody;
+    const r = await fetch(`${API}/api/jobs/${jobId}/script`, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ script: newScript })
+    });
+    if (r.ok) {
+      const lbl = document.getElementById('drawer-saved-lbl');
+      if (lbl) { lbl.classList.add('show'); setTimeout(()=>lbl.classList.remove('show'), 2500); }
+      if (btn) { btn.disabled=false; btn.textContent='💾 Guardar hook'; }
+    }
+  } catch(e) { if (btn) { btn.disabled=false; btn.textContent='Error'; } }
+}
+
+async function _retryFromTTS(jobId) {
+  if (!confirm('¿Regenerar la voz con el guión actualizado?\n\nEsto tardará ~60 minutos (XTTS en CPU).\nSe mantendrán las imágenes y clips existentes.')) return;
+  const btn = document.getElementById('btn-retry-tts');
+  if (btn) { btn.disabled=true; btn.textContent='Lanzando…'; }
+  try {
+    const r = await fetch(`${API}/api/jobs/${jobId}/retry-from-tts`, { method:'POST' });
+    const d = await r.json();
+    if (!r.ok) { alert('Error: ' + (d.detail||JSON.stringify(d))); if(btn){btn.disabled=false;btn.textContent='🔄 Regenerar voz + vídeo';} return; }
+    closeDrawer();
+    currentJobId = jobId;
+    document.getElementById('pipeline-lbl').textContent = 'Pipeline en curso';
+    if (eventSource) eventSource.close();
+    eventSource = new EventSource(`${API}/api/jobs/${jobId}/stream`);
+    eventSource.onmessage = e => {
+      const d = JSON.parse(e.data);
+      if (d.type==='step')  onStep(d);
+      if (d.type==='end')   onEnd(d);
+      if (d.type==='error') onError(d);
+    };
+    startStatusPolling(jobId);
+    document.getElementById('btn-cancel').style.display = 'inline-block';
+  } catch(e) { alert('Error: '+e.message); if(btn){btn.disabled=false;btn.textContent='🔄 Regenerar voz + vídeo';} }
+}
+
+function _esc(str) {
+  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Hacer clickable un step cuando está "done"
+function _makeStepClickable(key, jobId) {
+  const stepEl = document.getElementById('step-' + key);
+  if (!stepEl || stepEl.classList.contains('clickable')) return;
+  // Solo estos pasos tienen preview útil
+  const previewable = ['script','tts','images','thumbnail','hook_videos','render'];
+  if (!previewable.includes(key)) return;
+  stepEl.classList.add('clickable');
+  stepEl.addEventListener('click', () => openStepDrawer(jobId, key));
+  // Añadir hint de "ver →"
+  const nameEl = stepEl.querySelector('.step-name');
+  if (nameEl && !stepEl.querySelector('.step-peek')) {
+    const peek = document.createElement('div');
+    peek.className = 'step-peek';
+    peek.textContent = 'click para ver →';
+    nameEl.insertAdjacentElement('afterend', peek);
+  }
+}
 </script>
+
+<!-- Asset Drawer -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+<div class="asset-drawer" id="asset-drawer">
+  <div class="drawer-header">
+    <span class="drawer-title" id="drawer-title">Asset</span>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+</div>
+
 </body>
 </html>
