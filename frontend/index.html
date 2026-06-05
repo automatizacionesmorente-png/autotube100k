@@ -1459,24 +1459,30 @@ function onEnd({job}) {
   document.getElementById('pipeline-lbl').textContent = '✅ Vídeo listo para revisión';
   eventSource.close();
 
-  if (job.youtube_url) {
-    // Ya subido (raro, pero por si acaso)
-    document.getElementById('final-result').innerHTML =
-      `<div style="padding:0 20px 16px;"><a href="${job.youtube_url}" target="_blank" class="btn btn-green" style="width:100%;padding:11px;font-size:12px;border-radius:6px;">▶ Ver en YouTube ↗</a></div>`;
-  } else if (job.video_path) {
-    // Mostrar preview del vídeo + botón subir
+  // Mostrar siempre el player si hay vídeo — aunque ya esté subido a YouTube
+  if (job.video_path) {
     const review = document.getElementById('video-review');
     const vid    = document.getElementById('video-preview');
     const dl     = document.getElementById('btn-download');
     const videoUrl = `${API}/api/jobs/${job.id}/video`;
     vid.src = videoUrl;
     dl.href = videoUrl;
-    dl.download = job.title + '.mp4';
+    dl.download = (job.title || 'video') + '.mp4';
     review.style.display = 'block';
     document.getElementById('upload-status').textContent = '';
-    document.getElementById('btn-upload-yt').disabled = false;
-    document.getElementById('btn-upload-yt').textContent = '▶ Subir a YouTube';
-    _loadUploadChannels(job.channel_id);
+    if (job.youtube_url) {
+      // Ya subido: botón para verlo en YouTube (en vez del botón de subir)
+      document.getElementById('btn-upload-yt').textContent = '▶ Ver en YouTube ↗';
+      document.getElementById('btn-upload-yt').disabled = false;
+      document.getElementById('btn-upload-yt').onclick = () => window.open(job.youtube_url, '_blank');
+      document.getElementById('upload-status').innerHTML =
+        `<span style="color:var(--green);font-size:11px;">✓ Ya publicado en YouTube</span>`;
+    } else {
+      document.getElementById('btn-upload-yt').disabled = false;
+      document.getElementById('btn-upload-yt').textContent = '▶ Subir a YouTube';
+      document.getElementById('btn-upload-yt').onclick = uploadToYoutube;
+      _loadUploadChannels(job.channel_id);
+    }
   }
   loadJobs(); loadNavCost();
 }
@@ -1582,20 +1588,28 @@ async function openJobDetail(jobId) {
     });
     document.getElementById('pipeline-lbl').textContent = '✅ Vídeo listo para revisión';
     document.getElementById('btn-cancel').style.display = 'none';
-    if (job.youtube_url) {
-      document.getElementById('final-result').innerHTML =
-        `<div style="padding:0 20px 16px;"><a href="${job.youtube_url}" target="_blank" class="btn btn-green" style="width:100%;padding:11px;font-size:12px;border-radius:6px;">▶ Ver en YouTube ↗</a></div>`;
-    } else if (job.video_path) {
+    // Mostrar siempre el player si hay vídeo — aunque ya esté subido a YouTube
+    if (job.video_path) {
       const videoUrl = `${API}/api/jobs/${job.id}/video`;
       document.getElementById('video-preview').src = videoUrl;
       document.getElementById('btn-download').href = videoUrl;
-      document.getElementById('btn-upload-yt').disabled = false;
-      document.getElementById('btn-upload-yt').textContent = '▶ Subir a YouTube';
+      document.getElementById('btn-download').download = (job.title||'video') + '.mp4';
       document.getElementById('upload-status').textContent = '';
       document.getElementById('video-review').style.display = 'block';
       currentJobId = job.id;
       currentChannelId = job.channel_id;
-      _loadUploadChannels(job.channel_id);
+      if (job.youtube_url) {
+        document.getElementById('btn-upload-yt').textContent = '▶ Ver en YouTube ↗';
+        document.getElementById('btn-upload-yt').disabled = false;
+        document.getElementById('btn-upload-yt').onclick = () => window.open(job.youtube_url, '_blank');
+        document.getElementById('upload-status').innerHTML =
+          `<span style="color:var(--green);font-size:11px;">✓ Ya publicado en YouTube</span>`;
+      } else {
+        document.getElementById('btn-upload-yt').disabled = false;
+        document.getElementById('btn-upload-yt').textContent = '▶ Subir a YouTube';
+        document.getElementById('btn-upload-yt').onclick = uploadToYoutube;
+        _loadUploadChannels(job.channel_id);
+      }
       _loadThumbnailVariants(job.id);
       _checkShort(job.id);
     }
