@@ -693,6 +693,7 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
               <div class="tone-opt"    data-tone="documental"   onclick="selectTone(this)">Documental</div>
               <div class="tone-opt"    data-tone="drama"        onclick="selectTone(this)">Drama</div>
               <div class="tone-opt"    data-tone="humor"        onclick="selectTone(this)">Humor</div>
+              <div class="tone-opt"    data-tone="deportivo"    onclick="selectTone(this)">⚽ Deportivo</div>
             </div>
           </div>
           <div class="field">
@@ -1023,7 +1024,7 @@ const API = window.location.hostname === 'localhost' ? '' : BACKEND_BASE_URL;
 
 const STEPS_META = {
   script:      { icon: '✦', label: 'Guión Claude' },
-  tts:         { icon: '◎', label: 'Voz Kokoro' },
+  tts:         { icon: '◎', label: 'Voz XTTS' },
   images:      { icon: '◈', label: 'Imágenes Flux' },
   thumbnail:   { icon: '⬡', label: 'Miniatura' },
   hook_videos: { icon: '▷', label: 'Hook — Imágenes impacto' },
