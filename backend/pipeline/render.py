@@ -30,9 +30,57 @@ def _pick_music(tone: str) -> Path | None:
             mp3s = list(d.glob("*.mp3"))
             if mp3s:
                 return random.choice(mp3s)
-    # Buscar en cualquier subcarpeta
     all_mp3s = list(MUSIC_DIR.rglob("*.mp3"))
     return random.choice(all_mp3s) if all_mp3s else None
+
+
+# ── MÚSICA DINÁMICA: diferentes tracks para hook (épico) y cuerpo (atmosférico) ──
+# Keywords por intensidad — se buscan en los nombres de archivo de toda la librería
+_HOOK_KEYWORDS = {
+    "misterio":     ["tense", "suspense", "dark", "tense"],
+    "drama":        ["total-war", "dramatic-intense", "dramatic-epic", "epic-orchestral", "meeting-the-stars"],
+    "motivacional": ["epic-choir", "epic-glory", "epic-uplifting", "inspiring-energetic"],
+    "deportivo":    ["total-war", "epic-glory", "epic-choir", "inspiring-energetic", "dramatic-epic"],
+    "documental":   ["dramatic-intense", "epic", "cinematic-trailer"],
+    "humor":        ["inspiring-glitchy", "pirates"],
+    "neutro":       ["epic", "dramatic", "cinematic-trailer"],
+}
+_BODY_KEYWORDS = {
+    "misterio":     ["mysterious", "mystical", "ambient", "dark-hope", "documentary-suspense"],
+    "drama":        ["melancholic", "never-again", "carrusel"],
+    "motivacional": ["inspiring-cinematic", "abstract-emotions", "cinematic-inspiration"],
+    "deportivo":    ["inspiring-cinematic", "epic-uplifting", "abstract-emotions"],
+    "documental":   ["documentary-background", "documentary-suspense", "nastelbom"],
+    "humor":        ["nature", "peaceful", "feel-the-touch"],
+    "neutro":       ["melancholic-ambient", "abstract-emotions", "cinematic-inspiration"],
+}
+
+def _pick_music_pair(tone: str) -> tuple:
+    """
+    Devuelve (hook_track, body_track) — dos pistas distintas para dinámica emocional.
+    Hook: épico e intenso (primeros 90s). Cuerpo: atmosférico y discreto (el resto).
+    """
+    all_mp3s = list(MUSIC_DIR.rglob("*.mp3"))
+    if not all_mp3s:
+        return None, None
+
+    def _pick(keywords: list) -> Path | None:
+        for kw in random.sample(keywords, len(keywords)):
+            matches = [p for p in all_mp3s if kw in p.stem]
+            if matches:
+                return random.choice(matches)
+        return random.choice(all_mp3s)
+
+    hook_kws = _HOOK_KEYWORDS.get(tone, _HOOK_KEYWORDS["neutro"])
+    body_kws = _BODY_KEYWORDS.get(tone, _BODY_KEYWORDS["neutro"])
+    hook_track = _pick(hook_kws)
+    body_track = _pick(body_kws)
+    # Garantizar que sean pistas distintas
+    if hook_track and body_track and hook_track == body_track:
+        others = [p for p in all_mp3s if p != hook_track]
+        if others:
+            body_track = random.choice(others)
+    return hook_track, body_track
 
 # ── Resolución de salida ────────────────────────────────────────────────────
 OUT_W, OUT_H = 1920, 1080   # 1080p Full HD — calidad profesional YouTube
@@ -66,12 +114,13 @@ def _ffmpeg(*args):
 def _color_grade(tone: str) -> str:
     """Filtro de color grading según el tono narrativo."""
     grades = {
-        "misterio": "eq=contrast=1.12:brightness=-0.06:saturation=0.75,colorchannelmixer=rr=0.9:gg=0.95:bb=1.1",
-        "drama":    "eq=contrast=1.15:brightness=-0.08:saturation=0.70,colorchannelmixer=rr=0.85:gg=0.90:bb=1.05",
-        "motivacional": "eq=contrast=1.05:brightness=0.02:saturation=1.15",
-        "documental":   "eq=contrast=1.08:brightness=-0.02:saturation=0.90",
-        "humor":        "eq=contrast=1.0:brightness=0.03:saturation=1.10",
-        "neutro":       "eq=contrast=1.05:brightness=-0.01:saturation=0.95",
+        "misterio":   "eq=contrast=1.12:brightness=-0.06:saturation=0.75,colorchannelmixer=rr=0.9:gg=0.95:bb=1.1",
+        "drama":      "eq=contrast=1.15:brightness=-0.08:saturation=0.70,colorchannelmixer=rr=0.85:gg=0.90:bb=1.05",
+        "motivacional":"eq=contrast=1.05:brightness=0.02:saturation=1.15",
+        "deportivo":  "eq=contrast=1.10:brightness=0.03:saturation=1.25,colorchannelmixer=rr=1.05:gg=0.95:bb=0.85",
+        "documental": "eq=contrast=1.08:brightness=-0.02:saturation=0.90",
+        "humor":      "eq=contrast=1.0:brightness=0.03:saturation=1.10",
+        "neutro":     "eq=contrast=1.05:brightness=-0.01:saturation=0.95",
     }
     return grades.get(tone, grades["neutro"])
 
@@ -233,16 +282,18 @@ def render_video(
              f"color: {tone}")
 
     # ── HOOK ──────────────────────────────────────────────────────────────────
-    hook_dur = min(25.0, audio_dur * 0.15)
+    # Los primeros 60-90 segundos son el hook real (no 25s). MrBeast-level retention.
+    hook_dur = min(90.0, audio_dur * 0.20)
     hook_concat = tmp / "hook.mp4"
 
     valid_hook_vids = [v for v in (hook_clips or []) if v.exists() and v.stat().st_size > 0]
     valid_hook_imgs = [i for i in (hook_images or []) if i.exists() and i.stat().st_size > 5000]
 
     if valid_hook_vids:
-        # HOOK tipo tráiler: cortes RÁPIDOS (~3s) para máximo dinamismo y enganche.
+        # HOOK tipo tráiler: cortes MUY RÁPIDOS (1.5-2.5s) = máximo dinamismo y enganche.
+        # Los primeros 90s son el hook — cada 2s un corte nuevo impide que el cerebro descanse.
         # Si hay pocos clips, se reciclan para llenar el hook con cortes frecuentes.
-        clip_len = max(2.5, min(3.5, hook_dur / max(1, len(valid_hook_vids))))
+        clip_len = max(1.5, min(2.5, hook_dur / max(1, len(valid_hook_vids))))
         n_needed = max(len(valid_hook_vids), int(hook_dur / clip_len))
         src_cycle = (valid_hook_vids * ((n_needed // len(valid_hook_vids)) + 1))[:n_needed]
         trimmed = []
@@ -250,10 +301,14 @@ def render_video(
             t_out = tmp / f"hvtrim_{k:02d}.mp4"
             # tomar un tramo distinto de cada clip al reciclar (variedad)
             ss = (k // len(valid_hook_vids)) * clip_len
+            # Fades de 0.08s (antes 0.18s) = cortes más abruptos y cinematográficos en el hook
+            # Color grade del hook: más contraste y saturación que el cuerpo (energía máxima)
             _ffmpeg("-ss", f"{ss:.2f}", "-i", str(v), "-t", f"{clip_len:.2f}",
-                    "-vf", "scale=1920:1080:force_original_aspect_ratio=increase,"
-                           "crop=1920:1080,fps=25,fade=t=in:st=0:d=0.18,"
-                           f"fade=t=out:st={max(0,clip_len-0.18):.2f}:d=0.18",
+                    "-vf", ("scale=1920:1080:force_original_aspect_ratio=increase,"
+                            "crop=1920:1080,fps=25,"
+                            "eq=contrast=1.22:brightness=-0.04:saturation=1.35,"
+                            "fade=t=in:st=0:d=0.08,"
+                            f"fade=t=out:st={max(0,clip_len-0.08):.2f}:d=0.08"),
                     "-c:v", "libx264", "-preset", "ultrafast", "-an", "-r", "25",
                     "-pix_fmt", "yuv420p", str(t_out))
             trimmed.append(t_out)
@@ -353,54 +408,66 @@ def render_video(
     if progress_cb:
         progress_cb(90.0, 0.0, _total_expected, _total_expected, "encode")
 
-    music_path = _pick_music(tone)
-    has_music = music_path is not None and music_path.exists()
+    hook_music, body_music = _pick_music_pair(tone)
+    has_music = hook_music is not None and hook_music.exists()
+    music_info = f"🎵 {hook_music.stem[:22]}… + {body_music.stem[:22]}…" if has_music else "✗"
     add_step(job_id, "render", "running",
-             f"Subtítulos {'✓' if subs_ok else '✗'} · música {'✓ ' + music_path.stem[:30] if has_music else '✗ (sin música aún)'} · encode final…")
+             f"Subtítulos {'✓' if subs_ok else '✗'} · {music_info} · encode final…")
 
     # ── MEZCLA FINAL: audio + música + subtítulos + color grade + CTA ─────────
     cta_start = max(0, audio_dur - 12)
     grade = _color_grade(tone)
 
+    def _build_vf(esc_subs: str | None) -> str:
+        layers = []
+        if esc_subs:
+            layers.append(f"subtitles='{esc_subs}'")
+        layers.append(grade)
+        # CTA al final
+        layers.append(
+            f"drawtext=text='¡SUSCRÍBETE Y ACTIVA LA CAMPANITA!':"
+            f"fontcolor=white:fontsize=52:box=1:boxcolor=red@0.88:boxborderw=20:"
+            f"x=(w-text_w)/2:y=h*0.06:enable='between(t,{cta_start:.1f},{audio_dur:.1f})'"
+        )
+        return ",".join(layers)
+
     if subs_ok:
         esc = str(ass_path.resolve()).replace("'", "\\'").replace(":", "\\:")
-        vf = (
-            f"subtitles='{esc}',"
-            f"{grade},"
-            f"drawtext=text='¡SUSCRÍBETE Y ACTIVA LA CAMPANITA!':"
-            f"fontcolor=white:fontsize=52:box=1:boxcolor=red@0.88:boxborderw=20:"
-            f"x=(w-text_w)/2:y=h*0.06:enable='between(t,{cta_start:.1f},{audio_dur:.1f})'"
-        )
+        vf = _build_vf(esc)
     else:
-        vf = (
-            f"{grade},"
-            f"drawtext=text='¡SUSCRÍBETE Y ACTIVA LA CAMPANITA!':"
-            f"fontcolor=white:fontsize=52:box=1:boxcolor=red@0.88:boxborderw=20:"
-            f"x=(w-text_w)/2:y=h*0.06:enable='between(t,{cta_start:.1f},{audio_dur:.1f})'"
-        )
+        vf = _build_vf(None)
 
     if has_music:
-        # Mezcla cinematográfica que SE OYE (arreglado: antes el ducking la hundía).
-        # Para narración CONTINUA, lo correcto es nivel FIJO audible, no ducking:
-        # - música normalizada a -23 LUFS (la voz está a -16 → música ~7dB debajo = claramente
-        #   audible de fondo, pero la voz manda). loudnorm iguala TODAS las pistas a ese nivel.
-        # - normalize=0 → amix NO divide el volumen a la mitad (era parte del bug).
-        # - alimiter al final → evita saturación al sumar voz + música.
+        # ── MÚSICA: UN SOLO TRACK CONSISTENTE ───────────────────────────────
+        # Principio: LA VOZ MANDA SIEMPRE. La música es fondo, no protagonista.
+        # Un solo track atmosférico de principio a fin → sin cambios abruptos.
+        # Niveles profesionales de documental:
+        #   - Intro (0-2s, sin voz): música a -20 LUFS (se escucha claramente)
+        #   - Con voz: música baja a -32 LUFS (muy de fondo, no compite)
+        #   - Fade out 8s al final
+        # Usar solo el track del cuerpo (atmosférico) — un track consistente todo el vídeo
+        music_track = body_music if body_music and body_music.exists() else hook_music
+
+        # Música: fade in 2s → volumen bajo constante → fade out 8s
+        # Voz: sin delay, empieza en segundo 0, perfectamente sincronizada
+        fc = (
+            f"[2:a]loudnorm=I=-20:TP=-1,highpass=f=80,"
+            f"atrim=0:duration={audio_dur+4:.1f},"
+            f"afade=t=in:st=0:d=2,"
+            f"volume=0.18,"
+            f"afade=t=out:st={max(0,audio_dur-8):.1f}:d=8[m1];"
+            + "[1:a][m1]amix=inputs=2:normalize=0[mx];"
+            + "[mx]alimiter=limit=0.97[aout]"
+        )
         _ffmpeg(
             "-i", str(full_mp4),
             "-i", str(audio_path),
-            "-stream_loop", "-1", "-i", str(music_path),
-            "-filter_complex",
-            (
-                f"[2:a]loudnorm=I=-23:TP=-3,highpass=f=100,atrim=0:duration={audio_dur:.2f},"
-                f"afade=t=in:st=0:d=3,afade=t=out:st={max(0,audio_dur-4):.1f}:d=4[music];"
-                f"[1:a][music]amix=inputs=2:normalize=0[mx];"
-                f"[mx]alimiter=limit=0.97[aout]"
-            ),
+            "-stream_loop", "-1", "-i", str(music_track),
+            "-filter_complex", fc,
             "-map", "0:v", "-map", "[aout]",
             "-vf", vf,
             "-c:v", "libx264", "-preset", "fast", "-crf", "22",
-            "-c:a", "aac", "-b:a", "128k",
+            "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart",
             "-shortest",
             str(output_path)
@@ -411,7 +478,7 @@ def render_video(
             "-i", str(audio_path),
             "-vf", vf,
             "-c:v", "libx264", "-preset", "fast", "-crf", "22",
-            "-c:a", "aac", "-b:a", "128k",
+            "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart",
             "-shortest",
             str(output_path)
@@ -669,12 +736,17 @@ def _whisper_subtitles(audio_path: Path, ass_path: Path) -> bool:
         return False
 
 
+HOOK_SUB_DURATION = 90.0  # segundos — subtítulos del hook usan estilo grande e impactante
+
 def _build_ass(groups: list) -> str:
     """
-    Subtítulos estilo karaoke: la palabra que se está pronunciando se resalta
-    en amarillo (PrimaryColour) y las demás quedan en blanco (SecondaryColour),
-    usando tags \\k de ASS. Posición elevada para no chocar con los controles
-    de YouTube. Pop de entrada con \\fad.
+    Subtítulos con DOS estilos:
+
+    HOOK (0-90s): TikTokHook — texto grande (120px), BLANCO sólido, sin karaoke.
+    Todas las palabras visibles a la vez. Impacto visual inmediato para el 60% sin audio.
+
+    CUERPO (>90s): TikTok — karaoke amarillo (palabra activa) + blanco resto.
+    Presencia, legibilidad, sin quitar el protagonismo al vídeo.
     """
     header = (
         "[Script Info]\nScriptType: v4.00+\nPlayResX: 1920\nPlayResY: 1080\n"
@@ -684,9 +756,10 @@ def _build_ass(groups: list) -> str:
         "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
         "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        # PrimaryColour = AMARILLO (palabra activa) · SecondaryColour = BLANCO (resto)
-        # Fuente grande, contorno negro grueso, sombra. MarginV=180 = más arriba.
-        # 1080p: fuente 90px, contorno 6px, sombra 4px, margen inferior 240px
+        # Estilo HOOK: 120px, blanco sólido, contorno negro grueso, sin karaoke
+        "Style: TikTokHook,Arial Black,120,&H00FFFFFF,&H00FFFFFF,&H00000000,&HCC000000,"
+        "-1,0,0,0,100,100,0.3,0,1,8,5,2,60,60,200,1\n"
+        # Estilo CUERPO: 90px, amarillo activo + blanco resto (karaoke), margen inferior
         "Style: TikTok,Arial Black,90,&H0000F0FF,&H00FFFFFF,&H00000000,&H96000000,"
         "-1,0,0,0,100,100,0.5,0,1,6,4,2,60,60,240,1\n\n"
         "[Events]\nFormat: Layer, Start, End, Style, Name, "
@@ -694,27 +767,39 @@ def _build_ass(groups: list) -> str:
     )
     lines = []
     for group in groups:
-        # group = lista de (start, end, word)
         if not group:
             continue
         gs = group[0][0]
         ge = group[-1][1]
-        # Construir texto con tags \k (centisegundos por palabra)
-        parts = []
-        for (ws, we, w) in group:
-            w_clean = w.replace("{", "").replace("}", "").replace("\\", "").strip().upper()
-            if not w_clean:
+
+        if gs < HOOK_SUB_DURATION:
+            # ── ESTILO HOOK: todas las palabras juntas, blanco, grande ─────────
+            words = " ".join(
+                w.replace("{","").replace("}","").replace("\\","").strip().upper()
+                for (_, _, w) in group if w.strip()
+            )
+            if not words:
                 continue
-            k_cs = max(1, int((we - ws) * 100))  # duración de la palabra en centiseg
-            parts.append(f"{{\\k{k_cs}}}{w_clean} ")
-        if not parts:
-            continue
-        karaoke = "".join(parts).strip()
-        # \an2 = abajo-centro · \fad(80,80) = pop de entrada/salida suave
-        lines.append(
-            f"Dialogue: 0,{_t(gs)},{_t(ge+0.08)},TikTok,,0,0,0,,"
-            f"{{\\an2\\fad(80,80)}}{karaoke}"
-        )
+            lines.append(
+                f"Dialogue: 0,{_t(gs)},{_t(ge+0.1)},TikTokHook,,0,0,0,,"
+                f"{{\\an2\\fad(50,40)}}{words}"
+            )
+        else:
+            # ── ESTILO KARAOKE CUERPO: palabra activa en amarillo ──────────────
+            parts = []
+            for (ws, we, w) in group:
+                w_clean = w.replace("{","").replace("}","").replace("\\","").strip().upper()
+                if not w_clean:
+                    continue
+                k_cs = max(1, int((we - ws) * 100))
+                parts.append(f"{{\\k{k_cs}}}{w_clean} ")
+            if not parts:
+                continue
+            karaoke = "".join(parts).strip()
+            lines.append(
+                f"Dialogue: 0,{_t(gs)},{_t(ge+0.08)},TikTok,,0,0,0,,"
+                f"{{\\an2\\fad(80,80)}}{karaoke}"
+            )
     return header + "\n".join(lines) + "\n"
 
 

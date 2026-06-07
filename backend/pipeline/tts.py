@@ -50,7 +50,7 @@ VOICES_DIR  = "/root/autotube100k/voices"
 # Se usa en TODOS los vídeos (las voces de arquetipo eran sintéticas Edge TTS = robóticas).
 # Prioridad: voz subida por el usuario > esta voz universal > arquetipo > tono.
 # Para volver a voces por arquetipo: poner UNIVERSAL_VOICE = None.
-UNIVERSAL_VOICE = "voz_gaspar"
+UNIVERSAL_VOICE = "voz_alex_mx"   # voz mexicana real (35s referencia) — existe en /voices/
 
 # Mapa tono UI → perfil base (fallback si la auto-detección falla)
 XTTS_TONE_MAP = {
@@ -60,6 +60,7 @@ XTTS_TONE_MAP = {
     "documental":   "locutor_historico",
     "humor":        "humor_femenino",
     "neutro":       "neutro_profesional",
+    "deportivo":    "locutor_deportivo",   # Manolo Lama style: fútbol, hazañas, épica
 }
 
 # Keywords para auto-detección del mejor arquetipo narrador
@@ -140,48 +141,64 @@ def generate_audio(job_id: str, script: str, tone: str, output_path: Path,
         add_step(job_id, "tts", "done",
                  f"Voz ya generada · reutilizada · 0.00€", 0)
         return output_path
-    # Si existe el audio crudo pero falló el post-proceso, solo re-procesar
-    if raw_path.exists() and raw_path.stat().st_size > 100_000:
-        try:
-            add_step(job_id, "tts", "running", "Re-procesando voz ya generada…")
-            _postprocess_audio(raw_path, output_path, tone)
+    # Si existe audio crudo de XTTS (>50MB = calidad real) re-procesar sin regenerar
+    # IMPORTANTE: descartar archivos pequeños (<50MB) que son fallbacks de Edge TTS
+    if raw_path.exists():
+        raw_mb = raw_path.stat().st_size / 1024 / 1024
+        if raw_mb > 50:   # XTTS produce >50MB para 30+ min; Edge TTS <15MB
+            try:
+                add_step(job_id, "tts", "running",
+                         f"Re-procesando voz XTTS ya generada ({raw_mb:.0f}MB)…")
+                _postprocess_audio(raw_path, output_path, tone)
+                raw_path.unlink(missing_ok=True)
+                add_step(job_id, "tts", "done", "Voz XTTS recuperada · 0.00€", 0)
+                return output_path
+            except Exception:
+                pass
+        else:
+            # Audio crudo pequeño = era Edge TTS (voz mala) → borrarlo y regenerar con XTTS
+            add_step(job_id, "tts", "running",
+                     f"Audio previo era Edge TTS ({raw_mb:.0f}MB) → descartado, regenerando con XTTS…")
             raw_path.unlink(missing_ok=True)
-            add_step(job_id, "tts", "done", "Voz recuperada y procesada · 0.00€", 0)
-            return output_path
-        except Exception:
-            pass  # si falla, regenerar normalmente abajo
 
-    # ── Intentar XTTS v2 primero (calidad narrador profesional, gratis) ───────
+    # ── XTTS v2: hasta 3 intentos antes de caer en Edge TTS ──────────────────
     if _xtts_available():
-        try:
-            # 1. Voz personalizada del usuario (máxima prioridad)
-            # 2. Auto-detección por título+nicho (narrador perfecto para el contenido)
-            # 3. Fallback al mapa de tono UI
-            if custom_ref and Path(custom_ref).exists():
-                voice_profile = "voz personalizada (clonada)"
-                ref_wav = custom_ref
-            elif UNIVERSAL_VOICE and Path(f"{VOICES_DIR}/{UNIVERSAL_VOICE}.wav").exists():
-                voice_profile = UNIVERSAL_VOICE + " (humana real)"
-                ref_wav = f"{VOICES_DIR}/{UNIVERSAL_VOICE}.wav"
-            elif title or niche:
-                voice_profile = detect_best_archetype(title, niche, tone)
-                ref_wav = f"{VOICES_DIR}/{voice_profile}.wav"
-            else:
-                voice_profile = XTTS_TONE_MAP.get(tone, "neutro_profesional")
-                ref_wav = f"{VOICES_DIR}/{voice_profile}.wav"
-            add_step(job_id, "tts", "running",
-                     f"Generando voz con XTTS v2 · perfil '{voice_profile}' · gratis…")
-            _xtts_generate(script, raw_path, ref_wav)
-            add_cost_event(job_id, "xtts_v2", len(script), 0, 0)
-            _postprocess_audio(raw_path, output_path, tone)
-            raw_path.unlink(missing_ok=True)
-            size_mb = output_path.stat().st_size / 1024 / 1024
-            add_step(job_id, "tts", "done",
-                     f"Audio XTTS v2: {size_mb:.1f} MB · {voice_profile} · 0.00€", 0)
-            return output_path
-        except Exception as e:
-            add_step(job_id, "tts", "running",
-                     f"XTTS v2 falló ({str(e)[:60]}), usando Edge TTS…")
+        if custom_ref and Path(custom_ref).exists():
+            voice_profile = "voz personalizada (clonada)"
+            ref_wav = custom_ref
+        elif UNIVERSAL_VOICE and Path(f"{VOICES_DIR}/{UNIVERSAL_VOICE}.wav").exists():
+            voice_profile = UNIVERSAL_VOICE + " (humana real)"
+            ref_wav = f"{VOICES_DIR}/{UNIVERSAL_VOICE}.wav"
+        elif title or niche:
+            voice_profile = detect_best_archetype(title, niche, tone)
+            ref_wav = f"{VOICES_DIR}/{voice_profile}.wav"
+        else:
+            voice_profile = XTTS_TONE_MAP.get(tone, "neutro_profesional")
+            ref_wav = f"{VOICES_DIR}/{voice_profile}.wav"
+
+        last_err = None
+        for attempt in range(1, 4):   # 3 intentos
+            try:
+                add_step(job_id, "tts", "running",
+                         f"Generando voz XTTS v2 · '{voice_profile}' · intento {attempt}/3…")
+                # Limpiar raw parcial de intento anterior
+                if raw_path.exists():
+                    raw_path.unlink(missing_ok=True)
+                _xtts_generate(script, raw_path, ref_wav)
+                add_cost_event(job_id, "xtts_v2", len(script), 0, 0)
+                _postprocess_audio(raw_path, output_path, tone)
+                raw_path.unlink(missing_ok=True)
+                size_mb = output_path.stat().st_size / 1024 / 1024
+                add_step(job_id, "tts", "done",
+                         f"✅ Audio XTTS v2: {size_mb:.1f} MB · {voice_profile} · 0.00€", 0)
+                return output_path
+            except Exception as e:
+                last_err = e
+                add_step(job_id, "tts", "running",
+                         f"XTTS intento {attempt} falló: {str(e)[:80]}")
+
+        add_step(job_id, "tts", "running",
+                 f"⚠ XTTS falló 3 veces ({str(last_err)[:60]}). Usando Edge TTS como último recurso…")
 
     # ── Fallback: Edge TTS (gratis, buena calidad) ────────────────────────────
     voice = VOICE_MAP.get(tone, "es-ES-AlvaroNeural")
@@ -273,37 +290,48 @@ async def _edge_tts(script: str, voice: str, rate: str, output_path: Path):
 
 def _postprocess_audio(raw: Path, out: Path, tone: str):
     """
-    Post-procesado de audio LIMPIO Y CLARO con FFmpeg (gratis).
-    SIN reverb — el reverb (aecho) era lo que hacía que la voz sonara "borrosa".
-    Cadena de locución profesional (broadcast):
-    1. Paso alto 85Hz — quita rumble/graves de fondo
-    2. EQ corta el "barro" (~300Hz) que emborrona la voz
-    3. EQ realza la PRESENCIA (~3.2kHz) → cada palabra se entiende nítida
-    4. EQ leve de "aire" (~9kHz) → claridad y brillo
-    5. De-esser suave (controla sibilancias swithout harshness)
-    6. Compresor suave (voz uniforme, sin picos)
-    7. Normalización -16 LUFS (estándar YouTube)
-    8. Bitrate 192kbps
+    Cadena de audio broadcast profesional para narrador mexicano de YouTube.
+
+    0. silenceremove — elimina el silencio inicial que XTTS v2 genera antes de hablar
+       (sin esto: voz empieza en s=2 pero subtítulos en s=0 → desync)
+    1. Highpass 80Hz — elimina rumble sin quitar calidez
+    2. EQ +3dB @ 150Hz — CUERPO y gravedad de narrador masculino mexicano
+    3. EQ -3dB @ 300Hz — reduce nasalidad/cajón de XTTS
+    4. EQ +4dB @ 2500Hz — PRESENCIA (consonantes nítidas)
+    5. EQ +1dB @ 5000Hz — CLARIDAD suave (fricativas sin harshness)
+    6. EQ +1dB @ 9000Hz — AIRE (brillo de micrófono de estudio)
+    7. aexciter — humaniza la voz, añade armónicos que XTTS suprime
+    8. acompressor broadcast — voz uniforme, punchy, sin aplastamiento
+    9. alimiter — seguridad digital
+    10. loudnorm -14 LUFS — presencia fuerte en YouTube
     """
     import subprocess
 
     subprocess.run([
         "ffmpeg", "-y", "-i", str(raw),
         "-af", (
-            "highpass=f=90,"
-            # quitar barro/cajón (~280 Hz) que enturbia la voz
-            "equalizer=f=280:t=q:w=1.2:g=-2,"
-            # realce de presencia/inteligibilidad (~3.5 kHz) — consonantes nítidas
-            "equalizer=f=3500:t=q:w=1.3:g=3,"
-            # EXCITADOR ARMÓNICO — genera agudos que XTTS no produce (24kHz apagado).
-            # Es lo que convierte la voz "borrosa" en NÍTIDA y cristalina.
-            "aexciter=amount=2.5:blend=2:freq=7000,"
-            # realce de agudos/aire (brillo y claridad)
-            "treble=g=3:f=8000,"
-            # compresor (voz uniforme, sin picos)
-            "acompressor=threshold=-18dB:ratio=3:attack=5:release=80:makeup=2dB,"
-            # normalización estándar YouTube
-            "loudnorm=I=-16:TP=-1.5:LRA=11"
+            # 0. CRÍTICO: elimina silencio inicial de XTTS (sincroniza voz + subtítulos)
+            "silenceremove=1:0:-40dB,"
+            # 1. Eliminar rumble de fondo
+            "highpass=f=80,"
+            # 2. CALIDEZ — cuerpo y gravedad de voz masculina mexicana
+            "equalizer=f=150:t=q:w=0.8:g=3,"
+            # 3. Reducir nasalidad/cajón de XTTS
+            "equalizer=f=300:t=q:w=1.0:g=-3,"
+            # 4. PRESENCIA — claridad de consonantes
+            "equalizer=f=2500:t=q:w=1.2:g=4,"
+            # 5. CLARIDAD suave — fricativas sin harshness
+            "equalizer=f=5000:t=q:w=1.1:g=1,"
+            # 6. AIRE natural — brillo de estudio
+            "equalizer=f=9000:t=q:w=0.8:g=1,"
+            # 7. Excitador armónico — humaniza, añade textura
+            "aexciter=amount=2:blend=2:freq=5000,"
+            # 8. Compresor broadcast — voz uniforme, no aplastada
+            "acompressor=threshold=-18dB:ratio=3:attack=8:release=80:makeup=7dB,"
+            # 9. Limitador de seguridad
+            "alimiter=limit=0.97,"
+            # 10. Loudnorm (-14 LUFS = presencia fuerte en YouTube)
+            "loudnorm=I=-14:TP=-1.0:LRA=7"
         ),
         "-c:a", "libmp3lame", "-b:a", "192k", "-ar", "44100",
         str(out)

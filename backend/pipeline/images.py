@@ -35,49 +35,44 @@ def generate_image_prompts(job_id: str, script: str, niche: str,
             start = i * seg_size
             end = start + seg_size if i < count - 1 else len(words)
             seg = " ".join(words[start:end])
-            segments.append(seg[:300])  # max 300 chars por segmento al prompt
+            segments.append(seg[:600])  # 600 chars: contexto real para que la imagen sea fiel al guión
 
         segments_text = "\n".join(
             f"[{i+1}] {seg}" for i, seg in enumerate(segments)
         )
 
         msg = client.messages.create(
-            model="claude-sonnet-4-6",  # Sonnet entiende el guion mucho mejor → imágenes 100% acordes
+            model="claude-sonnet-4-6",
             max_tokens=6000,
-            messages=[{"role": "user", "content": f"""Eres el director de fotografía del mejor documental cinematográfico del mundo. Para cada fragmento de guión, creas el plano visual EXACTO que hace que el espectador no pueda apartar los ojos de la pantalla.
+            messages=[{"role": "user", "content": f"""Eres el director de fotografía del mejor documental cinematográfico sobre México. Para cada fragmento de guión, creas el plano visual EXACTO que transmite la misma emoción que las palabras.
 
 NICHO: {niche}
+CONTEXTO: Canal "México Oculto" — geografía, historia y misterios de México. Las imágenes deben mostrar paisajes, monumentos, geografía y elementos culturales de México cuando corresponda al texto.
 
-REGLAS ABSOLUTAS — VIOLAR UNA ES UN FRACASO:
+REGLAS ABSOLUTAS:
 
-1. ESPECIFICIDAD TOTAL: Cada prompt debe mostrar EXACTAMENTE lo que se narra.
-   - Narra "Madrid 1982" → aerial shot of Madrid skyline 1982, vintage cinematic
-   - Narra "un soldado en trinchera" → soldier in trench, mud, barbed wire, dramatic lighting
-   - Narra "el momento del gol" → stadium 80,000 people, overhead shot, confetti explosion
-   - Narra "firmaron el documento" → extreme close-up weathered hands signing old document
+1. ESPECIFICIDAD + EMOCIÓN: Cada prompt muestra EXACTAMENTE lo narrado Y transmite la emoción del momento.
+   - Narra algo perturbador → iluminación fría, sombras duras, ángulo bajo amenazante
+   - Narra algo revelador → rayo de luz rompiendo oscuridad, gran angular, momento de impacto
+   - Narra algo histórico → paleta desaturada vintage, grain cinematográfico, época correcta
+   - Narra algo humano → close-up de manos, ojos, detalles íntimos con bokeh suave
 
-2. VARIEDAD DE PLANOS OBLIGATORIA (rota en este orden aproximado):
-   - Plano general (wide shot, establishing shot, aerial drone)
-   - Plano medio (medium shot, waist up)
-   - Primer plano (close-up, face detail)
-   - Detalle extremo (extreme close-up: hands, eyes, objects)
-   - Plano conceptual (abstract metaphor of the concept)
+2. VARIEDAD DE PLANOS (rota obligatoriamente):
+   extreme close-up · close-up · medium shot · wide shot · aerial · POV · silhouette · macro detail
 
-3. CINEMATOGRAFÍA PROFESIONAL siempre:
-   - Iluminación dramática (chiaroscuro, golden hour, blue hour, storm light)
-   - Profundidad de campo (bokeh en los detalles, sharp en lo importante)
-   - Composición regla de tercios
-   - Temperatura de color acorde al momento (cálido=positivo, frío=drama, desaturado=pasado)
+3. CINEMATOGRAFÍA EMOCIONAL:
+   - Tensión/misterio: chiaroscuro, niebla, luz única lateral
+   - Revelación: backlight dramático, figura emergiendo de sombras
+   - Drama humano: luz suave difusa, profundidad de campo estrecha
+   - Épico/histórico: gran angular, luz dorada o tormentosa, composición monumental
 
-4. SIN TEXTO, SIN LOGOS, SIN ROSTROS RECONOCIBLES
-   - Personas: silhouettes, hands, backs, partial faces
-   - Famosos: symbolic objects, locations, crowd
+4. SIN TEXTO, SIN LOGOS, SIN ROSTROS RECONOCIBLES (silhouettes, backs, hands, partial)
 
-5. FORMATO: photorealistic, cinematic, 4K, 16:9, professional photography
+5. FORMATO: photorealistic, cinematic, 4K, 16:9, professional photography, award-winning
 
-Devuelve EXACTAMENTE {count} prompts en inglés, uno por línea, sin numeración ni texto extra.
+Devuelve EXACTAMENTE {count} prompts en inglés, uno por línea, sin numeración.
 
-FRAGMENTOS DEL GUIÓN (cada uno necesita su imagen perfecta):
+FRAGMENTOS DEL GUIÓN:
 {segments_text}"""}]
         )
 
@@ -98,46 +93,50 @@ FRAGMENTOS DEL GUIÓN (cada uno necesita su imagen perfecta):
 
 def generate_hook_prompts(niche: str, script_hook: str) -> list[str]:
     """
-    8 prompts visuales para el hook generados a partir del texto real del guión.
-    Cada imagen captura una escena concreta mencionada en el hook.
+    8 prompts cinematográficos de MÁXIMA CALIDAD para el hook.
+    Usa Sonnet (vs Haiku anterior) para mayor especificidad y calidad visual.
+    Cada imagen corresponde exactamente a una escena o emoción del hook.
     """
     try:
         client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1200,
-            messages=[{"role": "user", "content": f"""Eres un director de fotografía. Lee este fragmento de guión y genera 8 prompts de imagen AI que capturen visualmente las escenas, lugares, personas o momentos ESPECÍFICOS mencionados.
+            model="claude-sonnet-4-6",   # Sonnet en vez de Haiku → calidad máxima
+            max_tokens=1400,
+            messages=[{"role": "user", "content": f"""Eres el director de fotografía del mejor thriller cinematográfico del mundo. Tu trabajo: crear los 8 planos visuales más impactantes e hipnóticos que jamás hayan aparecido en un vídeo de YouTube.
 
 NICHO: {niche}
-FRAGMENTO DEL GUIÓN (hook):
-{script_hook[:600]}
+HOOK DEL VÍDEO (lo que se narra):
+{script_hook[:700]}
 
-REGLAS:
-- Cada prompt refleja algo CONCRETO del texto (lugar, objeto, persona, momento)
-- Estilo: cinematic, photorealistic, dramatic lighting, 16:9, 4K
-- Sin texto, sin logos, sin rostros reconocibles (silhouettes si hay personas)
-- Varía los planos: aerial, close-up, wide, detail
-- Máximo dramático e impactante
+MISIÓN: 8 prompts que capturen la EMOCIÓN y las ESCENAS EXACTAS del hook. Cada uno debe hacer que el espectador no pueda apartar los ojos.
 
-Devuelve SOLO 8 prompts en inglés, uno por línea, sin numeración."""}]
+REGLAS ABSOLUTAS:
+1. ESPECIFICIDAD TOTAL: refleja algo CONCRETO del texto (lugar, objeto, momento, concepto)
+2. EMOCIÓN CINEMATOGRÁFICA: cada prompt debe transmitir la misma tensión/impacto que el texto
+3. VARIEDAD DE PLANOS (usa todos): extreme close-up · close-up · medium shot · wide shot · aerial · macro · silhouette · POV
+4. ILUMINACIÓN DRAMÁTICA: chiaroscuro, single beam light, backlit silhouette, storm light, neon reflections
+5. Estilo: photorealistic, cinematic 4K, 16:9, professional photography, dramatic depth of field
+6. Sin texto, sin logos, sin rostros reconocibles
+
+Devuelve SOLO 8 prompts en inglés, uno por línea, sin numeración ni texto adicional."""}]
         )
         prompts = [p.strip() for p in msg.content[0].text.strip().split("\n") if p.strip()][:8]
         while len(prompts) < 8:
             prompts.append(
-                f"dramatic cinematic scene {niche}, dark moody lighting, photorealistic, 4K, 16:9"
+                f"dramatic extreme close-up human eye reflecting city lights, {niche}, "
+                f"chiaroscuro, photorealistic, cinematic 4K"
             )
         return prompts
     except Exception:
-        # fallback genérico si falla Haiku
         return [
-            f"extreme close-up human eyes wide open shock, {niche}, cinematic chiaroscuro, 4K",
-            f"dramatic dark corridor single beam of light, {niche}, heavy fog, cinematic, 4K",
-            f"aerial shot city at night rain neon reflections, {niche}, dark moody, cinematic",
-            f"silhouette lone figure stormy sky lightning, {niche}, backlit, wide shot, 4K",
-            f"close-up trembling hands holding document, {niche}, dramatic side light, 4K",
-            f"broken mirror reflection symbolic truth, {niche}, dark moody, cinematic, 4K",
-            f"old classified files documents secrets, {niche}, dramatic spotlight, photorealistic",
-            f"dramatic newspaper headline depth of field city, {niche}, desaturated, cinematic",
+            f"extreme close-up human eye wide open terror, {niche}, chiaroscuro, cinematic 4K",
+            f"silhouette person dark corridor single spotlight, {niche}, heavy fog, 4K",
+            f"aerial shot city night rain neon reflections, {niche}, dark moody, cinematic",
+            f"trembling hands close-up holding classified document, {niche}, dramatic side light",
+            f"broken mirror reflecting distorted face, {niche}, dark moody, cinematic 4K",
+            f"old surveillance camera footage street, {niche}, grainy, dramatic spotlight",
+            f"lone silhouette stormy sky lightning dramatic, {niche}, backlit, wide shot 4K",
+            f"shadow puppet strings control, {niche}, dramatic backlight, conceptual, cinematic",
         ]
 
 
@@ -294,16 +293,16 @@ def generate_hook_images(job_id: str, niche: str, script_hook: str,
 
 # Queries Pexels por tono — busca caras humanas reales con la emoción correcta
 THUMB_PEXELS_QUERY = {
-    "misterio":     "shocked surprised man dark dramatic portrait",
-    "drama":        "sad emotional woman dramatic portrait close up",
-    "motivacional": "confident powerful man portrait determination",
-    "documental":   "serious professional woman documentary portrait",
-    "humor":        "funny surprised face laughing portrait",
-    "neutro":       "serious man portrait dramatic lighting",
-    "truecrime":    "worried anxious woman dark portrait",
-    "historia":     "dramatic man historical serious portrait",
+    "misterio":     "shocked surprised latin man dark dramatic portrait",
+    "drama":        "sad emotional latin woman dramatic portrait close up",
+    "motivacional": "confident powerful hispanic man portrait determination",
+    "documental":   "amazed curious man mexico landscape dramatic",
+    "humor":        "funny surprised latin face laughing portrait",
+    "neutro":       "serious hispanic man portrait dramatic lighting",
+    "truecrime":    "worried anxious latin woman dark portrait",
+    "historia":     "dramatic man ancient mexico ruins historical",
     "conspiracion": "suspicious paranoid man dark portrait shadows",
-    "ciencia":      "amazed scientist woman discovery portrait",
+    "ciencia":      "amazed scientist discovery mexico portrait",
 }
 
 
