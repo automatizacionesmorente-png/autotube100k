@@ -1787,9 +1787,10 @@ function _applyDetailData(detail, analytics) {
     `<span style="width:6px;height:6px;background:#22c55e;border-radius:50%;animation:pulse-live 1.5s ease-in-out infinite;display:inline-block;"></span>EN VIVO · ${now}</span>`;
 
   // ── Big stats (siempre reales) ──
-  const subs  = totals.subscribers  || stats.subscribers  || 0;
-  const views = totals.total_views  || stats.total_views  || 0;
-  const vids  = totals.videos       || stats.videos_count || 0;
+  // Priorizar detail (suma real de vídeos) sobre analytics (contador canal con retraso)
+  const subs  = stats.subscribers  || totals.subscribers  || 0;
+  const views = stats.total_views  || totals.total_views  || 0;
+  const vids  = stats.videos_count || totals.videos       || 0;
   document.getElementById('chd-subs').textContent   = fmtNum(subs);
   document.getElementById('chd-views').textContent  = fmtNum(views);
   document.getElementById('chd-vcount').textContent = fmtNum(vids);
@@ -1805,8 +1806,8 @@ function _applyDetailData(detail, analytics) {
     document.getElementById('an-subs30').textContent    = `+${fmtNum(sg)} / −${fmtNum(sl)}`;
     document.getElementById('an-impr30').textContent    = fmtNum(Math.round(ov.impressions || 0));
   } else {
-    // Mostrar lo que tenemos de la Data API
-    document.getElementById('an-views30').textContent   = fmtNum(views);
+    // Fallback: mostrar datos reales de Data API
+    document.getElementById('an-views30').textContent   = fmtNum(views) + ' (total canal)';
     document.getElementById('an-minutes30').textContent = '—';
     document.getElementById('an-subs30').textContent    = fmtNum(subs);
     document.getElementById('an-impr30').textContent    = '—';
@@ -1888,9 +1889,8 @@ async function _refreshLiveStats(channelId) {
   try {
     const detail = await fetch(`${API}/api/channels/${channelId}/detail`).then(r=>r.json());
     const stats = detail.stats || {};
-    const totals = {};
     const subs  = stats.subscribers  || 0;
-    const views = stats.total_views  || 0;
+    const views = stats.total_views  || 0;  // suma real de vídeos, más preciso
     const vids  = stats.videos_count || 0;
     document.getElementById('chd-subs').textContent   = fmtNum(subs);
     document.getElementById('chd-views').textContent  = fmtNum(views);
