@@ -8,7 +8,7 @@ from typing import AsyncGenerator
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -46,8 +46,8 @@ def _fmt_eta(secs: float) -> str:
 def _make_render_progress_cb(job_id: str):
     """Devuelve un callback que convierte el % real del render a eventos SSE."""
     def cb(pct: float, eta_secs: float, done: int, total: int, phase: str):
-        # Mapeo honesto: render 0-100% → barra global 66-90%
-        global_pct = int(66 + min(pct, 100) * 24 / 100)
+        # Render tarda ~15 min = 20% de la barra (68% → 88%)
+        global_pct = int(70 + min(pct, 100) * 18 / 100)
         if phase == "clips":
             eta_str = _fmt_eta(eta_secs)
             msg = f"Clip {done}/{total}" + (f" · {eta_str}" if eta_str else "")
@@ -391,6 +391,8 @@ async def _do_retry_from_tts(
             hook_clips, body_images, audio_path, final_path, title,
             hook_images, tone, body_clips,
             _make_render_progress_cb(job_id),
+            True,    # fast_kenburns
+            script,  # guión completo — efectos cinematográficos
         )
         try:
             freed = cleanup_intermediates(job_dir)
@@ -535,6 +537,15 @@ async def _do_retry_render(
     job_dir    = OUTPUT_DIR / job_id
     final_path = job_dir / "final.mp4"
 
+    # Leer el guión completo (script.txt en disco > DB) — CRÍTICO para efectos cinematográficos
+    _script_path = job_dir / "script.txt"
+    _script_text = ""
+    if _script_path.exists():
+        _script_text = _script_path.read_text(encoding="utf-8")
+    else:
+        _job_data = get_job(job_id)
+        _script_text = (_job_data.get("script") or "") if _job_data else ""
+
     def _emit(step, status, message, progress):
         job_data  = get_job(job_id)
         real_cost = job_data["cost_total"] if job_data else 0
@@ -551,6 +562,8 @@ async def _do_retry_render(
             hook_clips, body_images, audio_path, final_path, title,
             hook_images, tone, body_clips,
             _make_render_progress_cb(job_id),
+            True,          # fast_kenburns
+            _script_text,  # guión completo — activa efectos cinematográficos
         )
 
         try:
@@ -605,9 +618,8 @@ async def _do_retry_render(
 
 
 @app.get("/api/jobs/{job_id}/video")
-async def stream_video(job_id: str):
-    """Sirve el vídeo final con soporte completo de range requests para streaming."""
-    from fastapi import Request
+async def stream_video(job_id: str, request: Request):
+    """Sirve el vídeo con soporte REAL de range requests (necesario para reproducir en navegador)."""
     from fastapi.responses import StreamingResponse
     import aiofiles
 
@@ -617,14 +629,58 @@ async def stream_video(job_id: str):
     video_path = Path(job["video_path"])
     if not video_path.exists():
         raise HTTPException(404, "Archivo de vídeo no encontrado en disco")
-    return FileResponse(
-        video_path,
-        media_type="video/mp4",
-        headers={
-            "Accept-Ranges": "bytes",
-            "Cache-Control": "no-cache",
-        }
-    )
+
+    file_size = video_path.stat().st_size
+    range_header = request.headers.get("range")
+
+    if range_header:
+        # Parsear "bytes=start-end"
+        try:
+            parts  = range_header.replace("bytes=", "").split("-")
+            start  = int(parts[0]) if parts[0] else 0
+            end    = int(parts[1]) if len(parts) > 1 and parts[1] else file_size - 1
+        except Exception:
+            start, end = 0, file_size - 1
+        end = min(end, file_size - 1)
+        content_len = end - start + 1
+
+        async def ranged():
+            async with aiofiles.open(video_path, "rb") as f:
+                await f.seek(start)
+                remaining = content_len
+                while remaining > 0:
+                    chunk = await f.read(min(512 * 1024, remaining))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+                    yield chunk
+
+        return StreamingResponse(
+            ranged(), status_code=206, media_type="video/mp4",
+            headers={
+                "Content-Range":  f"bytes {start}-{end}/{file_size}",
+                "Accept-Ranges":  "bytes",
+                "Content-Length": str(content_len),
+                "Cache-Control":  "no-cache",
+            }
+        )
+    else:
+        async def full():
+            async with aiofiles.open(video_path, "rb") as f:
+                while True:
+                    chunk = await f.read(512 * 1024)
+                    if not chunk:
+                        break
+                    yield chunk
+
+        return StreamingResponse(
+            full(), media_type="video/mp4",
+            headers={
+                "Accept-Ranges":  "bytes",
+                "Content-Length": str(file_size),
+                "Cache-Control":  "no-cache",
+            }
+        )
 
 class VoiceUpload(BaseModel):
     audio: str  # data URL base64 de un audio (mp3/wav/m4a) con la voz a clonar
@@ -947,6 +1003,256 @@ async def channel_detail_stats(channel_id: str):
         import traceback
         return {"channel": ch, "stats": None, "videos": [], "error": str(e), "trace": traceback.format_exc()}
 
+@app.get("/api/channels/{channel_id}/analytics")
+async def channel_analytics(channel_id: str):
+    """Analytics completas: retención, CTR, fuentes de tráfico, curva de abandono por vídeo."""
+    from .database import get_conn
+    from googleapiclient.discovery import build
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+    from datetime import datetime, timedelta
+
+    conn = get_conn()
+    ch = conn.execute("SELECT * FROM channels WHERE id=?", (channel_id,)).fetchone()
+    conn.close()
+    if not ch:
+        raise HTTPException(404, "Canal no encontrado")
+    ch = dict(ch)
+    if not ch.get("connected"):
+        return {"error": "Canal no conectado"}
+
+    try:
+        creds = Credentials(
+            token=ch["access_token"],
+            refresh_token=ch["refresh_token"],
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=os.environ.get("YOUTUBE_CLIENT_ID"),
+            client_secret=os.environ.get("YOUTUBE_CLIENT_SECRET"),
+        )
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            conn2 = get_conn()
+            conn2.execute("UPDATE channels SET access_token=? WHERE id=?", (creds.token, channel_id))
+            conn2.commit(); conn2.close()
+
+        yt       = build("youtube", "v3", credentials=creds)
+        yt_an    = build("youtubeAnalytics", "v2", credentials=creds)
+
+        # ── Obtener yt_channel_id real ────────────────────────────────────────
+        ch_resp = yt.channels().list(part="id,snippet,statistics", mine=True).execute()
+        if not ch_resp.get("items"):
+            return {"error": "No se pudo obtener el canal"}
+        yt_ch     = ch_resp["items"][0]
+        yt_cid    = yt_ch["id"]
+        ch_stats  = yt_ch.get("statistics", {})
+
+        today     = datetime.utcnow().strftime("%Y-%m-%d")
+        d30_ago   = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
+        d90_ago   = (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d")
+        d365_ago  = (datetime.utcnow() - timedelta(days=365)).strftime("%Y-%m-%d")
+
+        def safe_query(**kwargs):
+            try:
+                return yt_an.reports().query(**kwargs).execute()
+            except Exception as e:
+                return {"error": str(e), "columnHeaders": [], "rows": []}
+
+        # ── 1. Métricas globales canal (últimos 30 días) ──────────────────────
+        overview_30 = safe_query(
+            ids=f"channel=={yt_cid}",
+            startDate=d30_ago, endDate=today,
+            metrics="views,estimatedMinutesWatched,averageViewDuration,"
+                    "averageViewPercentage,subscribersGained,subscribersLost,"
+                    "impressions,impressionsClickThroughRate,likes,comments,shares",
+        )
+
+        # ── 2. Tendencia diaria 30d (para mini gráfico) ───────────────────────
+        trend_30 = safe_query(
+            ids=f"channel=={yt_cid}",
+            startDate=d30_ago, endDate=today,
+            metrics="views,estimatedMinutesWatched,subscribersGained",
+            dimensions="day",
+            sort="day",
+        )
+
+        # ── 3. Fuentes de tráfico 30d ─────────────────────────────────────────
+        traffic = safe_query(
+            ids=f"channel=={yt_cid}",
+            startDate=d30_ago, endDate=today,
+            metrics="views,estimatedMinutesWatched",
+            dimensions="insightTrafficSourceType",
+            sort="-views",
+        )
+
+        # ── 4. Dispositivos 30d ───────────────────────────────────────────────
+        devices = safe_query(
+            ids=f"channel=={yt_cid}",
+            startDate=d30_ago, endDate=today,
+            metrics="views",
+            dimensions="deviceType",
+            sort="-views",
+        )
+
+        # ── 5. Geografía top países 30d ───────────────────────────────────────
+        geo = safe_query(
+            ids=f"channel=={yt_cid}",
+            startDate=d30_ago, endDate=today,
+            metrics="views,estimatedMinutesWatched",
+            dimensions="country",
+            sort="-views",
+            maxResults=10,
+        )
+
+        # ── 6. Métricas por vídeo (total histórico) ───────────────────────────
+        vid_metrics = safe_query(
+            ids=f"channel=={yt_cid}",
+            startDate=d365_ago, endDate=today,
+            metrics="views,estimatedMinutesWatched,averageViewDuration,"
+                    "averageViewPercentage,impressions,impressionsClickThroughRate,"
+                    "likes,comments,shares,subscribersGained",
+            dimensions="video",
+            sort="-views",
+            maxResults=25,
+        )
+
+        # ── 7. Enriquecer vídeos con título y thumbnail ───────────────────────
+        vid_ids = []
+        if vid_metrics.get("rows"):
+            vid_ids = [r[0] for r in vid_metrics["rows"]]
+        vid_info = {}
+        if vid_ids:
+            vr = yt.videos().list(
+                part="snippet,statistics,contentDetails",
+                id=",".join(vid_ids[:25])
+            ).execute()
+            for v in vr.get("items", []):
+                vid_info[v["id"]] = {
+                    "title":     v["snippet"]["title"],
+                    "thumbnail": v["snippet"]["thumbnails"].get("medium", {}).get("url", ""),
+                    "published": v["snippet"]["publishedAt"][:10],
+                    "duration":  v.get("contentDetails", {}).get("duration", ""),
+                }
+
+        # ── 8. Curva de retención para los 3 vídeos con más vistas ───────────
+        retention_curves = {}
+        top3 = vid_ids[:3] if vid_ids else []
+        for vid_id in top3:
+            curve = safe_query(
+                ids=f"channel=={yt_cid}",
+                startDate=d365_ago, endDate=today,
+                metrics="audienceWatchRatio,relativeRetentionPerformance",
+                dimensions="elapsedVideoTimeRatio",
+                filters=f"video=={vid_id}",
+            )
+            if curve.get("rows"):
+                retention_curves[vid_id] = [
+                    {"pct": round(r[0]*100, 1), "ratio": round(r[1]*100, 2),
+                     "vs_similar": round(r[2]*100, 2) if len(r) > 2 else None}
+                    for r in curve["rows"]
+                ]
+
+        # ── 9. Parsear métricas globales en dict ──────────────────────────────
+        def parse_single(resp):
+            if not resp.get("rows"):
+                return {}
+            headers = [h["name"] for h in resp.get("columnHeaders", [])]
+            return dict(zip(headers, resp["rows"][0]))
+
+        def parse_rows(resp):
+            if not resp.get("rows"):
+                return []
+            headers = [h["name"] for h in resp.get("columnHeaders", [])]
+            return [dict(zip(headers, r)) for r in resp["rows"]]
+
+        overview = parse_single(overview_30)
+        trend    = parse_rows(trend_30)
+        traffic_rows = parse_rows(traffic)
+        device_rows  = parse_rows(devices)
+        geo_rows     = parse_rows(geo)
+
+        # Nombre legible para fuentes de tráfico
+        TRAFFIC_LABELS = {
+            "YT_SEARCH": "Búsqueda YouTube",
+            "SUGGESTED_VIDEO": "Vídeos sugeridos",
+            "BROWSE_FEATURES": "Inicio / Subs",
+            "EXT_URL": "Links externos",
+            "NOTIFICATION": "Notificaciones",
+            "PLAYLIST": "Playlists",
+            "DIRECT_OR_UNKNOWN": "Directo / desconocido",
+            "SHORTS": "YouTube Shorts",
+            "END_SCREEN": "Pantalla final",
+            "NO_LINK_OTHER": "Sin link (otro)",
+            "SUBSCRIBER": "Feed suscriptores",
+            "YT_CHANNEL": "Página del canal",
+        }
+
+        for t in traffic_rows:
+            t["label"] = TRAFFIC_LABELS.get(t.get("insightTrafficSourceType", ""), t.get("insightTrafficSourceType", ""))
+
+        # Construir lista de vídeos enriquecida
+        videos_analytics = []
+        if vid_metrics.get("rows"):
+            headers = [h["name"] for h in vid_metrics.get("columnHeaders", [])]
+            for row in vid_metrics["rows"]:
+                d = dict(zip(headers, row))
+                vid_id = d.get("video", "")
+                info = vid_info.get(vid_id, {})
+                videos_analytics.append({
+                    "id":           vid_id,
+                    "title":        info.get("title", vid_id),
+                    "thumbnail":    info.get("thumbnail", ""),
+                    "published":    info.get("published", ""),
+                    "duration":     info.get("duration", ""),
+                    "views":        int(d.get("views", 0)),
+                    "watch_minutes": round(float(d.get("estimatedMinutesWatched", 0))),
+                    "avg_duration_s": round(float(d.get("averageViewDuration", 0))),
+                    "avg_retention_pct": round(float(d.get("averageViewPercentage", 0)), 1),
+                    "impressions":  int(d.get("impressions", 0)),
+                    "ctr_pct":      round(float(d.get("impressionsClickThroughRate", 0)) * 100, 2),
+                    "likes":        int(d.get("likes", 0)),
+                    "comments":     int(d.get("comments", 0)),
+                    "shares":       int(d.get("shares", 0)),
+                    "subs_gained":  int(d.get("subscribersGained", 0)),
+                    "retention_curve": retention_curves.get(vid_id),
+                })
+
+        # Calcular medias del canal
+        if videos_analytics:
+            n = len(videos_analytics)
+            avg_views   = round(sum(v["views"] for v in videos_analytics) / n)
+            avg_ret     = round(sum(v["avg_retention_pct"] for v in videos_analytics) / n, 1)
+            avg_ctr     = round(sum(v["ctr_pct"] for v in videos_analytics) / n, 2)
+            avg_dur_s   = round(sum(v["avg_duration_s"] for v in videos_analytics) / n)
+            avg_impr    = round(sum(v["impressions"] for v in videos_analytics) / n)
+        else:
+            avg_views = avg_ret = avg_ctr = avg_dur_s = avg_impr = 0
+
+        return {
+            "overview_30d": overview,
+            "trend_30d":    trend,
+            "traffic":      traffic_rows,
+            "devices":      device_rows,
+            "geo":          geo_rows,
+            "videos":       videos_analytics,
+            "averages": {
+                "views_per_video":     avg_views,
+                "retention_pct":       avg_ret,
+                "ctr_pct":             avg_ctr,
+                "avg_duration_s":      avg_dur_s,
+                "impressions_per_video": avg_impr,
+            },
+            "channel_totals": {
+                "subscribers": int(ch_stats.get("subscriberCount", 0)),
+                "total_views": int(ch_stats.get("viewCount", 0)),
+                "videos":      int(ch_stats.get("videoCount", 0)),
+            }
+        }
+
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "trace": traceback.format_exc()}
+
+
 @app.get("/api/channels/sync")
 async def sync_channels_stats():
     """Sincroniza subs y vídeos de todos los canales conectados desde YouTube API."""
@@ -1117,76 +1423,104 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
         # Guardar guión completo en disco (permite edición desde la UI)
         (job_dir / "script.txt").write_text(script, encoding="utf-8")
         wcount = len(script.split())
-        emit("script", "done", f"Guión listo: {wcount} palabras (~{wcount//130} min)", 18)
+        emit("script", "done", f"Guión listo: {wcount} palabras (~{wcount//130} min)", 8)
         check_cancelled()
 
-        # ── VOZ en SEGUNDO PLANO (CPU, ~50min) mientras se generan las imágenes ──
-        # La voz no depende de las imágenes ni viceversa. La voz usa CPU; las imágenes
-        # usan red (fal.ai/Pexels). Solapándolas se ahorran ~10 min SIN perder calidad.
-        emit("tts", "running", "Generando voz (en paralelo con las imágenes)…", 20)
-        emit("images", "running", "Generando prompts de imagen con IA…", 20)
+        # ── VOZ en SEGUNDO PLANO (CPU, ~50-70min) mientras se generan las imágenes ──
+        emit("tts", "running", "Generando voz XTTS (CPU ~60 min)…", 10)
+        emit("images", "running", "Generando prompts de imagen con IA…", 10)
         from .pipeline.tts import generate_audio
         from .pipeline.images import (generate_image_prompts, generate_images,
-                                       generate_hook_images, generate_thumbnail)
+                                       generate_hook_images)
         audio_path = job_dir / "narration.mp3"
         custom_voice_ref = None
         if getattr(req, "use_custom_voice", False):
             _cv = Path("/root/autotube100k/voices/custom.wav")
             if _cv.exists():
                 custom_voice_ref = str(_cv)
-        # Lanzar la voz YA, en segundo plano (es el cuello de botella). No la esperamos aún.
+
+        # Lanzar la voz YA, en segundo plano.
         audio_task = asyncio.create_task(
             asyncio.to_thread(generate_audio, job_id, script, req.tone, audio_path,
                               custom_voice_ref, req.title, req.niche)
         )
 
-        # Mientras la voz se genera, hacemos TODO lo visual (no depende del audio):
+        # ── PROGRESO REAL DE LA VOZ: actualización cada 30s basada en tiempo ──
+        # La voz tarda ~2.3x la duración del audio (CPU sin GPU).
+        # Para un vídeo de 37 min → ~85 min de generación.
+        _tts_estimated_secs = (wcount / 145) * 60 * 2.3  # duración_script_seg * factor_CPU
+        _tts_start = asyncio.get_event_loop().time()
+
+        async def _tts_progress_loop():
+            """Emite progreso realista de la voz cada 30s hasta que termine."""
+            await asyncio.sleep(30)
+            while not audio_task.done():
+                elapsed  = asyncio.get_event_loop().time() - _tts_start
+                fraction = min(0.95, elapsed / max(1, _tts_estimated_secs))
+                # La voz ocupa del 10% al 68% de la barra global (58 puntos = ~60 min)
+                pct      = int(10 + fraction * 58)
+                mins_e   = int(elapsed / 60)
+                secs_e   = int(elapsed % 60)
+                mins_left = max(0, int((_tts_estimated_secs - elapsed) / 60))
+                msg = f"Generando voz… ⏱ {mins_e}:{secs_e:02d} transcurridos · ~{mins_left} min restantes"
+                _job_events.setdefault(job_id, []).append({
+                    "type": "step", "step": "tts", "status": "running",
+                    "message": msg, "progress": pct, "cost": 0,
+                    "is_progress": True,
+                    "sub_pct": round(fraction * 100, 1),
+                })
+                update_job(job_id, progress=pct)
+                await asyncio.sleep(30)
+
+        asyncio.create_task(_tts_progress_loop())
+
+        # Mientras la voz se genera, hacemos TODO lo visual:
         img_prompts = await asyncio.to_thread(generate_image_prompts, job_id, script, req.niche, 40)
 
-        images_dir   = job_dir / "images"
+        images_dir    = job_dir / "images"
         hook_imgs_dir = job_dir / "hook_images"
 
         def on_img_progress(done: int, total: int, fal_cost: float):
-            pct = 25 + int(done / total * 25)
+            # Las imágenes son rápidas (~10 min) — no tocan el % global para no confundir
             _job_events.setdefault(job_id, []).append({
                 "type": "step", "step": "images", "status": "running",
                 "message": f"Imagen {done}/{total}",
-                "progress": pct, "cost": fal_cost, "realtime": True,
+                "progress": 0, "cost": fal_cost, "realtime": True,
                 "sub_pct": round(done / total * 100, 1),
             })
 
-        emit("images", "running", "Generando 60 imágenes + 8 hook + B-roll vídeo + thumbnail (durante la voz)…", 30)
+        emit("images", "running", "Generando imágenes + clips + thumbnail (en paralelo con la voz)…", 0)
         from .pipeline.hook_videos import (generate_hook_prompts as gen_hookvid_prompts,
                                            generate_hook_videos, generate_body_videos)
         hook_vids_dir = job_dir / "hook_videos"
 
         def _hook_videos_task():
-            # Footage real de Pexels para el hook (gratis). Si no hay key, devuelve [].
-            queries = gen_hookvid_prompts(job_id, script, req.niche, 8)
+            queries = gen_hookvid_prompts(job_id, script, req.niche, 25)
             return generate_hook_videos(job_id, queries, hook_vids_dir)
 
-        body_task  = asyncio.to_thread(generate_images, job_id, img_prompts, images_dir, on_img_progress)
-        hook_task  = asyncio.to_thread(generate_hook_images, job_id, req.niche, script[:800], hook_imgs_dir)
-        thumb_task = asyncio.to_thread(generate_thumbnail, job_id, req.title, req.niche, job_dir, req.tone)
+        body_task    = asyncio.to_thread(generate_images, job_id, img_prompts, images_dir, on_img_progress)
+        hook_task    = asyncio.to_thread(generate_hook_images, job_id, req.niche, script[:800], hook_imgs_dir)
         hookvid_task = asyncio.to_thread(_hook_videos_task)
-        bodyvid_task = asyncio.to_thread(generate_body_videos, job_id, script, req.niche, 35)
-        body_images, hook_images, thumbnail_path, hook_clips, body_clips = await asyncio.gather(
-            body_task, hook_task, thumb_task, hookvid_task, bodyvid_task
+        bodyvid_task = asyncio.to_thread(generate_body_videos, job_id, script, req.niche, 100)
+        body_images, hook_images, hook_clips, body_clips = await asyncio.gather(
+            body_task, hook_task, hookvid_task, bodyvid_task
         )
+        thumbnail_path = None  # miniatura generada externamente con Nanobanana
 
-        emit("images",    "done", f"{len(body_images)} imágenes + {len(body_clips)} clips vídeo (cuerpo dinámico)", 55)
+        emit("images",     "done", f"{len(body_images)} imágenes + {len(body_clips)} clips vídeo", 0)
         hook_src = f"{len(hook_clips)} clips vídeo Pexels" if hook_clips else f"{len(hook_images)} imágenes"
-        emit("hook_videos","done", f"Hook: {hook_src}", 58)
-        emit("thumbnail", "done", "Miniatura con título lista", 60)
+        emit("hook_videos","done", f"Hook: {hook_src}", 0)
+        emit("thumbnail",  "done", "Miniatura lista", 0)
 
-        # Ahora esperamos a que la voz (que iba en paralelo) termine, antes de montar
-        emit("tts", "running", "Esperando a que termine la voz (se generó en paralelo)…", 62)
+        # Esperar a que la voz termine — es el cuello de botella real
         audio_result = await audio_task
-        emit("tts", "done", "Audio listo", 64)
+        tts_elapsed = asyncio.get_event_loop().time() - _tts_start
+        tts_mins = int(tts_elapsed / 60); tts_secs = int(tts_elapsed % 60)
+        emit("tts", "done", f"Voz lista en {tts_mins}:{tts_secs:02d} min", 68)
         check_cancelled()
 
-        # ── Paso 7: Render FFmpeg ─────────────────────────────────
-        emit("render", "running", "Montando vídeo con FFmpeg (sin huecos en blanco)…", 66)
+        # ── Paso 7: Render FFmpeg (68% → 88%) ────────────────────
+        emit("render", "running", "Montando vídeo con FFmpeg…", 70)
         from .pipeline.render import render_video
         final_path = job_dir / "final.mp4"
         await asyncio.to_thread(
@@ -1195,9 +1529,10 @@ async def run_pipeline(job_id: str, req: GenerateRequest):
             body_images, audio_path, final_path, req.title,
             hook_images, req.tone, body_clips,
             _make_render_progress_cb(job_id),
-            not getattr(req, "quality_render", False),  # fast_kenburns: rápido por defecto
+            not getattr(req, "quality_render", False),
+            script,   # guión completo para análisis emocional de música
         )
-        emit("render", "done", "Vídeo montado completamente", 90)
+        emit("render", "done", "Vídeo montado completamente", 88)
 
         # Limpieza post-render: borrar archivos de trabajo (el vídeo ya los contiene)
         try:

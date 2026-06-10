@@ -420,105 +420,6 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
 .step-subbar-fill  { height:100%; background:var(--gold); border-radius:2px; width:0%; transition:width 0.8s ease; }
 .step-subbar-pct   { font-size:10px; color:var(--muted); min-width:28px; text-align:right; }
 
-/* ─── ASSET DRAWER ─── */
-.step.clickable        { cursor: pointer; transition: background 0.15s; }
-.step.clickable:hover  { background: var(--cream); }
-.step.clickable:hover .step-name { color: var(--gold); }
-.step-peek             { font-size: 10px; color: var(--gold); margin-top: 2px; letter-spacing: 0.03em; }
-
-.drawer-overlay {
-  position: fixed; inset: 0; background: rgba(28,25,20,0.45);
-  z-index: 400; opacity: 0; pointer-events: none; transition: opacity 0.25s;
-}
-.drawer-overlay.open { opacity: 1; pointer-events: auto; }
-
-.asset-drawer {
-  position: fixed; top: 0; right: -720px; width: 720px; max-width: 96vw;
-  height: 100vh; background: var(--white);
-  border-left: 1px solid var(--border);
-  box-shadow: -8px 0 32px rgba(0,0,0,0.08);
-  z-index: 401; display: flex; flex-direction: column;
-  transition: right 0.28s cubic-bezier(0.4,0,0.2,1);
-  overflow: hidden;
-}
-.asset-drawer.open { right: 0; }
-
-.drawer-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 24px; border-bottom: 1px solid var(--border);
-  flex-shrink: 0; background: var(--white);
-}
-.drawer-title  { font-size: 13px; font-weight: 600; color: var(--ink); }
-.drawer-close  {
-  width: 28px; height: 28px; border-radius: 50%; background: var(--cream);
-  border: 1px solid var(--border2); cursor: pointer; font-size: 13px;
-  display: flex; align-items: center; justify-content: center; color: var(--muted);
-  transition: all 0.15s;
-}
-.drawer-close:hover { background: var(--red-bg); border-color: var(--red); color: var(--red); }
-
-.drawer-body   { flex: 1; overflow-y: auto; padding: 20px 24px; }
-
-.drawer-section { margin-bottom: 20px; }
-.drawer-section-title {
-  font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--muted); margin-bottom: 8px;
-}
-
-/* Hook / Script textarea */
-.drawer-textarea {
-  width: 100%; min-height: 280px; font-family: 'Inter', sans-serif;
-  font-size: 12.5px; line-height: 1.7; color: var(--ink); background: var(--cream);
-  border: 1px solid var(--border2); border-radius: 8px; padding: 14px 16px;
-  resize: vertical; outline: none; transition: border-color 0.15s;
-}
-.drawer-textarea:focus { border-color: var(--gold); background: var(--white); }
-.drawer-textarea.hook  { min-height: 200px; background: #fffdf5; border-color: #e8d98a; }
-
-.drawer-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-.drawer-btn {
-  padding: 8px 16px; border-radius: 7px; font-size: 11.5px; font-weight: 500;
-  cursor: pointer; border: 1px solid var(--border2); background: var(--cream);
-  color: var(--ink2); transition: all 0.15s;
-}
-.drawer-btn:hover { border-color: var(--gold); color: var(--gold); }
-.drawer-btn.primary {
-  background: var(--ink); border-color: var(--ink); color: var(--white);
-}
-.drawer-btn.primary:hover { background: var(--gold2); border-color: var(--gold2); }
-.drawer-btn.danger {
-  background: var(--red-bg); border-color: var(--red); color: var(--red);
-}
-.drawer-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-
-/* Image grid */
-.img-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 6px; margin-top: 4px;
-}
-.img-grid img {
-  width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px;
-  border: 1px solid var(--border); cursor: pointer; transition: all 0.15s;
-  background: var(--cream);
-}
-.img-grid img:hover { border-color: var(--gold); transform: scale(1.03); }
-
-/* Audio player */
-.drawer-audio { width: 100%; border-radius: 8px; margin-top: 4px; }
-
-/* Thumbnail preview */
-.thumb-preview {
-  width: 100%; border-radius: 10px; border: 1px solid var(--border);
-  display: block; margin-top: 4px;
-}
-
-/* Save feedback */
-.drawer-saved {
-  font-size: 11px; color: var(--green); opacity: 0; transition: opacity 0.3s;
-  margin-left: 6px; align-self: center;
-}
-.drawer-saved.show { opacity: 1; }
-
 /* result */
 .result-ok {
   margin: 0 20px 16px;
@@ -693,7 +594,6 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
               <div class="tone-opt"    data-tone="documental"   onclick="selectTone(this)">Documental</div>
               <div class="tone-opt"    data-tone="drama"        onclick="selectTone(this)">Drama</div>
               <div class="tone-opt"    data-tone="humor"        onclick="selectTone(this)">Humor</div>
-              <div class="tone-opt"    data-tone="deportivo"    onclick="selectTone(this)">⚽ Deportivo</div>
             </div>
           </div>
           <div class="field">
@@ -860,39 +760,125 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
 </div>
 
 <!-- ══ MODAL DETALLE CANAL ══ -->
-<div id="modal-ch-detail" class="modal-overlay" onclick="if(event.target===this)closeChDetail()" style="display:none;position:fixed;inset:0;background:rgba(28,25,20,.55);z-index:200;display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;">
-  <div style="background:#fff;border-radius:16px;width:100%;max-width:720px;box-shadow:0 24px 80px rgba(0,0,0,.18);overflow:hidden;">
+<div id="modal-ch-detail" class="modal-overlay" onclick="if(event.target===this)closeChDetail()" style="display:none;position:fixed;inset:0;background:rgba(28,25,20,.6);z-index:200;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;">
+  <div style="background:#fff;border-radius:18px;width:100%;max-width:900px;box-shadow:0 32px 100px rgba(0,0,0,.22);overflow:hidden;">
+
     <!-- Header -->
-    <div style="background:var(--ink);padding:28px 32px;position:relative;">
-      <button onclick="closeChDetail()" style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,.12);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;">✕</button>
-      <div id="chd-kicker" style="font-size:10px;color:rgba(255,255,255,.5);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;">Canal YouTube</div>
-      <div id="chd-name" style="font-family:'Playfair Display',serif;font-size:22px;color:#fff;margin-bottom:4px;">—</div>
-      <div id="chd-meta" style="font-size:11px;color:rgba(255,255,255,.45);">Cargando…</div>
-    </div>
-    <!-- Big stats -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border);">
-      <div style="padding:20px 24px;border-right:1px solid var(--border);text-align:center;">
-        <div id="chd-subs" style="font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);">—</div>
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;">Suscriptores</div>
-      </div>
-      <div style="padding:20px 24px;border-right:1px solid var(--border);text-align:center;">
-        <div id="chd-views" style="font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);">—</div>
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;">Visualizaciones</div>
-      </div>
-      <div style="padding:20px 24px;text-align:center;">
-        <div id="chd-vcount" style="font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);">—</div>
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;">Vídeos</div>
+    <div style="background:var(--ink);padding:24px 32px 0;position:relative;">
+      <button onclick="closeChDetail()" style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,.12);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;">✕</button>
+      <div id="chd-kicker" style="font-size:10px;color:rgba(255,255,255,.45);letter-spacing:.12em;text-transform:uppercase;margin-bottom:5px;">Canal YouTube</div>
+      <div id="chd-name" style="font-family:'Playfair Display',serif;font-size:22px;color:#fff;margin-bottom:3px;">—</div>
+      <div id="chd-meta" style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:16px;">Cargando…</div>
+      <!-- Tabs -->
+      <div style="display:flex;gap:0;border-top:1px solid rgba(255,255,255,.1);">
+        <button id="chd-tab-resumen" onclick="chdTab('resumen')" style="padding:10px 20px;background:none;border:none;color:rgba(255,255,255,.9);font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid var(--gold);letter-spacing:.04em;">RESUMEN</button>
+        <button id="chd-tab-videos" onclick="chdTab('videos')" style="padding:10px 20px;background:none;border:none;color:rgba(255,255,255,.45);font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;letter-spacing:.04em;">VÍDEOS</button>
+        <button id="chd-tab-audiencia" onclick="chdTab('audiencia')" style="padding:10px 20px;background:none;border:none;color:rgba(255,255,255,.45);font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;letter-spacing:.04em;">AUDIENCIA</button>
       </div>
     </div>
-    <!-- Canal info -->
-    <div id="chd-info" style="padding:16px 24px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;gap:24px;flex-wrap:wrap;"></div>
-    <!-- Últimos vídeos -->
-    <div style="padding:24px 28px;">
-      <div style="font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.06em;text-transform:uppercase;margin-bottom:16px;">Últimos vídeos publicados</div>
-      <div id="chd-videos" style="display:flex;flex-direction:column;gap:12px;">
-        <div style="color:var(--muted);font-size:12px;">Cargando vídeos…</div>
+
+    <!-- ── TAB: RESUMEN ── -->
+    <div id="chd-panel-resumen">
+      <!-- Big stats -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border);">
+        <div style="padding:18px 20px;border-right:1px solid var(--border);text-align:center;">
+          <div id="chd-subs" style="font-family:'Playfair Display',serif;font-size:26px;color:var(--ink);">—</div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px;">Suscriptores</div>
+        </div>
+        <div style="padding:18px 20px;border-right:1px solid var(--border);text-align:center;">
+          <div id="chd-views" style="font-family:'Playfair Display',serif;font-size:26px;color:var(--ink);">—</div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px;">Views totales</div>
+        </div>
+        <div style="padding:18px 20px;text-align:center;">
+          <div id="chd-vcount" style="font-family:'Playfair Display',serif;font-size:26px;color:var(--ink);">—</div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px;">Vídeos</div>
+        </div>
+      </div>
+
+      <!-- Analytics KPIs últimos 30 días -->
+      <div style="padding:20px 24px 4px;border-bottom:1px solid var(--border);">
+        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;">📊 Analytics — últimos 30 días</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;" id="chd-kpis-30">
+          <div style="background:var(--cream);border-radius:10px;padding:14px 16px;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Views 30d</div><div id="an-views30" style="font-size:20px;font-weight:700;color:var(--ink);">—</div></div>
+          <div style="background:var(--cream);border-radius:10px;padding:14px 16px;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Minutos vistos 30d</div><div id="an-minutes30" style="font-size:20px;font-weight:700;color:var(--ink);">—</div></div>
+          <div style="background:var(--cream);border-radius:10px;padding:14px 16px;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Subs ganados 30d</div><div id="an-subs30" style="font-size:20px;font-weight:700;color:var(--green);">—</div></div>
+          <div style="background:var(--cream);border-radius:10px;padding:14px 16px;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Impresiones 30d</div><div id="an-impr30" style="font-size:20px;font-weight:700;color:var(--ink);">—</div></div>
+        </div>
+      </div>
+
+      <!-- Medias por vídeo -->
+      <div style="padding:20px 24px 4px;border-bottom:1px solid var(--border);">
+        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;">🎯 Medias por vídeo (histórico)</div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px;">
+          <div style="text-align:center;padding:12px 8px;background:var(--cream);border-radius:10px;">
+            <div id="avg-views" style="font-size:18px;font-weight:700;color:var(--ink);">—</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;">Views/vídeo</div>
+          </div>
+          <div style="text-align:center;padding:12px 8px;background:var(--cream);border-radius:10px;">
+            <div id="avg-ret" style="font-size:18px;font-weight:700;color:var(--gold);">—</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;">Retención %</div>
+          </div>
+          <div style="text-align:center;padding:12px 8px;background:var(--cream);border-radius:10px;">
+            <div id="avg-ctr" style="font-size:18px;font-weight:700;color:var(--ink);">—</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;">CTR %</div>
+          </div>
+          <div style="text-align:center;padding:12px 8px;background:var(--cream);border-radius:10px;">
+            <div id="avg-dur" style="font-size:18px;font-weight:700;color:var(--ink);">—</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;">Duración media</div>
+          </div>
+          <div style="text-align:center;padding:12px 8px;background:var(--cream);border-radius:10px;">
+            <div id="avg-impr" style="font-size:18px;font-weight:700;color:var(--ink);">—</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;">Impr./vídeo</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fuentes de tráfico -->
+      <div style="padding:20px 24px 20px;" id="chd-traffic-section">
+        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;">🚦 Fuentes de tráfico (30d)</div>
+        <div id="chd-traffic" style="display:flex;flex-direction:column;gap:8px;">
+          <div style="color:var(--muted);font-size:12px;">Cargando…</div>
+        </div>
       </div>
     </div>
+
+    <!-- ── TAB: VÍDEOS ── -->
+    <div id="chd-panel-videos" style="display:none;">
+      <div style="padding:20px 24px;">
+        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;">🎬 Analytics por vídeo</div>
+        <!-- Cabecera tabla -->
+        <div style="display:grid;grid-template-columns:2fr 60px 70px 60px 70px 60px 60px;gap:6px;padding:8px 10px;background:var(--cream2);border-radius:8px;margin-bottom:8px;font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">
+          <div>Vídeo</div><div style="text-align:right;">Views</div><div style="text-align:center;">Retención</div><div style="text-align:right;">CTR%</div><div style="text-align:right;">Watch min</div><div style="text-align:right;">Impr.</div><div style="text-align:right;">+Subs</div>
+        </div>
+        <div id="chd-videos-analytics" style="display:flex;flex-direction:column;gap:4px;">
+          <div style="color:var(--muted);font-size:12px;padding:20px 0;text-align:center;">Cargando analytics…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: AUDIENCIA ── -->
+    <div id="chd-panel-audiencia" style="display:none;">
+      <div style="padding:20px 24px;">
+        <!-- Dispositivos -->
+        <div style="margin-bottom:24px;">
+          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;">📱 Dispositivos (30d)</div>
+          <div id="chd-devices" style="display:flex;flex-direction:column;gap:7px;"></div>
+        </div>
+        <!-- Países -->
+        <div style="margin-bottom:24px;">
+          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;">🌍 Top países (30d)</div>
+          <div id="chd-geo" style="display:flex;flex-direction:column;gap:7px;"></div>
+        </div>
+        <!-- Curvas de retención -->
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;">📉 Curva de abandono — top 3 vídeos</div>
+          <div id="chd-retention" style="display:flex;flex-direction:column;gap:20px;">
+            <div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">Cargando curvas…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1024,7 +1010,7 @@ const API = window.location.hostname === 'localhost' ? '' : BACKEND_BASE_URL;
 
 const STEPS_META = {
   script:      { icon: '✦', label: 'Guión Claude' },
-  tts:         { icon: '◎', label: 'Voz XTTS' },
+  tts:         { icon: '◎', label: 'Voz Kokoro' },
   images:      { icon: '◈', label: 'Imágenes Flux' },
   thumbnail:   { icon: '⬡', label: 'Miniatura' },
   hook_videos: { icon: '▷', label: 'Hook — Imágenes impacto' },
@@ -1389,11 +1375,6 @@ function onStep({step, status, message, progress, cost, realtime, sub_pct, eta_s
     if (el && el.textContent) el.textContent = el.textContent.replace('⏱', '✓');
   }
 
-  // Hacer clickable el step cuando termina
-  if (status === 'done' && currentJobId) {
-    _makeStepClickable(step, currentJobId);
-  }
-
   // Coste: solo en eventos de paso completo (no en fal.ai realtime ni en is_progress)
   if (cost > 0) {
     if (realtime) {
@@ -1460,30 +1441,24 @@ function onEnd({job}) {
   document.getElementById('pipeline-lbl').textContent = '✅ Vídeo listo para revisión';
   eventSource.close();
 
-  // Mostrar siempre el player si hay vídeo — aunque ya esté subido a YouTube
-  if (job.video_path) {
+  if (job.youtube_url) {
+    // Ya subido (raro, pero por si acaso)
+    document.getElementById('final-result').innerHTML =
+      `<div style="padding:0 20px 16px;"><a href="${job.youtube_url}" target="_blank" class="btn btn-green" style="width:100%;padding:11px;font-size:12px;border-radius:6px;">▶ Ver en YouTube ↗</a></div>`;
+  } else if (job.video_path) {
+    // Mostrar preview del vídeo + botón subir
     const review = document.getElementById('video-review');
     const vid    = document.getElementById('video-preview');
     const dl     = document.getElementById('btn-download');
     const videoUrl = `${API}/api/jobs/${job.id}/video`;
     vid.src = videoUrl;
     dl.href = videoUrl;
-    dl.download = (job.title || 'video') + '.mp4';
+    dl.download = job.title + '.mp4';
     review.style.display = 'block';
     document.getElementById('upload-status').textContent = '';
-    if (job.youtube_url) {
-      // Ya subido: botón para verlo en YouTube (en vez del botón de subir)
-      document.getElementById('btn-upload-yt').textContent = '▶ Ver en YouTube ↗';
-      document.getElementById('btn-upload-yt').disabled = false;
-      document.getElementById('btn-upload-yt').onclick = () => window.open(job.youtube_url, '_blank');
-      document.getElementById('upload-status').innerHTML =
-        `<span style="color:var(--green);font-size:11px;">✓ Ya publicado en YouTube</span>`;
-    } else {
-      document.getElementById('btn-upload-yt').disabled = false;
-      document.getElementById('btn-upload-yt').textContent = '▶ Subir a YouTube';
-      document.getElementById('btn-upload-yt').onclick = uploadToYoutube;
-      _loadUploadChannels(job.channel_id);
-    }
+    document.getElementById('btn-upload-yt').disabled = false;
+    document.getElementById('btn-upload-yt').textContent = '▶ Subir a YouTube';
+    _loadUploadChannels(job.channel_id);
   }
   loadJobs(); loadNavCost();
 }
@@ -1580,37 +1555,26 @@ async function openJobDetail(jobId) {
       if (d.type === 'error') onError(d);
     };
   } else if (job.status === 'done') {
-    currentJobId = jobId;
     Object.keys(STEPS_META).forEach(key => {
       const dot = document.getElementById('dot-' + key);
       if (dot) dot.className = 'step-icon done';
-      // Activar clickable en todos los steps del job completado
-      _makeStepClickable(key, jobId);
     });
     document.getElementById('pipeline-lbl').textContent = '✅ Vídeo listo para revisión';
     document.getElementById('btn-cancel').style.display = 'none';
-    // Mostrar siempre el player si hay vídeo — aunque ya esté subido a YouTube
-    if (job.video_path) {
+    if (job.youtube_url) {
+      document.getElementById('final-result').innerHTML =
+        `<div style="padding:0 20px 16px;"><a href="${job.youtube_url}" target="_blank" class="btn btn-green" style="width:100%;padding:11px;font-size:12px;border-radius:6px;">▶ Ver en YouTube ↗</a></div>`;
+    } else if (job.video_path) {
       const videoUrl = `${API}/api/jobs/${job.id}/video`;
       document.getElementById('video-preview').src = videoUrl;
       document.getElementById('btn-download').href = videoUrl;
-      document.getElementById('btn-download').download = (job.title||'video') + '.mp4';
+      document.getElementById('btn-upload-yt').disabled = false;
+      document.getElementById('btn-upload-yt').textContent = '▶ Subir a YouTube';
       document.getElementById('upload-status').textContent = '';
       document.getElementById('video-review').style.display = 'block';
       currentJobId = job.id;
       currentChannelId = job.channel_id;
-      if (job.youtube_url) {
-        document.getElementById('btn-upload-yt').textContent = '▶ Ver en YouTube ↗';
-        document.getElementById('btn-upload-yt').disabled = false;
-        document.getElementById('btn-upload-yt').onclick = () => window.open(job.youtube_url, '_blank');
-        document.getElementById('upload-status').innerHTML =
-          `<span style="color:var(--green);font-size:11px;">✓ Ya publicado en YouTube</span>`;
-      } else {
-        document.getElementById('btn-upload-yt').disabled = false;
-        document.getElementById('btn-upload-yt').textContent = '▶ Subir a YouTube';
-        document.getElementById('btn-upload-yt').onclick = uploadToYoutube;
-        _loadUploadChannels(job.channel_id);
-      }
+      _loadUploadChannels(job.channel_id);
       _loadThumbnailVariants(job.id);
       _checkShort(job.id);
     }
@@ -1696,63 +1660,210 @@ function parseDuration(iso) {
   return `${min}:${String(s).padStart(2,'0')}`;
 }
 
+function chdTab(tab) {
+  ['resumen','videos','audiencia'].forEach(t => {
+    document.getElementById(`chd-panel-${t}`).style.display = t === tab ? 'block' : 'none';
+    const btn = document.getElementById(`chd-tab-${t}`);
+    btn.style.color = t === tab ? 'rgba(255,255,255,.9)' : 'rgba(255,255,255,.4)';
+    btn.style.borderBottomColor = t === tab ? 'var(--gold)' : 'transparent';
+  });
+}
+
+function fmtSec(s) {
+  if (!s) return '—';
+  const m = Math.floor(s/60), ss = Math.round(s%60);
+  return m > 0 ? `${m}m ${ss}s` : `${ss}s`;
+}
+
+function retColor(pct) {
+  if (pct >= 50) return '#22c55e';
+  if (pct >= 35) return 'var(--gold)';
+  if (pct >= 20) return '#f97316';
+  return '#ef4444';
+}
+
+function renderBar(val, max, color='var(--gold)') {
+  const pct = max > 0 ? Math.min(100, (val/max)*100) : 0;
+  return `<div style="background:var(--cream2);border-radius:4px;height:6px;flex:1;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${color};border-radius:4px;transition:width .4s;"></div></div>`;
+}
+
+function renderRetentionCurve(curve, title) {
+  if (!curve || !curve.length) return `<div style="color:var(--muted);font-size:11px;">Sin datos de retención</div>`;
+  const maxRatio = Math.max(...curve.map(p => p.ratio));
+  const points = curve.filter((_,i) => i % 2 === 0); // cada 2% para no saturar
+  const bars = points.map(p => {
+    const h = Math.round((p.ratio / (maxRatio || 1)) * 48);
+    const col = p.ratio > 80 ? '#22c55e' : p.ratio > 50 ? 'var(--gold)' : p.ratio > 25 ? '#f97316' : '#ef4444';
+    return `<div title="${p.pct}% del vídeo → ${p.ratio}% espectadores" style="width:8px;height:${h}px;background:${col};border-radius:2px 2px 0 0;flex-shrink:0;"></div>`;
+  }).join('');
+
+  // puntos de caída más brusca
+  let maxDrop = 0, dropAt = 0;
+  for (let i = 1; i < curve.length; i++) {
+    const drop = curve[i-1].ratio - curve[i].ratio;
+    if (drop > maxDrop) { maxDrop = drop; dropAt = curve[i].pct; }
+  }
+
+  return `
+    <div style="border:1px solid var(--border);border-radius:12px;padding:16px;background:#fafaf8;">
+      <div style="font-size:11px;font-weight:600;color:var(--ink);margin-bottom:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</div>
+      <div style="display:flex;align-items:flex-end;gap:1px;height:52px;margin-bottom:8px;">${bars}</div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);">
+        <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+      </div>
+      ${maxDrop > 3 ? `<div style="margin-top:8px;font-size:10px;color:#ef4444;">⚠️ Mayor caída al ${dropAt}% del vídeo (−${maxDrop.toFixed(1)}pp)</div>` : ''}
+    </div>`;
+}
+
 async function openChDetail(channelId) {
   const modal = document.getElementById('modal-ch-detail');
   modal.style.display = 'flex';
+  chdTab('resumen');
+
   // Reset
   document.getElementById('chd-name').textContent = 'Cargando…';
   document.getElementById('chd-meta').textContent = '';
-  document.getElementById('chd-subs').textContent = '—';
-  document.getElementById('chd-views').textContent = '—';
-  document.getElementById('chd-vcount').textContent = '—';
-  document.getElementById('chd-info').innerHTML = '';
-  document.getElementById('chd-videos').innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando vídeos…</div>';
+  ['chd-subs','chd-views','chd-vcount','an-views30','an-minutes30','an-subs30','an-impr30',
+   'avg-views','avg-ret','avg-ctr','avg-dur','avg-impr'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.textContent = '—';
+  });
+  document.getElementById('chd-traffic').innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando…</div>';
+  document.getElementById('chd-videos-analytics').innerHTML = '<div style="color:var(--muted);font-size:12px;padding:20px 0;text-align:center;">Cargando…</div>';
+  document.getElementById('chd-devices').innerHTML = '';
+  document.getElementById('chd-geo').innerHTML = '';
+  document.getElementById('chd-retention').innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">Cargando curvas…</div>';
 
   try {
-    const data = await fetch(`${API}/api/channels/${channelId}/detail`).then(r => r.json());
-    const ch = data.channel;
-    const stats = data.stats;
-    const videos = data.videos || [];
+    // Carga en paralelo: detail + analytics
+    const [detail, analytics] = await Promise.all([
+      fetch(`${API}/api/channels/${channelId}/detail`).then(r => r.json()),
+      fetch(`${API}/api/channels/${channelId}/analytics`).then(r => r.json()),
+    ]);
 
+    const ch = detail.channel;
+    const stats = detail.stats;
+    const ov = analytics.overview_30d || {};
+    const avgs = analytics.averages || {};
+    const totals = analytics.channel_totals || {};
+
+    // ── Header ──
     document.getElementById('chd-name').textContent = ch.name;
-    document.getElementById('chd-subs').textContent  = stats ? fmtNum(stats.subscribers) : '—';
-    document.getElementById('chd-views').textContent = stats ? fmtNum(stats.total_views)  : '—';
-    document.getElementById('chd-vcount').textContent= stats ? fmtNum(stats.videos_count) : '—';
-
-    // Meta info
     const parts = [];
     if (stats?.country) parts.push(`🌍 ${stats.country}`);
     if (stats?.created) parts.push(`📅 Canal desde ${stats.created}`);
-    if (ch.niche) parts.push(`🎯 Nicho: ${ch.niche}`);
-    document.getElementById('chd-meta').textContent = parts.join('  ·  ') || 'Sin datos adicionales';
+    if (ch.niche) parts.push(`🎯 ${ch.niche}`);
+    document.getElementById('chd-meta').textContent = parts.join('  ·  ') || '';
 
-    // Info row
-    const info = [];
-    if (stats?.description) {
-      const desc = stats.description.length > 180 ? stats.description.slice(0,180)+'…' : stats.description;
-      info.push(`<span style="color:var(--ink2);line-height:1.5;">${desc}</span>`);
-    }
-    document.getElementById('chd-info').innerHTML = info.join('') || '';
+    // ── Big stats ──
+    document.getElementById('chd-subs').textContent  = fmtNum(totals.subscribers || stats?.subscribers || 0);
+    document.getElementById('chd-views').textContent = fmtNum(totals.total_views  || stats?.total_views  || 0);
+    document.getElementById('chd-vcount').textContent= fmtNum(totals.videos       || stats?.videos_count || 0);
 
-    // Vídeos
-    if (!videos.length) {
-      document.getElementById('chd-videos').innerHTML = '<div style="color:var(--muted);font-size:12px;">No hay vídeos publicados aún.</div>';
+    // ── KPIs 30d ──
+    document.getElementById('an-views30').textContent   = fmtNum(Math.round(ov.views || 0));
+    document.getElementById('an-minutes30').textContent = fmtNum(Math.round(ov.estimatedMinutesWatched || 0));
+    const subsGained = Math.round(ov.subscribersGained || 0);
+    const subsLost   = Math.round(ov.subscribersLost || 0);
+    document.getElementById('an-subs30').textContent = `+${fmtNum(subsGained)} / −${fmtNum(subsLost)}`;
+    document.getElementById('an-impr30').textContent = fmtNum(Math.round(ov.impressions || 0));
+
+    // ── Medias por vídeo ──
+    document.getElementById('avg-views').textContent = fmtNum(avgs.views_per_video || 0);
+    const retPct = avgs.retention_pct || 0;
+    const retEl = document.getElementById('avg-ret');
+    retEl.textContent = `${retPct}%`;
+    retEl.style.color = retColor(retPct);
+    document.getElementById('avg-ctr').textContent = `${(avgs.ctr_pct || 0).toFixed(2)}%`;
+    document.getElementById('avg-dur').textContent = fmtSec(avgs.avg_duration_s || 0);
+    document.getElementById('avg-impr').textContent = fmtNum(avgs.impressions_per_video || 0);
+
+    // CTR global 30d badge
+    const ctr30 = ((ov.impressionsClickThroughRate || 0)*100).toFixed(2);
+    const ctr30badge = `<span style="background:${parseFloat(ctr30)>=4?'#dcfce7':parseFloat(ctr30)>=2?'#fef9c3':'#fee2e2'};color:${parseFloat(ctr30)>=4?'#166534':parseFloat(ctr30)>=2?'#854d0e':'#991b1b'};padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;">${ctr30}% CTR 30d</span>`;
+    const retBadge = `<span style="background:var(--cream);padding:2px 8px;border-radius:20px;font-size:10px;">⏱ ${((ov.averageViewDuration||0)/60).toFixed(1)}min visto</span>`;
+    document.getElementById('chd-meta').innerHTML += `  <span style="opacity:.6">·</span>  ${ctr30badge} ${retBadge}`;
+
+    // ── Fuentes de tráfico ──
+    const traffic = analytics.traffic || [];
+    if (traffic.length) {
+      const maxTV = Math.max(...traffic.map(t => t.views || 0));
+      document.getElementById('chd-traffic').innerHTML = traffic.map(t => `
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-size:11px;color:var(--ink);width:170px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${t.label||t.insightTrafficSourceType}</div>
+          ${renderBar(t.views, maxTV)}
+          <div style="font-size:11px;font-weight:600;color:var(--ink);width:52px;text-align:right;">${fmtNum(t.views)}</div>
+          <div style="font-size:10px;color:var(--muted);width:52px;text-align:right;">${fmtNum(Math.round(t.estimatedMinutesWatched||0))}min</div>
+        </div>`).join('');
     } else {
-      document.getElementById('chd-videos').innerHTML = videos.map(v => `
-        <a href="https://youtube.com/watch?v=${v.id}" target="_blank" style="text-decoration:none;display:flex;gap:14px;align-items:flex-start;padding:12px;border-radius:10px;border:1px solid var(--border);background:#fff;transition:background .15s;" onmouseover="this.style.background='var(--cream)'" onmouseout="this.style.background='#fff'">
-          ${v.thumbnail ? `<img src="${v.thumbnail}" style="width:100px;height:56px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : '<div style="width:100px;height:56px;background:var(--cream2);border-radius:6px;flex-shrink:0;"></div>'}
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:12px;font-weight:600;color:var(--ink);line-height:1.4;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${v.title}</div>
-            <div style="display:flex;gap:16px;font-size:10px;color:var(--muted);flex-wrap:wrap;">
-              <span>👁 ${fmtNum(v.views)} views</span>
-              <span>👍 ${fmtNum(v.likes)}</span>
-              <span>💬 ${fmtNum(v.comments)}</span>
-              ${parseDuration(v.duration) ? `<span>⏱ ${parseDuration(v.duration)}</span>` : ''}
-              <span style="margin-left:auto;">📅 ${v.published}</span>
-            </div>
-          </div>
-        </a>`).join('');
+      document.getElementById('chd-traffic').innerHTML = '<div style="color:var(--muted);font-size:12px;">Sin datos de tráfico todavía</div>';
     }
+
+    // ── Tabla vídeos analytics ──
+    const videos = analytics.videos || [];
+    if (videos.length) {
+      document.getElementById('chd-videos-analytics').innerHTML = videos.map(v => {
+        const ret = v.avg_retention_pct || 0;
+        const retW = Math.round(ret);
+        return `
+        <a href="https://youtube.com/watch?v=${v.id}" target="_blank" style="text-decoration:none;display:grid;grid-template-columns:2fr 60px 70px 60px 70px 60px 60px;gap:6px;align-items:center;padding:10px;border-radius:8px;border:1px solid var(--border);background:#fff;transition:background .15s;" onmouseover="this.style.background='var(--cream)'" onmouseout="this.style.background='#fff'">
+          <div style="min-width:0;">
+            <div style="font-size:11px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${v.title}</div>
+            <div style="font-size:9px;color:var(--muted);margin-top:2px;">📅 ${v.published} · ⏱ ${fmtSec(v.avg_duration_s)} medio</div>
+          </div>
+          <div style="text-align:right;font-size:11px;font-weight:700;color:var(--ink);">${fmtNum(v.views)}</div>
+          <div style="text-align:center;">
+            <div style="font-size:11px;font-weight:700;color:${retColor(ret)};">${ret}%</div>
+            <div style="background:var(--cream2);border-radius:3px;height:4px;margin-top:3px;overflow:hidden;"><div style="width:${retW}%;height:100%;background:${retColor(ret)};border-radius:3px;"></div></div>
+          </div>
+          <div style="text-align:right;font-size:11px;color:var(--ink);">${v.ctr_pct}%</div>
+          <div style="text-align:right;font-size:11px;color:var(--ink);">${fmtNum(v.watch_minutes)}</div>
+          <div style="text-align:right;font-size:11px;color:var(--muted);">${fmtNum(v.impressions)}</div>
+          <div style="text-align:right;font-size:11px;color:var(--green);font-weight:600;">+${v.subs_gained}</div>
+        </a>`;
+      }).join('');
+    } else {
+      document.getElementById('chd-videos-analytics').innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">Sin datos de vídeos todavía</div>';
+    }
+
+    // ── Dispositivos ──
+    const devices = analytics.devices || [];
+    const DEV_LABEL = {MOBILE:'📱 Móvil', DESKTOP:'🖥️ Escritorio', TABLET:'📟 Tablet', TV:'📺 Smart TV', GAME_CONSOLE:'🎮 Consola'};
+    if (devices.length) {
+      const maxDv = Math.max(...devices.map(d => d.views||0));
+      document.getElementById('chd-devices').innerHTML = devices.map(d => `
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-size:11px;color:var(--ink);width:130px;flex-shrink:0;">${DEV_LABEL[d.deviceType]||d.deviceType}</div>
+          ${renderBar(d.views, maxDv, 'var(--ink2)')}
+          <div style="font-size:11px;font-weight:600;color:var(--ink);width:50px;text-align:right;">${fmtNum(d.views)}</div>
+        </div>`).join('');
+    } else {
+      document.getElementById('chd-devices').innerHTML = '<div style="color:var(--muted);font-size:12px;">Sin datos</div>';
+    }
+
+    // ── Geografía ──
+    const geo = analytics.geo || [];
+    if (geo.length) {
+      const maxGv = Math.max(...geo.map(g => g.views||0));
+      document.getElementById('chd-geo').innerHTML = geo.map(g => `
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-size:11px;color:var(--ink);width:130px;flex-shrink:0;">${g.country}</div>
+          ${renderBar(g.views, maxGv, '#6366f1')}
+          <div style="font-size:11px;font-weight:600;color:var(--ink);width:50px;text-align:right;">${fmtNum(g.views)}</div>
+        </div>`).join('');
+    } else {
+      document.getElementById('chd-geo').innerHTML = '<div style="color:var(--muted);font-size:12px;">Sin datos</div>';
+    }
+
+    // ── Curvas de retención ──
+    const top3 = (analytics.videos||[]).slice(0,3);
+    if (top3.some(v => v.retention_curve)) {
+      document.getElementById('chd-retention').innerHTML = top3.map(v =>
+        renderRetentionCurve(v.retention_curve, v.title)
+      ).join('');
+    } else {
+      document.getElementById('chd-retention').innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">Las curvas de retención aparecen cuando el vídeo tiene suficientes visualizaciones</div>';
+    }
+
   } catch(e) {
     document.getElementById('chd-name').textContent = 'Error cargando datos';
     document.getElementById('chd-meta').textContent = e.toString();
@@ -2087,253 +2198,6 @@ async function _checkShort(jobId) {
     }
   } catch(e) {}
 }
-
-// ═══════════════════════════════════════════════════════════════
-// ASSET DRAWER — ver y editar el output de cada paso del pipeline
-// ═══════════════════════════════════════════════════════════════
-
-let _drawerJobId = null;
-let _drawerStep  = null;
-
-function openStepDrawer(jobId, stepKey) {
-  _drawerJobId = jobId;
-  _drawerStep  = stepKey;
-  const meta = STEPS_META[stepKey] || {};
-  document.getElementById('drawer-title').textContent = meta.label || stepKey;
-  document.getElementById('drawer-body').innerHTML =
-    '<div style="text-align:center;padding:40px;color:var(--muted);font-size:12px;">Cargando…</div>';
-  document.getElementById('asset-drawer').classList.add('open');
-  document.getElementById('drawer-overlay').classList.add('open');
-  _loadDrawerContent(jobId, stepKey);
-}
-
-function closeDrawer() {
-  document.getElementById('asset-drawer').classList.remove('open');
-  document.getElementById('drawer-overlay').classList.remove('open');
-}
-
-async function _loadDrawerContent(jobId, stepKey) {
-  const body = document.getElementById('drawer-body');
-  try {
-    if (stepKey === 'script') {
-      const r = await fetch(`${API}/api/jobs/${jobId}/script`);
-      if (!r.ok) { body.innerHTML = '<p style="color:var(--red);padding:20px;">Guión no disponible.</p>'; return; }
-      const d = await r.json();
-      body.innerHTML = `
-        <div class="drawer-section">
-          <div class="drawer-section-title">📊 ${d.words} palabras · ~${Math.round(d.words/130)} min de vídeo</div>
-        </div>
-        <div class="drawer-section">
-          <div class="drawer-section-title">⚡ HOOK (primeros ~90 segundos)</div>
-          <textarea class="drawer-textarea hook" id="drawer-hook">${_esc(d.hook)}</textarea>
-        </div>
-        <div class="drawer-section">
-          <div class="drawer-section-title">📄 CUERPO DEL GUIÓN</div>
-          <textarea class="drawer-textarea" id="drawer-body-text" style="min-height:320px;">${_esc(d.body)}</textarea>
-        </div>
-        <div class="drawer-actions">
-          <button class="drawer-btn primary" onclick="_saveScript('${jobId}')">💾 Guardar cambios</button>
-          <button class="drawer-btn danger"  onclick="_retryFromTTS('${jobId}')" id="btn-retry-tts">🔄 Regenerar voz + vídeo</button>
-          <span class="drawer-saved" id="drawer-saved-lbl">✓ Guardado</span>
-        </div>
-        <div style="margin-top:12px;padding:10px 12px;background:var(--cream);border-radius:6px;font-size:11px;color:var(--muted);line-height:1.6;">
-          <strong style="color:var(--ink2);">Cómo editar:</strong> Modifica el hook o el cuerpo → Guardar cambios → Regenerar voz + vídeo.<br>
-          ⚠ Regenerar voz tarda ~60 min (CPU sin GPU). Solo hazlo si el hook necesita corrección importante.
-        </div>`;
-    }
-    else if (stepKey === 'hook_videos') {
-      // Hook: texto editable + preview de imágenes/clips
-      const [sRes, aRes] = await Promise.all([
-        fetch(`${API}/api/jobs/${jobId}/script`),
-        fetch(`${API}/api/jobs/${jobId}/assets`),
-      ]);
-      const s = sRes.ok ? await sRes.json() : null;
-      const a = aRes.ok ? await aRes.json() : { hook_images: [] };
-      const hookText = s ? s.hook : '(Guión no disponible)';
-      const hookImgs = a.hook_images || [];
-      body.innerHTML = `
-        <div class="drawer-section">
-          <div class="drawer-section-title">⚡ TEXTO DEL HOOK — los primeros ~90 segundos</div>
-          <textarea class="drawer-textarea hook" id="drawer-hook" style="min-height:240px;">${_esc(hookText)}</textarea>
-          <div class="drawer-actions">
-            <button class="drawer-btn primary" onclick="_saveHookOnly('${jobId}')">💾 Guardar hook</button>
-            <button class="drawer-btn danger"  onclick="_retryFromTTS('${jobId}')" id="btn-retry-tts">🔄 Regenerar voz + vídeo con este hook</button>
-            <span class="drawer-saved" id="drawer-saved-lbl">✓ Guardado</span>
-          </div>
-          <div style="margin-top:10px;padding:10px 12px;background:#fffdf5;border:1px solid #e8d98a;border-radius:6px;font-size:11px;color:var(--muted);line-height:1.6;">
-            <strong style="color:var(--ink2);">Este es el texto que narra el hook.</strong> Edítalo si quieres cambiarlo y pulsa Regenerar. El resto del guión no cambia.
-          </div>
-        </div>
-        ${hookImgs.length ? `
-        <div class="drawer-section">
-          <div class="drawer-section-title">🖼 IMÁGENES DEL HOOK (${hookImgs.length})</div>
-          <div class="img-grid">${hookImgs.map(u=>`<img src="${API}${u}" loading="lazy" onclick="window.open('${API}${u}','_blank')">`).join('')}</div>
-        </div>` : ''}`;
-    }
-    else if (stepKey === 'images') {
-      const r = await fetch(`${API}/api/jobs/${jobId}/assets`);
-      if (!r.ok) { body.innerHTML = '<p style="color:var(--red);padding:20px;">Assets no disponibles.</p>'; return; }
-      const d = await r.json();
-      const imgs = d.images || [];
-      if (!imgs.length) { body.innerHTML = '<p style="color:var(--muted);padding:20px;">Imágenes aún no generadas.</p>'; return; }
-      body.innerHTML = `
-        <div class="drawer-section">
-          <div class="drawer-section-title">🖼 ${imgs.length} IMÁGENES GENERADAS</div>
-          <div class="img-grid">${imgs.map(u=>`<img src="${API}${u}" loading="lazy" onclick="window.open('${API}${u}','_blank')">`).join('')}</div>
-        </div>`;
-    }
-    else if (stepKey === 'tts') {
-      const r = await fetch(`${API}/api/jobs/${jobId}/assets`);
-      const d = r.ok ? await r.json() : {};
-      if (!d.audio) { body.innerHTML = '<p style="color:var(--muted);padding:20px;">Audio no disponible aún.</p>'; return; }
-      body.innerHTML = `
-        <div class="drawer-section">
-          <div class="drawer-section-title">🎙 NARRACIÓN — escúchala antes de subir</div>
-          <audio class="drawer-audio" controls preload="metadata" src="${API}${d.audio}"></audio>
-          <div style="margin-top:12px;font-size:11px;color:var(--muted);">
-            Si la narración no te convence, edita el guión desde el paso <strong>Guión Claude</strong> y regenera la voz.
-          </div>
-        </div>`;
-    }
-    else if (stepKey === 'thumbnail') {
-      const r = await fetch(`${API}/api/jobs/${jobId}/assets`);
-      const d = r.ok ? await r.json() : {};
-      if (!d.thumbnail) { body.innerHTML = '<p style="color:var(--muted);padding:20px;">Miniatura no disponible aún.</p>'; return; }
-      body.innerHTML = `
-        <div class="drawer-section">
-          <div class="drawer-section-title">🖼 MINIATURA AUTO-GENERADA</div>
-          <img class="thumb-preview" src="${API}${d.thumbnail}" alt="Miniatura">
-          <div style="margin-top:10px;font-size:11px;color:var(--muted);">
-            Puedes reemplazarla subiendo tu propia miniatura antes de publicar.
-          </div>
-        </div>`;
-    }
-    else if (stepKey === 'render') {
-      const r = await fetch(`${API}/api/jobs/${jobId}/assets`);
-      const d = r.ok ? await r.json() : {};
-      body.innerHTML = `
-        <div class="drawer-section">
-          <div class="drawer-section-title">🎬 VÍDEO FINAL</div>
-          ${d.has_video
-            ? `<video controls style="width:100%;border-radius:8px;border:1px solid var(--border);margin-top:4px;" preload="metadata">
-                 <source src="${API}${d.video_url}" type="video/mp4">
-               </video>
-               <div style="margin-top:10px;">
-                 <a href="${API}${d.video_url}" download style="font-size:11px;color:var(--blue);">⬇ Descargar vídeo</a>
-               </div>`
-            : '<p style="color:var(--muted);padding:20px 0;">Vídeo no disponible. ¿El render ha terminado?</p>'
-          }
-        </div>`;
-    }
-    else {
-      body.innerHTML = '<p style="color:var(--muted);padding:20px;">Sin preview disponible para este paso.</p>';
-    }
-  } catch(e) {
-    body.innerHTML = `<p style="color:var(--red);padding:20px;">Error: ${e.message}</p>`;
-  }
-}
-
-async function _saveScript(jobId) {
-  const hookEl = document.getElementById('drawer-hook');
-  const bodyEl = document.getElementById('drawer-body-text');
-  if (!hookEl) return;
-  const fullScript = hookEl.value + '\n\n' + (bodyEl ? bodyEl.value : '');
-  const btn = document.querySelector('[onclick="_saveScript(\'' + jobId + '\')"]');
-  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
-  try {
-    const r = await fetch(`${API}/api/jobs/${jobId}/script`, {
-      method: 'PUT', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ script: fullScript })
-    });
-    const d = await r.json();
-    if (r.ok) {
-      const lbl = document.getElementById('drawer-saved-lbl');
-      if (lbl) { lbl.classList.add('show'); setTimeout(()=>lbl.classList.remove('show'), 2500); }
-      if (btn) { btn.disabled = false; btn.textContent = '💾 Guardar cambios'; }
-    }
-  } catch(e) { if (btn) { btn.disabled=false; btn.textContent='Error'; } }
-}
-
-async function _saveHookOnly(jobId) {
-  const hookEl = document.getElementById('drawer-hook');
-  if (!hookEl) return;
-  const btn = document.querySelector('[onclick="_saveHookOnly(\'' + jobId + '\')"]');
-  if (btn) { btn.disabled=true; btn.textContent='Guardando…'; }
-  try {
-    // Leer guión completo, reemplazar solo el hook
-    const r0 = await fetch(`${API}/api/jobs/${jobId}/script`);
-    const d0 = r0.ok ? await r0.json() : null;
-    const newBody = d0 ? d0.body : '';
-    const newScript = hookEl.value + '\n\n' + newBody;
-    const r = await fetch(`${API}/api/jobs/${jobId}/script`, {
-      method:'PUT', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ script: newScript })
-    });
-    if (r.ok) {
-      const lbl = document.getElementById('drawer-saved-lbl');
-      if (lbl) { lbl.classList.add('show'); setTimeout(()=>lbl.classList.remove('show'), 2500); }
-      if (btn) { btn.disabled=false; btn.textContent='💾 Guardar hook'; }
-    }
-  } catch(e) { if (btn) { btn.disabled=false; btn.textContent='Error'; } }
-}
-
-async function _retryFromTTS(jobId) {
-  if (!confirm('¿Regenerar la voz con el guión actualizado?\n\nEsto tardará ~60 minutos (XTTS en CPU).\nSe mantendrán las imágenes y clips existentes.')) return;
-  const btn = document.getElementById('btn-retry-tts');
-  if (btn) { btn.disabled=true; btn.textContent='Lanzando…'; }
-  try {
-    const r = await fetch(`${API}/api/jobs/${jobId}/retry-from-tts`, { method:'POST' });
-    const d = await r.json();
-    if (!r.ok) { alert('Error: ' + (d.detail||JSON.stringify(d))); if(btn){btn.disabled=false;btn.textContent='🔄 Regenerar voz + vídeo';} return; }
-    closeDrawer();
-    currentJobId = jobId;
-    document.getElementById('pipeline-lbl').textContent = 'Pipeline en curso';
-    if (eventSource) eventSource.close();
-    eventSource = new EventSource(`${API}/api/jobs/${jobId}/stream`);
-    eventSource.onmessage = e => {
-      const d = JSON.parse(e.data);
-      if (d.type==='step')  onStep(d);
-      if (d.type==='end')   onEnd(d);
-      if (d.type==='error') onError(d);
-    };
-    startStatusPolling(jobId);
-    document.getElementById('btn-cancel').style.display = 'inline-block';
-  } catch(e) { alert('Error: '+e.message); if(btn){btn.disabled=false;btn.textContent='🔄 Regenerar voz + vídeo';} }
-}
-
-function _esc(str) {
-  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-// Hacer clickable un step cuando está "done"
-function _makeStepClickable(key, jobId) {
-  const stepEl = document.getElementById('step-' + key);
-  if (!stepEl || stepEl.classList.contains('clickable')) return;
-  // Solo estos pasos tienen preview útil
-  const previewable = ['script','tts','images','thumbnail','hook_videos','render'];
-  if (!previewable.includes(key)) return;
-  stepEl.classList.add('clickable');
-  stepEl.addEventListener('click', () => openStepDrawer(jobId, key));
-  // Añadir hint de "ver →"
-  const nameEl = stepEl.querySelector('.step-name');
-  if (nameEl && !stepEl.querySelector('.step-peek')) {
-    const peek = document.createElement('div');
-    peek.className = 'step-peek';
-    peek.textContent = 'click para ver →';
-    nameEl.insertAdjacentElement('afterend', peek);
-  }
-}
 </script>
-
-<!-- Asset Drawer -->
-<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
-<div class="asset-drawer" id="asset-drawer">
-  <div class="drawer-header">
-    <span class="drawer-title" id="drawer-title">Asset</span>
-    <button class="drawer-close" onclick="closeDrawer()">✕</button>
-  </div>
-  <div class="drawer-body" id="drawer-body"></div>
-</div>
-
 </body>
 </html>
