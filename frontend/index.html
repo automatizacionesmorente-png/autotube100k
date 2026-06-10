@@ -308,6 +308,7 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
 .job-dot.error   { background: var(--red); }
 .job-dot.pending { background: var(--muted2); }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+@keyframes pulse-live { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
 .job-title { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .job-meta  { font-size: 11px; color: var(--muted); margin-top: 1px; }
 .job-cost  { font-family: 'Playfair Display', serif; font-size: 14px; color: var(--green); flex-shrink: 0; font-weight: 500; }
@@ -1660,6 +1661,10 @@ function parseDuration(iso) {
   return `${min}:${String(s).padStart(2,'0')}`;
 }
 
+let _chdRefreshInterval = null;
+let _chdChannelId = null;
+let _chdLastUpdate = null;
+
 function chdTab(tab) {
   ['resumen','videos','audiencia'].forEach(t => {
     document.getElementById(`chd-panel-${t}`).style.display = t === tab ? 'block' : 'none';
@@ -1715,163 +1720,229 @@ function renderRetentionCurve(curve, title) {
     </div>`;
 }
 
-async function openChDetail(channelId) {
-  const modal = document.getElementById('modal-ch-detail');
-  modal.style.display = 'flex';
-  chdTab('resumen');
+// ── Render helpers ──────────────────────────────────────────────────────────
+function _renderVideosTab(videos, detailVideos) {
+  // Preferir analytics si tiene datos, si no usar detail
+  const src = (videos && videos.length) ? videos : (detailVideos||[]).map(v => ({
+    id: v.id, title: v.title, thumbnail: v.thumbnail, published: v.published,
+    duration: v.duration, views: v.views, likes: v.likes, comments: v.comments,
+    watch_minutes: null, avg_duration_s: null, avg_retention_pct: null,
+    impressions: null, ctr_pct: null, subs_gained: null, shares: null,
+  }));
 
-  // Reset
-  document.getElementById('chd-name').textContent = 'Cargando…';
-  document.getElementById('chd-meta').textContent = '';
-  ['chd-subs','chd-views','chd-vcount','an-views30','an-minutes30','an-subs30','an-impr30',
-   'avg-views','avg-ret','avg-ctr','avg-dur','avg-impr'].forEach(id => {
-    const el = document.getElementById(id); if(el) el.textContent = '—';
-  });
-  document.getElementById('chd-traffic').innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando…</div>';
-  document.getElementById('chd-videos-analytics').innerHTML = '<div style="color:var(--muted);font-size:12px;padding:20px 0;text-align:center;">Cargando…</div>';
-  document.getElementById('chd-devices').innerHTML = '';
-  document.getElementById('chd-geo').innerHTML = '';
-  document.getElementById('chd-retention').innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">Cargando curvas…</div>';
+  if (!src.length) {
+    document.getElementById('chd-videos-analytics').innerHTML =
+      '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">No hay vídeos publicados todavía</div>';
+    return;
+  }
 
-  try {
-    // Carga en paralelo: detail + analytics
-    const [detail, analytics] = await Promise.all([
-      fetch(`${API}/api/channels/${channelId}/detail`).then(r => r.json()),
-      fetch(`${API}/api/channels/${channelId}/analytics`).then(r => r.json()),
-    ]);
+  const hasAnalytics = videos && videos.length > 0 && videos[0].avg_retention_pct !== null;
+  document.getElementById('chd-videos-analytics').innerHTML = src.map(v => {
+    const ret = v.avg_retention_pct || 0;
+    const hasRet = v.avg_retention_pct !== null;
+    return `
+    <a href="https://youtube.com/watch?v=${v.id}" target="_blank"
+       style="text-decoration:none;display:grid;grid-template-columns:2fr 60px ${hasAnalytics?'70px 60px 70px 60px 60px':'auto'};gap:6px;align-items:center;padding:10px;border-radius:8px;border:1px solid var(--border);background:#fff;transition:background .15s;"
+       onmouseover="this.style.background='var(--cream)'" onmouseout="this.style.background='#fff'">
+      <div style="min-width:0;display:flex;gap:10px;align-items:center;">
+        ${v.thumbnail ? `<img src="${v.thumbnail}" style="width:72px;height:40px;object-fit:cover;border-radius:5px;flex-shrink:0;">` : ''}
+        <div style="min-width:0;">
+          <div style="font-size:11px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${v.title}</div>
+          <div style="font-size:9px;color:var(--muted);margin-top:2px;">📅 ${v.published}${parseDuration(v.duration)?` · ⏱ ${parseDuration(v.duration)}`:''}${hasRet?` · ⌛ ${fmtSec(v.avg_duration_s)} medio`:''}</div>
+          <div style="font-size:9px;color:var(--muted);margin-top:1px;">👍 ${fmtNum(v.likes||0)} · 💬 ${fmtNum(v.comments||0)}${v.shares?` · 🔗 ${fmtNum(v.shares)}`:''}</div>
+        </div>
+      </div>
+      <div style="text-align:right;font-size:13px;font-weight:700;color:var(--ink);">${fmtNum(v.views)}</div>
+      ${hasAnalytics ? `
+      <div style="text-align:center;">
+        ${hasRet ? `<div style="font-size:11px;font-weight:700;color:${retColor(ret)};">${ret}%</div>
+        <div style="background:var(--cream2);border-radius:3px;height:4px;margin-top:3px;overflow:hidden;"><div style="width:${Math.round(ret)}%;height:100%;background:${retColor(ret)};border-radius:3px;"></div></div>` : '<span style="color:var(--muted);font-size:10px;">—</span>'}
+      </div>
+      <div style="text-align:right;font-size:11px;color:var(--ink);">${v.ctr_pct !== null ? v.ctr_pct+'%' : '—'}</div>
+      <div style="text-align:right;font-size:11px;color:var(--ink);">${v.watch_minutes !== null ? fmtNum(v.watch_minutes) : '—'}</div>
+      <div style="text-align:right;font-size:11px;color:var(--muted);">${v.impressions !== null ? fmtNum(v.impressions) : '—'}</div>
+      <div style="text-align:right;font-size:11px;color:var(--green);font-weight:600;">${v.subs_gained !== null ? '+'+v.subs_gained : '—'}</div>` : ''}
+    </a>`;
+  }).join('');
+}
 
-    const ch = detail.channel;
-    const stats = detail.stats;
-    const ov = analytics.overview_30d || {};
-    const avgs = analytics.averages || {};
-    const totals = analytics.channel_totals || {};
+function _applyDetailData(detail, analytics) {
+  const ch     = detail.channel;
+  const stats  = detail.stats || {};
+  const videos = detail.videos || [];
+  const ov     = analytics?.overview_30d || {};
+  const avgs   = analytics?.averages || {};
+  const totals = analytics?.channel_totals || {};
 
-    // ── Header ──
-    document.getElementById('chd-name').textContent = ch.name;
-    const parts = [];
-    if (stats?.country) parts.push(`🌍 ${stats.country}`);
-    if (stats?.created) parts.push(`📅 Canal desde ${stats.created}`);
-    if (ch.niche) parts.push(`🎯 ${ch.niche}`);
-    document.getElementById('chd-meta').textContent = parts.join('  ·  ') || '';
+  // ── Header + meta ──
+  document.getElementById('chd-name').textContent = ch.name;
+  const parts = [];
+  if (stats.country)  parts.push(`🌍 ${stats.country}`);
+  if (stats.created)  parts.push(`📅 Canal desde ${stats.created}`);
+  if (ch.niche)       parts.push(`🎯 ${ch.niche}`);
+  const now = new Date().toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('chd-meta').innerHTML =
+    parts.join('  ·  ') +
+    `  <span style="display:inline-flex;align-items:center;gap:4px;background:rgba(34,197,94,.15);color:#16a34a;padding:1px 8px;border-radius:20px;font-size:10px;font-weight:600;margin-left:8px;">` +
+    `<span style="width:6px;height:6px;background:#22c55e;border-radius:50%;animation:pulse-live 1.5s ease-in-out infinite;display:inline-block;"></span>EN VIVO · ${now}</span>`;
 
-    // ── Big stats ──
-    document.getElementById('chd-subs').textContent  = fmtNum(totals.subscribers || stats?.subscribers || 0);
-    document.getElementById('chd-views').textContent = fmtNum(totals.total_views  || stats?.total_views  || 0);
-    document.getElementById('chd-vcount').textContent= fmtNum(totals.videos       || stats?.videos_count || 0);
+  // ── Big stats (siempre reales) ──
+  const subs  = totals.subscribers  || stats.subscribers  || 0;
+  const views = totals.total_views  || stats.total_views  || 0;
+  const vids  = totals.videos       || stats.videos_count || 0;
+  document.getElementById('chd-subs').textContent   = fmtNum(subs);
+  document.getElementById('chd-views').textContent  = fmtNum(views);
+  document.getElementById('chd-vcount').textContent = fmtNum(vids);
 
-    // ── KPIs 30d ──
+  const hasAnalyticsData = ov && Object.keys(ov).length > 0;
+
+  // ── KPIs 30d ──
+  if (hasAnalyticsData) {
     document.getElementById('an-views30').textContent   = fmtNum(Math.round(ov.views || 0));
     document.getElementById('an-minutes30').textContent = fmtNum(Math.round(ov.estimatedMinutesWatched || 0));
-    const subsGained = Math.round(ov.subscribersGained || 0);
-    const subsLost   = Math.round(ov.subscribersLost || 0);
-    document.getElementById('an-subs30').textContent = `+${fmtNum(subsGained)} / −${fmtNum(subsLost)}`;
-    document.getElementById('an-impr30').textContent = fmtNum(Math.round(ov.impressions || 0));
+    const sg = Math.round(ov.subscribersGained || 0);
+    const sl = Math.round(ov.subscribersLost   || 0);
+    document.getElementById('an-subs30').textContent    = `+${fmtNum(sg)} / −${fmtNum(sl)}`;
+    document.getElementById('an-impr30').textContent    = fmtNum(Math.round(ov.impressions || 0));
+  } else {
+    // Mostrar lo que tenemos de la Data API
+    document.getElementById('an-views30').textContent   = fmtNum(views);
+    document.getElementById('an-minutes30').textContent = '—';
+    document.getElementById('an-subs30').textContent    = fmtNum(subs);
+    document.getElementById('an-impr30').textContent    = '—';
+    // Banner explicativo
+    const kpiDiv = document.getElementById('chd-kpis-30');
+    if (kpiDiv && !kpiDiv.dataset.warned) {
+      kpiDiv.dataset.warned = '1';
+      kpiDiv.insertAdjacentHTML('afterend',
+        `<div style="background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:11px;color:#92400e;margin-bottom:12px;">
+          ⏳ <strong>Analytics avanzadas disponibles con ~100+ views.</strong> Actualmente el canal tiene ${views} views — sigue generando contenido y aquí aparecerá retención, CTR, fuentes de tráfico y más.
+        </div>`
+      );
+    }
+  }
 
-    // ── Medias por vídeo ──
-    document.getElementById('avg-views').textContent = fmtNum(avgs.views_per_video || 0);
+  // ── Medias ──
+  if (hasAnalyticsData && avgs.views_per_video) {
+    document.getElementById('avg-views').textContent = fmtNum(avgs.views_per_video);
     const retPct = avgs.retention_pct || 0;
     const retEl = document.getElementById('avg-ret');
     retEl.textContent = `${retPct}%`;
     retEl.style.color = retColor(retPct);
-    document.getElementById('avg-ctr').textContent = `${(avgs.ctr_pct || 0).toFixed(2)}%`;
+    document.getElementById('avg-ctr').textContent = `${(avgs.ctr_pct||0).toFixed(2)}%`;
     document.getElementById('avg-dur').textContent = fmtSec(avgs.avg_duration_s || 0);
     document.getElementById('avg-impr').textContent = fmtNum(avgs.impressions_per_video || 0);
+  } else if (videos.length) {
+    const totalV = videos.reduce((s,v)=>s+v.views,0);
+    document.getElementById('avg-views').textContent = fmtNum(Math.round(totalV/videos.length));
+    const totalL = videos.reduce((s,v)=>s+v.likes,0);
+    document.getElementById('avg-ret').textContent = '—';
+    document.getElementById('avg-ctr').textContent = '—';
+    document.getElementById('avg-dur').textContent = '—';
+    document.getElementById('avg-impr').textContent = '—';
+  }
 
-    // CTR global 30d badge
-    const ctr30 = ((ov.impressionsClickThroughRate || 0)*100).toFixed(2);
-    const ctr30badge = `<span style="background:${parseFloat(ctr30)>=4?'#dcfce7':parseFloat(ctr30)>=2?'#fef9c3':'#fee2e2'};color:${parseFloat(ctr30)>=4?'#166534':parseFloat(ctr30)>=2?'#854d0e':'#991b1b'};padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;">${ctr30}% CTR 30d</span>`;
-    const retBadge = `<span style="background:var(--cream);padding:2px 8px;border-radius:20px;font-size:10px;">⏱ ${((ov.averageViewDuration||0)/60).toFixed(1)}min visto</span>`;
-    document.getElementById('chd-meta').innerHTML += `  <span style="opacity:.6">·</span>  ${ctr30badge} ${retBadge}`;
+  // ── Fuentes tráfico ──
+  const traffic = analytics?.traffic || [];
+  if (traffic.length) {
+    const maxTV = Math.max(...traffic.map(t => t.views||0));
+    document.getElementById('chd-traffic').innerHTML = traffic.map(t => `
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="font-size:11px;color:var(--ink);width:170px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${t.label||t.insightTrafficSourceType}</div>
+        ${renderBar(t.views, maxTV)}
+        <div style="font-size:11px;font-weight:600;color:var(--ink);width:52px;text-align:right;">${fmtNum(t.views)}</div>
+        <div style="font-size:10px;color:var(--muted);width:52px;text-align:right;">${fmtNum(Math.round(t.estimatedMinutesWatched||0))}min</div>
+      </div>`).join('');
+  } else {
+    document.getElementById('chd-traffic').innerHTML =
+      `<div style="color:var(--muted);font-size:12px;">Disponible cuando el canal tenga más actividad</div>`;
+  }
 
-    // ── Fuentes de tráfico ──
-    const traffic = analytics.traffic || [];
-    if (traffic.length) {
-      const maxTV = Math.max(...traffic.map(t => t.views || 0));
-      document.getElementById('chd-traffic').innerHTML = traffic.map(t => `
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div style="font-size:11px;color:var(--ink);width:170px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${t.label||t.insightTrafficSourceType}</div>
-          ${renderBar(t.views, maxTV)}
-          <div style="font-size:11px;font-weight:600;color:var(--ink);width:52px;text-align:right;">${fmtNum(t.views)}</div>
-          <div style="font-size:10px;color:var(--muted);width:52px;text-align:right;">${fmtNum(Math.round(t.estimatedMinutesWatched||0))}min</div>
-        </div>`).join('');
-    } else {
-      document.getElementById('chd-traffic').innerHTML = '<div style="color:var(--muted);font-size:12px;">Sin datos de tráfico todavía</div>';
-    }
+  // ── Tab VÍDEOS ──
+  _renderVideosTab(analytics?.videos || [], videos);
 
-    // ── Tabla vídeos analytics ──
-    const videos = analytics.videos || [];
-    if (videos.length) {
-      document.getElementById('chd-videos-analytics').innerHTML = videos.map(v => {
-        const ret = v.avg_retention_pct || 0;
-        const retW = Math.round(ret);
-        return `
-        <a href="https://youtube.com/watch?v=${v.id}" target="_blank" style="text-decoration:none;display:grid;grid-template-columns:2fr 60px 70px 60px 70px 60px 60px;gap:6px;align-items:center;padding:10px;border-radius:8px;border:1px solid var(--border);background:#fff;transition:background .15s;" onmouseover="this.style.background='var(--cream)'" onmouseout="this.style.background='#fff'">
-          <div style="min-width:0;">
-            <div style="font-size:11px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${v.title}</div>
-            <div style="font-size:9px;color:var(--muted);margin-top:2px;">📅 ${v.published} · ⏱ ${fmtSec(v.avg_duration_s)} medio</div>
-          </div>
-          <div style="text-align:right;font-size:11px;font-weight:700;color:var(--ink);">${fmtNum(v.views)}</div>
-          <div style="text-align:center;">
-            <div style="font-size:11px;font-weight:700;color:${retColor(ret)};">${ret}%</div>
-            <div style="background:var(--cream2);border-radius:3px;height:4px;margin-top:3px;overflow:hidden;"><div style="width:${retW}%;height:100%;background:${retColor(ret)};border-radius:3px;"></div></div>
-          </div>
-          <div style="text-align:right;font-size:11px;color:var(--ink);">${v.ctr_pct}%</div>
-          <div style="text-align:right;font-size:11px;color:var(--ink);">${fmtNum(v.watch_minutes)}</div>
-          <div style="text-align:right;font-size:11px;color:var(--muted);">${fmtNum(v.impressions)}</div>
-          <div style="text-align:right;font-size:11px;color:var(--green);font-weight:600;">+${v.subs_gained}</div>
-        </a>`;
-      }).join('');
-    } else {
-      document.getElementById('chd-videos-analytics').innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">Sin datos de vídeos todavía</div>';
-    }
+  // ── Tab AUDIENCIA ──
+  const DEV_LABEL = {MOBILE:'📱 Móvil', DESKTOP:'🖥️ Escritorio', TABLET:'📟 Tablet', TV:'📺 Smart TV', GAME_CONSOLE:'🎮 Consola'};
+  const devs = analytics?.devices || [];
+  document.getElementById('chd-devices').innerHTML = devs.length
+    ? (() => { const m=Math.max(...devs.map(d=>d.views||0));
+        return devs.map(d=>`<div style="display:flex;align-items:center;gap:10px;"><div style="font-size:11px;color:var(--ink);width:130px;flex-shrink:0;">${DEV_LABEL[d.deviceType]||d.deviceType}</div>${renderBar(d.views,m,'var(--ink2)')}<div style="font-size:11px;font-weight:600;color:var(--ink);width:50px;text-align:right;">${fmtNum(d.views)}</div></div>`).join(''); })()
+    : '<div style="color:var(--muted);font-size:12px;">Sin suficientes datos todavía</div>';
 
-    // ── Dispositivos ──
-    const devices = analytics.devices || [];
-    const DEV_LABEL = {MOBILE:'📱 Móvil', DESKTOP:'🖥️ Escritorio', TABLET:'📟 Tablet', TV:'📺 Smart TV', GAME_CONSOLE:'🎮 Consola'};
-    if (devices.length) {
-      const maxDv = Math.max(...devices.map(d => d.views||0));
-      document.getElementById('chd-devices').innerHTML = devices.map(d => `
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div style="font-size:11px;color:var(--ink);width:130px;flex-shrink:0;">${DEV_LABEL[d.deviceType]||d.deviceType}</div>
-          ${renderBar(d.views, maxDv, 'var(--ink2)')}
-          <div style="font-size:11px;font-weight:600;color:var(--ink);width:50px;text-align:right;">${fmtNum(d.views)}</div>
-        </div>`).join('');
-    } else {
-      document.getElementById('chd-devices').innerHTML = '<div style="color:var(--muted);font-size:12px;">Sin datos</div>';
-    }
+  const geo = analytics?.geo || [];
+  document.getElementById('chd-geo').innerHTML = geo.length
+    ? (() => { const m=Math.max(...geo.map(g=>g.views||0));
+        return geo.map(g=>`<div style="display:flex;align-items:center;gap:10px;"><div style="font-size:11px;color:var(--ink);width:130px;flex-shrink:0;">${g.country}</div>${renderBar(g.views,m,'#6366f1')}<div style="font-size:11px;font-weight:600;color:var(--ink);width:50px;text-align:right;">${fmtNum(g.views)}</div></div>`).join(''); })()
+    : '<div style="color:var(--muted);font-size:12px;">Sin suficientes datos todavía</div>';
 
-    // ── Geografía ──
-    const geo = analytics.geo || [];
-    if (geo.length) {
-      const maxGv = Math.max(...geo.map(g => g.views||0));
-      document.getElementById('chd-geo').innerHTML = geo.map(g => `
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div style="font-size:11px;color:var(--ink);width:130px;flex-shrink:0;">${g.country}</div>
-          ${renderBar(g.views, maxGv, '#6366f1')}
-          <div style="font-size:11px;font-weight:600;color:var(--ink);width:50px;text-align:right;">${fmtNum(g.views)}</div>
-        </div>`).join('');
-    } else {
-      document.getElementById('chd-geo').innerHTML = '<div style="color:var(--muted);font-size:12px;">Sin datos</div>';
-    }
+  const top3 = (analytics?.videos||[]).slice(0,3);
+  document.getElementById('chd-retention').innerHTML = top3.some(v=>v.retention_curve)
+    ? top3.map(v => renderRetentionCurve(v.retention_curve, v.title)).join('')
+    : `<div style="background:var(--cream);border-radius:10px;padding:16px;font-size:11px;color:var(--muted);text-align:center;">
+        📈 Las curvas de abandono aparecen cuando cada vídeo supere ~100 visualizaciones.<br>
+        <span style="font-size:10px;">Datos procesados por YouTube con 24-48h de retraso.</span>
+       </div>`;
+}
 
-    // ── Curvas de retención ──
-    const top3 = (analytics.videos||[]).slice(0,3);
-    if (top3.some(v => v.retention_curve)) {
-      document.getElementById('chd-retention').innerHTML = top3.map(v =>
-        renderRetentionCurve(v.retention_curve, v.title)
-      ).join('');
-    } else {
-      document.getElementById('chd-retention').innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">Las curvas de retención aparecen cuando el vídeo tiene suficientes visualizaciones</div>';
-    }
+async function _refreshLiveStats(channelId) {
+  try {
+    const detail = await fetch(`${API}/api/channels/${channelId}/detail`).then(r=>r.json());
+    const stats = detail.stats || {};
+    const totals = {};
+    const subs  = stats.subscribers  || 0;
+    const views = stats.total_views  || 0;
+    const vids  = stats.videos_count || 0;
+    document.getElementById('chd-subs').textContent   = fmtNum(subs);
+    document.getElementById('chd-views').textContent  = fmtNum(views);
+    document.getElementById('chd-vcount').textContent = fmtNum(vids);
+    // Actualizar badge EN VIVO
+    const now = new Date().toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const liveBadge = document.querySelector('#chd-meta span[style*="EN VIVO"]');
+    if (liveBadge) liveBadge.innerHTML =
+      `<span style="width:6px;height:6px;background:#22c55e;border-radius:50%;animation:pulse-live 1.5s ease-in-out infinite;display:inline-block;"></span>EN VIVO · ${now}`;
+  } catch(e) {}
+}
+
+async function openChDetail(channelId) {
+  _chdChannelId = channelId;
+  if (_chdRefreshInterval) clearInterval(_chdRefreshInterval);
+
+  const modal = document.getElementById('modal-ch-detail');
+  modal.style.display = 'flex';
+  chdTab('resumen');
+
+  // Reset visual
+  document.getElementById('chd-name').textContent = 'Cargando…';
+  document.getElementById('chd-meta').textContent = '';
+  ['chd-subs','chd-views','chd-vcount','an-views30','an-minutes30','an-subs30','an-impr30',
+   'avg-views','avg-ret','avg-ctr','avg-dur','avg-impr'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.textContent = '…';
+  });
+  document.getElementById('chd-traffic').innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando…</div>';
+  document.getElementById('chd-videos-analytics').innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">Cargando…</div>';
+  document.getElementById('chd-retention').innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:16px;">Cargando…</div>';
+
+  try {
+    // Carga en paralelo
+    const [detail, analytics] = await Promise.all([
+      fetch(`${API}/api/channels/${channelId}/detail`).then(r=>r.json()),
+      fetch(`${API}/api/channels/${channelId}/analytics`).then(r=>r.json()),
+    ]);
+
+    _applyDetailData(detail, analytics);
+
+    // Auto-refresh cada 30s solo para subs/views (Data API, casi real-time)
+    _chdRefreshInterval = setInterval(() => _refreshLiveStats(channelId), 30000);
 
   } catch(e) {
-    document.getElementById('chd-name').textContent = 'Error cargando datos';
+    document.getElementById('chd-name').textContent = 'Error';
     document.getElementById('chd-meta').textContent = e.toString();
   }
 }
 
 function closeChDetail() {
   document.getElementById('modal-ch-detail').style.display = 'none';
+  if (_chdRefreshInterval) { clearInterval(_chdRefreshInterval); _chdRefreshInterval = null; }
 }
 
 function openAddChannel() { document.getElementById('modal-channel').classList.add('open'); }
