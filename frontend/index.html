@@ -1515,16 +1515,26 @@ async function openJobDetail(jobId) {
   totalCost = job.cost_total || 0;
   document.getElementById('cost-display').textContent = totalCost.toFixed(3);
 
+  // Orden de pasos para saber cuáles están ya completados al reconectar
+  const STEP_ORDER = ['script','tts','images','thumbnail','hook_videos','render','upload'];
+  const currentIdx = STEP_ORDER.indexOf(job.current_step);
+
   Object.entries(STEPS_META).forEach(([key, meta]) => {
-    const stepDone  = job.status === 'done';
-    const isCurrent = job.current_step === key;
-    const stepStatus = stepDone ? 'done' : isCurrent ? 'running' : 'pending';
+    const keyIdx    = STEP_ORDER.indexOf(key);
+    const jobDone   = job.status === 'done';
+    const isBefore  = keyIdx < currentIdx;
+    const isCurrent = key === job.current_step;
+    const stepStatus = jobDone ? 'done' : (isBefore ? 'done' : (isCurrent ? 'running' : 'pending'));
+    const stepMsg    = jobDone ? 'Completado ✓'
+                     : isBefore  ? 'Completado ✓'
+                     : isCurrent ? 'En curso…'
+                     : 'Esperando…';
     document.getElementById('step-list').insertAdjacentHTML('beforeend', `
       <div class="step" id="step-${key}">
         <div class="step-icon ${stepStatus}" id="dot-${key}">${meta.icon}</div>
         <div class="step-body">
           <div class="step-name">${meta.label}</div>
-          <div class="step-msg text-muted" id="msg-${key}">${isCurrent ? 'En curso…' : stepDone ? 'Completado' : 'Esperando…'}</div>
+          <div class="step-msg text-muted" id="msg-${key}">${stepMsg}</div>
           <div class="step-subbar" id="subbar-${key}">
             <div class="step-subbar-track"><div class="step-subbar-fill" id="subbar-fill-${key}"></div></div>
             <span class="step-subbar-pct" id="subbar-pct-${key}">0%</span>
@@ -1536,6 +1546,18 @@ async function openJobDetail(jobId) {
         </div>
       </div>`);
   });
+
+  // Cargar mensajes reales de pasos completados desde el historial del servidor
+  fetch(`${API}/api/jobs/${jobId}/steps`).then(r=>r.json()).then(steps => {
+    steps.forEach(s => {
+      const msg  = document.getElementById('msg-' + s.step);
+      const dot  = document.getElementById('dot-' + s.step);
+      const cost = document.getElementById('scost-' + s.step);
+      if (msg && s.message) msg.textContent = s.message;
+      if (dot && s.status)  dot.className = 'step-icon ' + s.status;
+      if (cost && s.cost > 0) cost.textContent = s.cost.toFixed(4) + '€';
+    });
+  }).catch(()=>{});
 
   const progress = job.progress || 0;
   document.getElementById('progress-fill').style.width = progress + '%';
