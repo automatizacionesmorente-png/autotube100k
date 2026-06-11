@@ -15,71 +15,104 @@ def generate_metadata(job_id: str, script: str, title: str, niche: str,
     proporcionalmente a la duración real del vídeo (no inventados).
     """
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+    # Extraer palabras clave del nicho para fallback
+    niche_keywords = [w.strip() for w in niche.replace(',', ' ').split() if len(w.strip()) > 3]
+
     msg = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=1100,
+        model="claude-sonnet-4-5-20251001",
+        max_tokens=2000,
         messages=[{
             "role": "user",
-            "content": f"""Título del vídeo: {title}
+            "content": f"""Título: {title}
 Nicho: {niche}
+Canal: México Oculto — geografía, historia y misterios de México
 
-GUIÓN COMPLETO (para ubicar los capítulos):
-{script[:6000]}
+GUIÓN (primeros 5000 caracteres para contexto):
+{script[:5000]}
 
-Genera metadatos optimizados para YouTube SEO:
+Genera metadatos YouTube SEO. Responde EXACTAMENTE con este formato — sin markdown, sin explicaciones:
 
-DESCRIPCION:
-Escribe 3-4 párrafos atractivos con palabras clave naturales sobre el tema.
-Incluye al final: "📌 SUSCRÍBETE para más contenido sobre {niche}"
+===DESCRIPCION===
+[4 párrafos en español mexicano, mínimo 200 palabras en total.
+Párrafo 1: Gancho impactante que invite a ver el vídeo (2-3 frases).
+Párrafo 2: Los 3 descubrimientos más impactantes del vídeo (sin spoilers).
+Párrafo 3: Contexto histórico/geográfico breve.
+Párrafo 4: Por qué importa hoy + CTA: "📌 SUSCRÍBETE a México Oculto 🇲🇽 Nuevo vídeo cada día."]
 
-CAPITULOS:
-Escribe 8 capítulos. Para cada uno indica el PORCENTAJE del guión donde empieza
-(0 a 100) y el nombre, en formato "PORCENTAJE|Nombre del capítulo".
-El primero SIEMPRE es "0|Introducción". Ejemplo:
+===CAPITULOS===
+[10 capítulos en formato EXACTO: número_de_porcentaje|Nombre del capítulo
+El primero SIEMPRE es 0|Introducción. Ejemplo real:
 0|Introducción
-12|El origen del misterio
-...
-Basa el porcentaje en dónde aparece ese contenido dentro del guión de arriba.
+8|El secreto enterrado
+18|1325: El nacimiento de Tenochtitlán
+...]
 
-HASHTAGS:
-Exactamente 15 hashtags relevantes separados por espacio. Empieza cada uno con #.
-Mezcla hashtags amplios (#YouTube, #{niche.replace(' ','')}) con específicos del tema.
+===HASHTAGS===
+[Exactamente en UNA línea separados por espacio: #MéxicoOculto #México #Historia #Geografía #Documental #CDMX más 8 hashtags específicos del tema]
 
-TAGS:
-15 tags SEO separados por comas, sin # (para el campo tags de YouTube).
-
-Usa exactamente esas cuatro etiquetas en mayúsculas."""
+===TAGS===
+[20 tags separados por coma, sin #, máximo 30 chars cada uno. Mezcla términos amplios y específicos del tema en español]"""
         }]
     )
     text = msg.content[0].text
-    sec = _parse_sections(text)
-    desc = sec.get("DESCRIPCION", "").strip()
-    chapters_raw = sec.get("CAPITULOS", "").strip()
-    hashtags = sec.get("HASHTAGS", "").strip()
-    tags_raw = sec.get("TAGS", "").strip()
+
+    # Parser robusto para formato ===SECCION===
+    import re
+    def _extract(section: str) -> str:
+        m = re.search(rf"===\s*{section}\s*===\s*(.*?)(?====|\Z)", text, re.DOTALL | re.IGNORECASE)
+        return m.group(1).strip() if m else ""
+
+    desc        = _extract("DESCRIPCION")
+    chapters_raw= _extract("CAPITULOS")
+    hashtags    = _extract("HASHTAGS")
+    tags_raw    = _extract("TAGS")
 
     chapters = _build_chapters(chapters_raw, audio_duration)
 
-    # Fallback: si la descripción salió vacía, no subir sin SEO — generar una mínima
-    if not desc:
-        desc = (f"{title}\n\nUn recorrido completo sobre {niche}. "
-                f"En este vídeo analizamos en profundidad esta historia con todos los detalles.\n\n"
-                f"📌 SUSCRÍBETE para más contenido sobre {niche}.")
-    if not hashtags:
-        base = niche.replace(' ', '')
-        hashtags = f"#{base} #documental #historia #YouTube #viral"
+    # ── Fallbacks robustos ───────────────────────────────────────────────────
+    if not desc or len(desc) < 80:
+        desc = (
+            f"¿Qué esconde {title}?\n\n"
+            f"En este documental exploramos los secretos mejor guardados de México: {niche}. "
+            f"Una historia fascinante que te hará ver México con otros ojos.\n\n"
+            f"📌 SUSCRÍBETE a México Oculto para descubrir los secretos mejor guardados de México. "
+            f"🇲🇽 Nuevo vídeo cada día."
+        )
 
-    # Combinar descripción con capítulos (YouTube los indexa automáticamente)
+    if not hashtags or "#" not in hashtags:
+        kw_tags = " ".join(f"#{k.capitalize()}" for k in niche_keywords[:5])
+        hashtags = f"#MéxicoOculto #México #Historia #Geografía #Documental {kw_tags}"
+
+    # Asegurar que los hashtags están correctamente formateados (uno por línea o en línea)
+    # YouTube acepta ambos formatos; usamos una línea para compactar
+    hashtags_clean = " ".join(
+        f"#{h.lstrip('#')}" for h in re.split(r'[\s,]+', hashtags) if h.strip().lstrip('#')
+    )
+
+    if not tags_raw:
+        # Fallback: generar tags desde el título y nicho
+        tags_raw = f"{title}, {niche}, México, historia de México, documental México, geografía México, México oculto, secretos México, cultura mexicana, historia azteca"
+
+    # Construir descripción final con capítulos
     parts = [desc]
     if chapters:
         parts.append(f"📖 CONTENIDO DEL VÍDEO:\n{chapters}")
-    parts.append(hashtags)
+    parts.append(hashtags_clean)
     full_description = "\n\n".join(parts)
+
     tags_list = _sanitize_tags(tags_raw)
+
+    # Garantía mínima de tags — si _sanitize_tags filtró todo, usar fallback directo
+    if not tags_list:
+        tags_list = _sanitize_tags(
+            f"México, historia México, documental México, geografía México, {title}, {niche}, "
+            "secretos México, cultura mexicana, México oculto, misterios México"
+        )
 
     return {
         "description": full_description,
-        "hashtags": hashtags,
+        "hashtags": hashtags_clean,
         "tags": tags_list,
     }
 
@@ -146,12 +179,14 @@ def upload_to_youtube(
             "title": title[:100],
             "description": description[:5000],
             "tags": metadata.get("tags", []),
-            "categoryId": "22",
+            "categoryId": "27",   # 27 = Education (mejor para monetización que 22=People)
             "defaultLanguage": "es",
+            "defaultAudioLanguage": "es",
         },
         "status": {
             "privacyStatus": "public",
             "selfDeclaredMadeForKids": False,
+            "containsSyntheticMedia": True,  # Declaración obligatoria de contenido AI
         }
     }
 
