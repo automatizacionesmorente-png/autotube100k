@@ -674,6 +674,8 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
 
       <!-- Pipeline activo -->
       <div id="pipeline-card" class="pipeline-card" style="display:none;">
+        <!-- Banner auto-job: aparece cuando la rutina automática lanza un vídeo -->
+        <div id="auto-job-banner" style="display:none;background:linear-gradient(90deg,#1c1914,#2a2318);color:var(--gold);font-size:11px;font-weight:600;padding:8px 16px;border-radius:8px 8px 0 0;letter-spacing:.04em;"></div>
         <div class="pipeline-head">
           <span class="pipeline-lbl" id="pipeline-lbl">Pipeline en curso</span>
           <div style="display:flex;align-items:center;gap:8px;">
@@ -2139,7 +2141,40 @@ async function loadNavCost() {
   document.getElementById('nav-cost').textContent = f.total_cost.toFixed(2)+'€';
 }
 
+// ── Auto-detectar vídeo en curso al cargar la página ─────────────────────────
+// Si la rutina automática lanzó un vídeo, se muestra solo sin tener que buscarlo.
+async function autoOpenRunningJob() {
+  try {
+    const jobs = await fetch(`${API}/api/jobs`).then(r => r.json()).catch(() => []);
+    const running = jobs.find(j => j.status === 'running' || j.status === 'pending');
+    if (running) {
+      // Ir a la pestaña CREAR si no estamos ya ahí
+      const crearTab = document.querySelector('.nav-tab[onclick*="crear"]') ||
+                       [...document.querySelectorAll('.nav-tab')].find(b => b.textContent.trim() === 'CREAR');
+      if (crearTab) crearTab.click();
+      // Abrir el pipeline del job en curso
+      await openJobDetail(running.id);
+      // Badge visual para avisar que fue lanzado automáticamente
+      const banner = document.getElementById('auto-job-banner');
+      if (banner) {
+        banner.textContent = `🤖 Vídeo generado automáticamente: "${running.title}"`;
+        banner.style.display = 'block';
+      }
+    }
+  } catch(e) {}
+}
+
+// Sondeo periódico: si abres la página mientras el vídeo lleva tiempo corriendo
+// o si el agente lo lanza mientras tienes la pestaña abierta
+setInterval(async () => {
+  if (currentJobId) return; // ya hay uno abierto, no hacer nada
+  const jobs = await fetch(`${API}/api/jobs`).then(r => r.json()).catch(() => []);
+  const running = jobs.find(j => j.status === 'running' || j.status === 'pending');
+  if (running) autoOpenRunningJob();
+}, 30000);
+
 loadJobs(); loadChannels(); loadNavCost();
+autoOpenRunningJob();
 
 // ── Miniatura propia: preview y helpers ──────────────────────────────────────
 function _fileToDataURL(file) {
