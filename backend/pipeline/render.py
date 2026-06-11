@@ -11,6 +11,26 @@ from ..database import add_step
 
 MUSIC_DIR = Path(__file__).parent.parent.parent / "music"
 
+# ── FUENTES PROFESIONALES ─────────────────────────────────────────────────────
+# Bebas Neue: documentales Netflix/YouTube (condensado, bold, cinematic)
+# Montserrat ExtraBold: subtítulos karaoke modernos
+# Oswald Bold: citas y lower thirds secundarios
+# DejaVu Mono Bold: efecto máquina de escribir (monoespaciado, siempre disponible)
+_F_BEBAS      = "/usr/share/fonts/custom/BebasNeue-Regular.ttf"
+_F_MONTSERRAT = "/usr/share/fonts/custom/Montserrat-ExtraBold.ttf"
+_F_OSWALD     = "/usr/share/fonts/custom/Oswald-Bold.ttf"
+_F_MONO       = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
+
+def _ff(font_path: str) -> str:
+    """Devuelve fontfile= para drawtext, con fallback a DejaVu si no existe."""
+    import os
+    return font_path if os.path.exists(font_path) else "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+
+# ── CONSTANTES TYPEWRITER ─────────────────────────────────────────────────────
+_TW_DT    = 0.065   # segundos entre cada carácter
+_TW_SIZE  = 36      # fontsize máquina de escribir
+_TW_CW    = 22      # ancho aprox. por carácter en px (monoespaciado a 36px)
+
 # Mapa tono → subcarpeta de música
 MUSIC_TONE_MAP = {
     "misterio":     ["misterio", "neutro"],
@@ -633,6 +653,124 @@ def _generate_subbass_hits(zones: list, audio_dur: float, tmp: Path) -> Path | N
     return result if result.exists() else None
 
 
+def _lower_third_typewriter(text: str, t0: float, t1: float, y_pos: str = "h-110") -> list[str]:
+    """
+    Lower third con efecto máquina de escribir profesional.
+    - Fondo negro semitransparente centrado
+    - Cada carácter aparece en secuencia cada _TW_DT segundos
+    - Cursor parpadeante mientras escribe
+    - Fuente monoespaciada DejaVu Mono Bold para efecto typewriter auténtico
+    """
+    text_up = text.upper()
+    n = len(text_up)
+    total_type = n * _TW_DT
+    total_w = n * _TW_CW + 24
+    bg_x = f"(w-{total_w})/2"
+    bg_y = f"{y_pos}-8"
+
+    layers = []
+
+    # Fondo negro bajo el texto
+    layers.append(
+        f"drawbox=x='{bg_x}':y='{bg_y}':w={total_w}:h={_TW_SIZE + 20}:"
+        f"color=0x000000@0.82:t=fill:"
+        f"enable='between(t,{t0:.3f},{t1:.3f})'"
+    )
+
+    # Línea decorativa encima del texto (estilo lower-third profesional)
+    line_y = f"{y_pos}-10"
+    layers.append(
+        f"drawbox=x='{bg_x}':y='{line_y}':w={total_w}:h=2:"
+        f"color=0xFFD700@0.90:t=fill:"
+        f"enable='between(t,{t0:.3f},{t1:.3f})'"
+    )
+
+    # Caracteres uno a uno
+    for i, char in enumerate(text_up):
+        if char == ' ':
+            continue
+        t_char = t0 + i * _TW_DT
+        x_char = f"(w-{total_w})/2 + {i * _TW_CW + 12}"
+        char_esc = char.replace("'", "\\'").replace(":", "\\:").replace(",", "\\,").replace("\\", "\\\\")
+        layers.append(
+            f"drawtext=text='{char_esc}':"
+            f"fontfile='{_ff(_F_MONO)}':"
+            f"fontsize={_TW_SIZE}:fontcolor=white@0.97:"
+            f"x={x_char}:y={y_pos}:"
+            f"enable='between(t,{t_char:.3f},{t1:.3f})'"
+        )
+
+    # Cursor parpadeante mientras escribe
+    cursor_x = f"(w-{total_w})/2 + {n * _TW_CW + 12}"
+    cursor_end = t0 + total_type + 0.4
+    layers.append(
+        f"drawtext=text='_':"
+        f"fontfile='{_ff(_F_MONO)}':"
+        f"fontsize={_TW_SIZE}:fontcolor=0xFFD700@0.90:"
+        f"x={cursor_x}:y={y_pos}:"
+        f"enable='between(t,{t0:.3f},{cursor_end:.3f})*eq(mod(floor((t)*8),2),0)'"
+    )
+
+    return layers
+
+
+def _generate_typewriter_audio(lower_thirds: list, audio_dur: float, tmp: Path) -> Path | None:
+    """
+    Genera pista de audio con ticks de máquina de escribir.
+    Crea un loop de ticks y lo activa solo durante los períodos de escritura de cada lower third.
+    """
+    if not lower_thirds:
+        return None
+
+    # Generar tick único (burst de alta frecuencia, 40ms)
+    tick = tmp / "tw_tick.wav"
+    try:
+        _ffmpeg(
+            "-f", "lavfi",
+            "-i", "aevalsrc=0.20*sin(2*PI*5200*t)*exp(-200*t)+0.08*sin(2*PI*2800*t)*exp(-150*t):s=44100:c=mono:d=0.04",
+            "-ar", "44100", "-ac", "2", str(tick)
+        )
+    except Exception:
+        return None
+
+    # Loop del tick a ritmo typewriter (~13 chars/seg)
+    loop_dur = audio_dur + 5
+    ticks_loop = tmp / "tw_loop.wav"
+    try:
+        _ffmpeg(
+            "-stream_loop", "-1", "-i", str(tick),
+            "-t", f"{loop_dur:.1f}",
+            "-af", f"aresample=44100",
+            "-ar", "44100", "-ac", "2", str(ticks_loop)
+        )
+    except Exception:
+        return None
+
+    # Volumen activo solo cuando hay escritura (entre t0 y t0+n*dt de cada lower third)
+    vol_parts = []
+    for lt in lower_thirds:
+        t0 = lt["start"]
+        n_chars = len(lt["text"].replace(' ', ''))
+        t_end_typing = min(t0 + n_chars * _TW_DT + 0.1, lt["end"])
+        vol_parts.append(f"between(t,{t0:.3f},{t_end_typing:.3f})")
+
+    if not vol_parts:
+        return None
+
+    vol_expr = "min(1," + "+".join(vol_parts) + ")"
+    result = tmp / "typewriter_track.wav"
+    try:
+        _ffmpeg(
+            "-i", str(ticks_loop),
+            "-af", f"volume='{vol_expr}',volume=0.18",  # -0.18 = volumen sutil
+            "-t", f"{audio_dur+1:.1f}",
+            "-ar", "44100", "-ac", "2", str(result)
+        )
+        return result if result.exists() and result.stat().st_size > 1000 else None
+    except Exception:
+        return None
+
+
 def _generate_heartbeat_track(zones: list, audio_dur: float, tmp: Path) -> Path | None:
     """
     Genera pista de latido cardíaco en zonas de tensión/misterio (numpy vectorizado, 0€).
@@ -1122,6 +1260,10 @@ def render_video(
     heartbeat_track = _generate_heartbeat_track(_vf_zones, audio_dur, tmp)
     has_hb = heartbeat_track is not None and heartbeat_track.exists()
 
+    # Audio máquina de escribir para lower thirds (ticks sincronizados carácter a carácter)
+    typewriter_track = _generate_typewriter_audio(lower_thirds, audio_dur, tmp)
+    has_tw = typewriter_track is not None and typewriter_track.exists()
+
     # Log de estado con todas las variables ya definidas
     n_zones    = len(_vf_zones) if _vf_zones else 4
     n_hist     = len(historical_sections)
@@ -1139,26 +1281,31 @@ def render_video(
     # Re-hook al 32% y al 50% (rescata a los espectadores que están a punto de irse)
     mid_t = audio_dur * 0.32
     mid_hook_filter = (
-        f"drawtext=text='Y lo más impactante viene ahora...':"
-        f"fontsize=42:fontcolor=white@0.92:"
-        f"box=1:boxcolor=black@0.70:boxborderw=16:"
-        f"x=(w-text_w)/2:y=h*0.88:"
+        f"drawtext=text='Y LO MAS IMPACTANTE VIENE AHORA...':"
+        f"fontfile='{_ff(_F_BEBAS)}':"
+        f"fontsize=52:fontcolor=white@0.94:"
+        f"box=1:boxcolor=black@0.72:boxborderw=18:"
+        f"shadowcolor=black@0.40:shadowx=2:shadowy=2:"
+        f"x=(w-text_w)/2:y=h*0.87:"
         f"enable='between(t,{mid_t:.0f},{mid_t+4.0:.0f})'"
     )
     mid50_t = audio_dur * 0.50
     mid50_hook_filter = (
-        f"drawtext=text='Lo que viene ahora... nadie lo sabe.':"
-        f"fontsize=38:fontcolor=0xFFE000@0.95:"
-        f"box=1:boxcolor=black@0.75:boxborderw=14:"
-        f"x=(w-text_w)/2:y=h*0.88:"
+        f"drawtext=text='LO QUE VIENE AHORA... NADIE LO SABE.':"
+        f"fontfile='{_ff(_F_BEBAS)}':"
+        f"fontsize=48:fontcolor=0xFFD700@0.96:"
+        f"box=1:boxcolor=black@0.75:boxborderw=16:"
+        f"shadowcolor=black@0.40:shadowx=2:shadowy=2:"
+        f"x=(w-text_w)/2:y=h*0.87:"
         f"enable='between(t,{mid50_t:.0f},{mid50_t+4.5:.0f})'"
     )
 
-    # Marca de canal — identidad visual sutil (15% opacidad, esquina superior derecha)
+    # Marca de canal — identidad visual (esquina superior derecha)
     watermark_filter = (
-        "drawtext=text='México Oculto':"
-        "fontsize=26:fontcolor=white@0.18:"
-        "x=w-text_w-28:y=24"
+        f"drawtext=text='México Oculto':"
+        f"fontfile='{_ff(_F_OSWALD)}':"
+        f"fontsize=24:fontcolor=white@0.22:"
+        f"x=w-text_w-28:y=22"
     )
 
     # ── MEZCLA FINAL: audio + música + subtítulos + color grade + CTA ─────────
@@ -1183,10 +1330,13 @@ def render_video(
         # Momento ideal: el espectador ya enganchó pero aún no se fue.
         # Duración 6s: lo suficiente para leer sin molestar.
         layers.append(
-            "drawtext=text='🔔 SUSCRÍBETE para más secretos de México':"
-            "fontsize=36:fontcolor=white:box=1:boxcolor=0x00000088:boxborderw=10:"
-            "x=(w-text_w)/2:y=h*0.06:"
-            "enable='between(t,15,21)'"
+            f"drawtext=text='SUSCRIBETE PARA MAS SECRETOS DE MEXICO':"
+            f"fontfile='{_ff(_F_BEBAS)}':"
+            f"fontsize=44:fontcolor=white@0.95:"
+            f"box=1:boxcolor=0x000000@0.72:boxborderw=14:"
+            f"shadowcolor=black@0.50:shadowx=2:shadowy=2:"
+            f"x=(w-text_w)/2:y=h*0.05:"
+            f"enable='between(t,15,21)'"
         )
 
         # Color grade dinámico por zona emocional (frío/cálido/clímax)
@@ -1249,34 +1399,20 @@ def render_video(
             )
             layers.append(
                 f"drawtext=text='{txt}':"
-                f"fontsize=54:fontcolor=white:"
-                f"box=1:boxcolor=black@0.82:boxborderw=30:"
+                f"fontfile='{_ff(_F_BEBAS)}':"
+                f"fontsize=62:fontcolor=white@0.96:"
+                f"shadowcolor=black@0.70:shadowx=3:shadowy=3:"
+                f"box=1:boxcolor=0x000000@0.78:boxborderw=28:"
                 f"x=(w-text_w)/2:y='{y_expr}':"
                 f"enable='between(t,{t0:.2f},{t1:.2f})'"
             )
 
         # ── LOWER THIRDS ANIMADOS: slide desde izquierda, salida por izquierda ─
         # Entrada en 0.28s, salida en 0.18s. Canales de 1M+ los tienen SIEMPRE.
-        # x expression: de -text_w (fuera pantalla) a 80 (posición final)
+        # ── LOWER THIRDS: efecto máquina de escribir profesional ─────────────
         for lt in lower_thirds:
             t0, t1 = lt["start"], lt["end"]
-            txt = lt["text"].replace("'", "\\'").replace(":", "\\:").replace(",", "\\,")
-            si = 0.28   # slide-in duration (s)
-            so = 0.18   # slide-out duration (s)
-            x_expr = (
-                f"if(lt(t-{t0:.2f},{si}),"
-                f"(-text_w-10)+(text_w+90)*(t-{t0:.2f})/{si},"
-                f"if(gt(t,{t1:.2f}-{so}),"
-                f"80+(80+text_w+10)*(t-{t1:.2f}+{so})/{so},"
-                f"80))"
-            )
-            layers.append(
-                f"drawtext=text='{txt}':"
-                f"fontsize=34:fontcolor=white@0.95:"
-                f"box=1:boxcolor=black@0.55:boxborderw=12:"
-                f"x='{x_expr}':y=h-140:"
-                f"enable='between(t,{t0:.2f},{t1:.2f})'"
-            )
+            layers.extend(_lower_third_typewriter(lt["text"], t0, t1, y_pos="h-108"))
 
         # ── CITAS DE FUENTES: credibilidad instantánea ─────────────────────
         # "Según el INAH" aparece en pantalla al mencionarlo — da autoridad al instante.
@@ -1285,9 +1421,10 @@ def render_video(
             txt = sc["text"].replace("'", "\\'").replace(":", "\\:").replace(",", "\\,")
             layers.append(
                 f"drawtext=text='{txt}':"
-                f"fontsize=30:fontcolor=white@0.92:"
-                f"box=1:boxcolor=0x1A3A5C@0.82:boxborderw=10:"
-                f"x=80:y=h-200:"
+                f"fontfile='{_ff(_F_OSWALD)}':"
+                f"fontsize=28:fontcolor=white@0.90:"
+                f"box=1:boxcolor=0x0D2540@0.85:boxborderw=12:"
+                f"x=72:y=h-195:"
                 f"enable='between(t,{t0:.1f},{t1:.1f})'"
             )
 
@@ -1300,9 +1437,11 @@ def render_video(
             txt = imp["text"].replace("'", "\\'").replace(":", "\\:").replace(",", "\\,")
             layers.append(
                 f"drawtext=text='{txt}':"
-                f"fontsize=128:fontcolor=0x00F0FF@0.95:"
-                f"x=(w-text_w)/2:y=h*0.38:"
-                f"box=1:boxcolor=black@0.60:boxborderw=22:"
+                f"fontfile='{_ff(_F_BEBAS)}':"
+                f"fontsize=134:fontcolor=0xFFFFFF@0.97:"
+                f"x=(w-text_w)/2:y=h*0.37:"
+                f"shadowcolor=0x000000@0.85:shadowx=4:shadowy=4:"
+                f"borderw=3:bordercolor=0x00D4FF@0.80:"
                 f"enable='between(t,{t0:.2f},{t1:.2f})'"
             )
 
@@ -1429,9 +1568,13 @@ def render_video(
 
         # ── CTA AL FINAL ──────────────────────────────────────────────────────
         layers.append(
-            f"drawtext=text='¡SUSCRÍBETE Y ACTIVA LA CAMPANITA!':"
-            f"fontcolor=white:fontsize=52:box=1:boxcolor=red@0.88:boxborderw=20:"
-            f"x=(w-text_w)/2:y=h*0.06:enable='between(t,{cta_start:.1f},{audio_dur:.1f})'"
+            f"drawtext=text='SUSCRIBETE Y ACTIVA LA CAMPANITA':"
+            f"fontfile='{_ff(_F_BEBAS)}':"
+            f"fontsize=58:fontcolor=white@0.97:"
+            f"box=1:boxcolor=0xCC0000@0.90:boxborderw=22:"
+            f"shadowcolor=black@0.50:shadowx=3:shadowy=3:"
+            f"x=(w-text_w)/2:y=h*0.05:"
+            f"enable='between(t,{cta_start:.1f},{audio_dur:.1f})'"
         )
 
         # ── FADE TO BLACK FINAL (2.5s) ────────────────────────────────────────
@@ -1520,6 +1663,9 @@ def render_video(
         if has_hb:
             inputs += ["-i", str(heartbeat_track)]
             hb_label = f"[{extra_idx}:a]"; extra_idx += 1
+        if has_tw:
+            inputs += ["-i", str(typewriter_track)]
+            tw_label = f"[{extra_idx}:a]"; extra_idx += 1
 
         # ── MÚSICA FIX: convertir voz mono→stereo antes del amix ─────────────
         # La voz XTTS es MONO. Si hacemos amix(mono_voz + stereo_música),
@@ -1552,6 +1698,11 @@ def render_video(
         if has_hb:
             fc_parts.append(f"{hb_label}lowpass=f=200,volume=0.9[hb]")
             mix_labels.append("[hb]")
+
+        # Ticks de máquina de escribir sincronizados con lower thirds
+        if has_tw:
+            fc_parts.append(f"{tw_label}highpass=f=1000,volume=1.0[tw]")
+            mix_labels.append("[tw]")
 
         n_mix = len(mix_labels)
         fc_parts.append(f"{''.join(mix_labels)}amix=inputs={n_mix}:normalize=0[mx]")
@@ -1909,11 +2060,12 @@ def _build_ass(words: list) -> str:
         "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
         "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        # Base: blanco. La palabra activa se sobreescribe con \c inline.
-        "Style: Big,Arial Black,96,&H00FFFFFF,&H0000F0FF,&H00000000,&HAA000000,"
-        "-1,0,0,0,100,100,1.0,0,1,8,5,2,80,80,200,1\n"
-        "Style: Main,Arial Black,80,&H00FFFFFF,&H0000F0FF,&H00000000,&H88000000,"
-        "-1,0,0,0,100,100,0.8,0,1,6,4,2,60,60,180,1\n\n"
+        # Montserrat ExtraBold — subtítulos estilo Netflix/YouTube premium
+        # Bold=-1 (bold inline), outline grueso + sombra suave
+        "Style: Big,Montserrat,96,&H00FFFFFF,&H0000F0FF,&H00000000,&HAA000000,"
+        "-1,0,0,0,100,100,0.5,0,1,7,4,2,80,80,200,1\n"
+        "Style: Main,Montserrat,80,&H00FFFFFF,&H0000F0FF,&H00000000,&H88000000,"
+        "-1,0,0,0,100,100,0.3,0,1,5,3,2,60,60,180,1\n\n"
         "[Events]\nFormat: Layer, Start, End, Style, Name, "
         "MarginL, MarginR, MarginV, Effect, Text\n"
     )
