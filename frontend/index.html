@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { overflow-x: hidden; max-width: 100%; }
 
 :root {
   --cream:   #f7f4ef;
@@ -2061,8 +2062,8 @@ async function _checkShort(jobId) {
   .mbn-badge.visible { display: block; }
 
   /* ── LAYOUT ── */
-  main { padding: 14px 12px 72px; }
-  .two-col { grid-template-columns: 1fr; gap: 12px; }
+  main { padding: 14px 12px 72px; overflow-x: hidden; max-width: 100%; width: 100%; }
+  .two-col { grid-template-columns: 1fr !important; gap: 12px; max-width: 100%; }
   .two-col > div:first-child { order: 2; }
   .two-col > div:last-child  { order: 1; }
 
@@ -2155,8 +2156,8 @@ async function _checkShort(jobId) {
   /* ── FINANZAS ── */
   .stats-grid { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
   .stat-num { font-size: 22px !important; }
-  .finance-table { overflow-x: auto; }
-  table { min-width: 460px; }
+  .finance-table { overflow-x: auto; max-width: 100%; }
+  table { min-width: auto; width: 100%; }
 
   /* ── MISC ── */
   #short-row { padding: 12px !important; }
@@ -2164,10 +2165,12 @@ async function _checkShort(jobId) {
   .result-err { font-size: 12px !important; padding: 12px !important; line-height: 1.5; }
 
   /* ── FIX OVERFLOW: nada sale de la pantalla ── */
-  main { max-width: 100vw; overflow-x: hidden; }
-  .card { overflow: hidden; max-width: 100%; }
-  .card-body { overflow: hidden; }
-  .page { max-width: 100%; }
+  .card { overflow: hidden; max-width: 100%; width: 100%; }
+  .card-body { overflow: hidden; max-width: 100%; }
+  .card-head { overflow: hidden; max-width: 100%; }
+  .page { max-width: 100%; overflow-x: hidden; }
+  .pipeline-card { max-width: 100%; overflow: hidden; }
+  .two-col > div { max-width: 100%; overflow: hidden; }
 
   /* ── HISTORIAL: texto truncado correcto ── */
   .job-row {
