@@ -308,7 +308,6 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
 .job-dot.error   { background: var(--red); }
 .job-dot.pending { background: var(--muted2); }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
-@keyframes pulse-live { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
 .job-title { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .job-meta  { font-size: 11px; color: var(--muted); margin-top: 1px; }
 .job-cost  { font-family: 'Playfair Display', serif; font-size: 14px; color: var(--green); flex-shrink: 0; font-weight: 500; }
@@ -561,6 +560,23 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
   </div>
 </nav>
 
+<!-- ── BOTTOM NAV BAR (mobile only) ── -->
+<div id="mobile-bottom-nav">
+  <button class="mbn-btn active" onclick="mbnGo('crear',this)" id="mbn-crear">
+    <span class="mbn-icon">🎬</span>
+    <span>Crear</span>
+    <span class="mbn-badge" id="mbn-badge-crear"></span>
+  </button>
+  <button class="mbn-btn" onclick="mbnGo('canales',this)" id="mbn-canales">
+    <span class="mbn-icon">📺</span>
+    <span>Canales</span>
+  </button>
+  <button class="mbn-btn" onclick="mbnGo('finanzas',this)" id="mbn-finanzas">
+    <span class="mbn-icon">💰</span>
+    <span>Finanzas</span>
+  </button>
+</div>
+
 <main>
 
 <!-- ══ CREAR ══ -->
@@ -674,8 +690,6 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
 
       <!-- Pipeline activo -->
       <div id="pipeline-card" class="pipeline-card" style="display:none;">
-        <!-- Banner auto-job: aparece cuando la rutina automática lanza un vídeo -->
-        <div id="auto-job-banner" style="display:none;background:linear-gradient(90deg,#1c1914,#2a2318);color:var(--gold);font-size:11px;font-weight:600;padding:8px 16px;border-radius:8px 8px 0 0;letter-spacing:.04em;"></div>
         <div class="pipeline-head">
           <span class="pipeline-lbl" id="pipeline-lbl">Pipeline en curso</span>
           <div style="display:flex;align-items:center;gap:8px;">
@@ -763,125 +777,39 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
 </div>
 
 <!-- ══ MODAL DETALLE CANAL ══ -->
-<div id="modal-ch-detail" class="modal-overlay" onclick="if(event.target===this)closeChDetail()" style="display:none;position:fixed;inset:0;background:rgba(28,25,20,.6);z-index:200;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;">
-  <div style="background:#fff;border-radius:18px;width:100%;max-width:900px;box-shadow:0 32px 100px rgba(0,0,0,.22);overflow:hidden;">
-
+<div id="modal-ch-detail" class="modal-overlay" onclick="if(event.target===this)closeChDetail()" style="display:none;position:fixed;inset:0;background:rgba(28,25,20,.55);z-index:200;display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:720px;box-shadow:0 24px 80px rgba(0,0,0,.18);overflow:hidden;">
     <!-- Header -->
-    <div style="background:var(--ink);padding:24px 32px 0;position:relative;">
-      <button onclick="closeChDetail()" style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,.12);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;">✕</button>
-      <div id="chd-kicker" style="font-size:10px;color:rgba(255,255,255,.45);letter-spacing:.12em;text-transform:uppercase;margin-bottom:5px;">Canal YouTube</div>
-      <div id="chd-name" style="font-family:'Playfair Display',serif;font-size:22px;color:#fff;margin-bottom:3px;">—</div>
-      <div id="chd-meta" style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:16px;">Cargando…</div>
-      <!-- Tabs -->
-      <div style="display:flex;gap:0;border-top:1px solid rgba(255,255,255,.1);">
-        <button id="chd-tab-resumen" onclick="chdTab('resumen')" style="padding:10px 20px;background:none;border:none;color:rgba(255,255,255,.9);font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid var(--gold);letter-spacing:.04em;">RESUMEN</button>
-        <button id="chd-tab-videos" onclick="chdTab('videos')" style="padding:10px 20px;background:none;border:none;color:rgba(255,255,255,.45);font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;letter-spacing:.04em;">VÍDEOS</button>
-        <button id="chd-tab-audiencia" onclick="chdTab('audiencia')" style="padding:10px 20px;background:none;border:none;color:rgba(255,255,255,.45);font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;letter-spacing:.04em;">AUDIENCIA</button>
+    <div style="background:var(--ink);padding:28px 32px;position:relative;">
+      <button onclick="closeChDetail()" style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,.12);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;">✕</button>
+      <div id="chd-kicker" style="font-size:10px;color:rgba(255,255,255,.5);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;">Canal YouTube</div>
+      <div id="chd-name" style="font-family:'Playfair Display',serif;font-size:22px;color:#fff;margin-bottom:4px;">—</div>
+      <div id="chd-meta" style="font-size:11px;color:rgba(255,255,255,.45);">Cargando…</div>
+    </div>
+    <!-- Big stats -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border);">
+      <div style="padding:20px 24px;border-right:1px solid var(--border);text-align:center;">
+        <div id="chd-subs" style="font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);">—</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;">Suscriptores</div>
+      </div>
+      <div style="padding:20px 24px;border-right:1px solid var(--border);text-align:center;">
+        <div id="chd-views" style="font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);">—</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;">Visualizaciones</div>
+      </div>
+      <div style="padding:20px 24px;text-align:center;">
+        <div id="chd-vcount" style="font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);">—</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;">Vídeos</div>
       </div>
     </div>
-
-    <!-- ── TAB: RESUMEN ── -->
-    <div id="chd-panel-resumen">
-      <!-- Big stats -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border);">
-        <div style="padding:18px 20px;border-right:1px solid var(--border);text-align:center;">
-          <div id="chd-subs" style="font-family:'Playfair Display',serif;font-size:26px;color:var(--ink);">—</div>
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px;">Suscriptores</div>
-        </div>
-        <div style="padding:18px 20px;border-right:1px solid var(--border);text-align:center;">
-          <div id="chd-views" style="font-family:'Playfair Display',serif;font-size:26px;color:var(--ink);">—</div>
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px;">Views totales</div>
-        </div>
-        <div style="padding:18px 20px;text-align:center;">
-          <div id="chd-vcount" style="font-family:'Playfair Display',serif;font-size:26px;color:var(--ink);">—</div>
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px;">Vídeos</div>
-        </div>
-      </div>
-
-      <!-- Analytics KPIs últimos 30 días -->
-      <div style="padding:20px 24px 4px;border-bottom:1px solid var(--border);">
-        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;">📊 Analytics — últimos 30 días</div>
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;" id="chd-kpis-30">
-          <div style="background:var(--cream);border-radius:10px;padding:14px 16px;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Views 30d</div><div id="an-views30" style="font-size:20px;font-weight:700;color:var(--ink);">—</div></div>
-          <div style="background:var(--cream);border-radius:10px;padding:14px 16px;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Minutos vistos 30d</div><div id="an-minutes30" style="font-size:20px;font-weight:700;color:var(--ink);">—</div></div>
-          <div style="background:var(--cream);border-radius:10px;padding:14px 16px;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Subs ganados 30d</div><div id="an-subs30" style="font-size:20px;font-weight:700;color:var(--green);">—</div></div>
-          <div style="background:var(--cream);border-radius:10px;padding:14px 16px;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Impresiones 30d</div><div id="an-impr30" style="font-size:20px;font-weight:700;color:var(--ink);">—</div></div>
-        </div>
-      </div>
-
-      <!-- Medias por vídeo -->
-      <div style="padding:20px 24px 4px;border-bottom:1px solid var(--border);">
-        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;">🎯 Medias por vídeo (histórico)</div>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px;">
-          <div style="text-align:center;padding:12px 8px;background:var(--cream);border-radius:10px;">
-            <div id="avg-views" style="font-size:18px;font-weight:700;color:var(--ink);">—</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;">Views/vídeo</div>
-          </div>
-          <div style="text-align:center;padding:12px 8px;background:var(--cream);border-radius:10px;">
-            <div id="avg-ret" style="font-size:18px;font-weight:700;color:var(--gold);">—</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;">Retención %</div>
-          </div>
-          <div style="text-align:center;padding:12px 8px;background:var(--cream);border-radius:10px;">
-            <div id="avg-ctr" style="font-size:18px;font-weight:700;color:var(--ink);">—</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;">CTR %</div>
-          </div>
-          <div style="text-align:center;padding:12px 8px;background:var(--cream);border-radius:10px;">
-            <div id="avg-dur" style="font-size:18px;font-weight:700;color:var(--ink);">—</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;">Duración media</div>
-          </div>
-          <div style="text-align:center;padding:12px 8px;background:var(--cream);border-radius:10px;">
-            <div id="avg-impr" style="font-size:18px;font-weight:700;color:var(--ink);">—</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;">Impr./vídeo</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Fuentes de tráfico -->
-      <div style="padding:20px 24px 20px;" id="chd-traffic-section">
-        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;">🚦 Fuentes de tráfico (30d)</div>
-        <div id="chd-traffic" style="display:flex;flex-direction:column;gap:8px;">
-          <div style="color:var(--muted);font-size:12px;">Cargando…</div>
-        </div>
+    <!-- Canal info -->
+    <div id="chd-info" style="padding:16px 24px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;gap:24px;flex-wrap:wrap;"></div>
+    <!-- Últimos vídeos -->
+    <div style="padding:24px 28px;">
+      <div style="font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.06em;text-transform:uppercase;margin-bottom:16px;">Últimos vídeos publicados</div>
+      <div id="chd-videos" style="display:flex;flex-direction:column;gap:12px;">
+        <div style="color:var(--muted);font-size:12px;">Cargando vídeos…</div>
       </div>
     </div>
-
-    <!-- ── TAB: VÍDEOS ── -->
-    <div id="chd-panel-videos" style="display:none;">
-      <div style="padding:20px 24px;">
-        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;">🎬 Analytics por vídeo</div>
-        <!-- Cabecera tabla -->
-        <div style="display:grid;grid-template-columns:2fr 60px 70px 60px 70px 60px 60px;gap:6px;padding:8px 10px;background:var(--cream2);border-radius:8px;margin-bottom:8px;font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">
-          <div>Vídeo</div><div style="text-align:right;">Views</div><div style="text-align:center;">Retención</div><div style="text-align:right;">CTR%</div><div style="text-align:right;">Watch min</div><div style="text-align:right;">Impr.</div><div style="text-align:right;">+Subs</div>
-        </div>
-        <div id="chd-videos-analytics" style="display:flex;flex-direction:column;gap:4px;">
-          <div style="color:var(--muted);font-size:12px;padding:20px 0;text-align:center;">Cargando analytics…</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── TAB: AUDIENCIA ── -->
-    <div id="chd-panel-audiencia" style="display:none;">
-      <div style="padding:20px 24px;">
-        <!-- Dispositivos -->
-        <div style="margin-bottom:24px;">
-          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;">📱 Dispositivos (30d)</div>
-          <div id="chd-devices" style="display:flex;flex-direction:column;gap:7px;"></div>
-        </div>
-        <!-- Países -->
-        <div style="margin-bottom:24px;">
-          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;">🌍 Top países (30d)</div>
-          <div id="chd-geo" style="display:flex;flex-direction:column;gap:7px;"></div>
-        </div>
-        <!-- Curvas de retención -->
-        <div>
-          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;">📉 Curva de abandono — top 3 vídeos</div>
-          <div id="chd-retention" style="display:flex;flex-direction:column;gap:20px;">
-            <div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">Cargando curvas…</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
   </div>
 </div>
 
@@ -1163,6 +1091,9 @@ function _showUploaded(youtubeUrl, studioUrl) {
   // Abrir YouTube Studio automáticamente para revisar
   const openUrl = studioUrl || `https://studio.youtube.com`;
   window.open(openUrl, '_blank');
+  // Notificar al equipo por WhatsApp
+  const _jobTitle = window._currentJobTitle || document.getElementById('pipeline-lbl')?.textContent?.replace('Pipeline en curso','').trim() || '';
+  _notifyEquipo(youtubeUrl, _jobTitle).catch(()=>{});
 }
 
 async function _pollUpload(jobId) {
@@ -1515,26 +1446,16 @@ async function openJobDetail(jobId) {
   totalCost = job.cost_total || 0;
   document.getElementById('cost-display').textContent = totalCost.toFixed(3);
 
-  // Orden de pasos para saber cuáles están ya completados al reconectar
-  const STEP_ORDER = ['script','tts','images','thumbnail','hook_videos','render','upload'];
-  const currentIdx = STEP_ORDER.indexOf(job.current_step);
-
   Object.entries(STEPS_META).forEach(([key, meta]) => {
-    const keyIdx    = STEP_ORDER.indexOf(key);
-    const jobDone   = job.status === 'done';
-    const isBefore  = keyIdx < currentIdx;
-    const isCurrent = key === job.current_step;
-    const stepStatus = jobDone ? 'done' : (isBefore ? 'done' : (isCurrent ? 'running' : 'pending'));
-    const stepMsg    = jobDone ? 'Completado ✓'
-                     : isBefore  ? 'Completado ✓'
-                     : isCurrent ? 'En curso…'
-                     : 'Esperando…';
+    const stepDone  = job.status === 'done';
+    const isCurrent = job.current_step === key;
+    const stepStatus = stepDone ? 'done' : isCurrent ? 'running' : 'pending';
     document.getElementById('step-list').insertAdjacentHTML('beforeend', `
       <div class="step" id="step-${key}">
         <div class="step-icon ${stepStatus}" id="dot-${key}">${meta.icon}</div>
         <div class="step-body">
           <div class="step-name">${meta.label}</div>
-          <div class="step-msg text-muted" id="msg-${key}">${stepMsg}</div>
+          <div class="step-msg text-muted" id="msg-${key}">${isCurrent ? 'En curso…' : stepDone ? 'Completado' : 'Esperando…'}</div>
           <div class="step-subbar" id="subbar-${key}">
             <div class="step-subbar-track"><div class="step-subbar-fill" id="subbar-fill-${key}"></div></div>
             <span class="step-subbar-pct" id="subbar-pct-${key}">0%</span>
@@ -1546,18 +1467,6 @@ async function openJobDetail(jobId) {
         </div>
       </div>`);
   });
-
-  // Cargar mensajes reales de pasos completados desde el historial del servidor
-  fetch(`${API}/api/jobs/${jobId}/steps`).then(r=>r.json()).then(steps => {
-    steps.forEach(s => {
-      const msg  = document.getElementById('msg-' + s.step);
-      const dot  = document.getElementById('dot-' + s.step);
-      const cost = document.getElementById('scost-' + s.step);
-      if (msg && s.message) msg.textContent = s.message;
-      if (dot && s.status)  dot.className = 'step-icon ' + s.status;
-      if (cost && s.cost > 0) cost.textContent = s.cost.toFixed(4) + '€';
-    });
-  }).catch(()=>{});
 
   const progress = job.progress || 0;
   document.getElementById('progress-fill').style.width = progress + '%';
@@ -1685,288 +1594,71 @@ function parseDuration(iso) {
   return `${min}:${String(s).padStart(2,'0')}`;
 }
 
-let _chdRefreshInterval = null;
-let _chdChannelId = null;
-let _chdLastUpdate = null;
-
-function chdTab(tab) {
-  ['resumen','videos','audiencia'].forEach(t => {
-    document.getElementById(`chd-panel-${t}`).style.display = t === tab ? 'block' : 'none';
-    const btn = document.getElementById(`chd-tab-${t}`);
-    btn.style.color = t === tab ? 'rgba(255,255,255,.9)' : 'rgba(255,255,255,.4)';
-    btn.style.borderBottomColor = t === tab ? 'var(--gold)' : 'transparent';
-  });
-}
-
-function fmtSec(s) {
-  if (!s) return '—';
-  const m = Math.floor(s/60), ss = Math.round(s%60);
-  return m > 0 ? `${m}m ${ss}s` : `${ss}s`;
-}
-
-function retColor(pct) {
-  if (pct >= 50) return '#22c55e';
-  if (pct >= 35) return 'var(--gold)';
-  if (pct >= 20) return '#f97316';
-  return '#ef4444';
-}
-
-function renderBar(val, max, color='var(--gold)') {
-  const pct = max > 0 ? Math.min(100, (val/max)*100) : 0;
-  return `<div style="background:var(--cream2);border-radius:4px;height:6px;flex:1;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${color};border-radius:4px;transition:width .4s;"></div></div>`;
-}
-
-function renderRetentionCurve(curve, title) {
-  if (!curve || !curve.length) return `<div style="color:var(--muted);font-size:11px;">Sin datos de retención</div>`;
-  const maxRatio = Math.max(...curve.map(p => p.ratio));
-  const points = curve.filter((_,i) => i % 2 === 0); // cada 2% para no saturar
-  const bars = points.map(p => {
-    const h = Math.round((p.ratio / (maxRatio || 1)) * 48);
-    const col = p.ratio > 80 ? '#22c55e' : p.ratio > 50 ? 'var(--gold)' : p.ratio > 25 ? '#f97316' : '#ef4444';
-    return `<div title="${p.pct}% del vídeo → ${p.ratio}% espectadores" style="width:8px;height:${h}px;background:${col};border-radius:2px 2px 0 0;flex-shrink:0;"></div>`;
-  }).join('');
-
-  // puntos de caída más brusca
-  let maxDrop = 0, dropAt = 0;
-  for (let i = 1; i < curve.length; i++) {
-    const drop = curve[i-1].ratio - curve[i].ratio;
-    if (drop > maxDrop) { maxDrop = drop; dropAt = curve[i].pct; }
-  }
-
-  return `
-    <div style="border:1px solid var(--border);border-radius:12px;padding:16px;background:#fafaf8;">
-      <div style="font-size:11px;font-weight:600;color:var(--ink);margin-bottom:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</div>
-      <div style="display:flex;align-items:flex-end;gap:1px;height:52px;margin-bottom:8px;">${bars}</div>
-      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);">
-        <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
-      </div>
-      ${maxDrop > 3 ? `<div style="margin-top:8px;font-size:10px;color:#ef4444;">⚠️ Mayor caída al ${dropAt}% del vídeo (−${maxDrop.toFixed(1)}pp)</div>` : ''}
-    </div>`;
-}
-
-// ── Render helpers ──────────────────────────────────────────────────────────
-function _renderVideosTab(videos, detailVideos) {
-  // Preferir analytics si tiene datos, si no usar detail
-  const src = (videos && videos.length) ? videos : (detailVideos||[]).map(v => ({
-    id: v.id, title: v.title, thumbnail: v.thumbnail, published: v.published,
-    duration: v.duration, views: v.views, likes: v.likes, comments: v.comments,
-    watch_minutes: null, avg_duration_s: null, avg_retention_pct: null,
-    impressions: null, ctr_pct: null, subs_gained: null, shares: null,
-  }));
-
-  if (!src.length) {
-    document.getElementById('chd-videos-analytics').innerHTML =
-      '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">No hay vídeos publicados todavía</div>';
-    return;
-  }
-
-  const hasAnalytics = videos && videos.length > 0 && videos[0].avg_retention_pct !== null;
-  document.getElementById('chd-videos-analytics').innerHTML = src.map(v => {
-    const ret = v.avg_retention_pct || 0;
-    const hasRet = v.avg_retention_pct !== null;
-    return `
-    <a href="https://youtube.com/watch?v=${v.id}" target="_blank"
-       style="text-decoration:none;display:grid;grid-template-columns:2fr 60px ${hasAnalytics?'70px 60px 70px 60px 60px':'auto'};gap:6px;align-items:center;padding:10px;border-radius:8px;border:1px solid var(--border);background:#fff;transition:background .15s;"
-       onmouseover="this.style.background='var(--cream)'" onmouseout="this.style.background='#fff'">
-      <div style="min-width:0;display:flex;gap:10px;align-items:center;">
-        ${v.thumbnail ? `<img src="${v.thumbnail}" style="width:72px;height:40px;object-fit:cover;border-radius:5px;flex-shrink:0;">` : ''}
-        <div style="min-width:0;">
-          <div style="font-size:11px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${v.title}</div>
-          <div style="font-size:9px;color:var(--muted);margin-top:2px;">📅 ${v.published}${parseDuration(v.duration)?` · ⏱ ${parseDuration(v.duration)}`:''}${hasRet?` · ⌛ ${fmtSec(v.avg_duration_s)} medio`:''}</div>
-          <div style="font-size:9px;color:var(--muted);margin-top:1px;">👍 ${fmtNum(v.likes||0)} · 💬 ${fmtNum(v.comments||0)}${v.shares?` · 🔗 ${fmtNum(v.shares)}`:''}</div>
-        </div>
-      </div>
-      <div style="text-align:right;font-size:13px;font-weight:700;color:var(--ink);">${fmtNum(v.views)}</div>
-      ${hasAnalytics ? `
-      <div style="text-align:center;">
-        ${hasRet ? `<div style="font-size:11px;font-weight:700;color:${retColor(ret)};">${ret}%</div>
-        <div style="background:var(--cream2);border-radius:3px;height:4px;margin-top:3px;overflow:hidden;"><div style="width:${Math.round(ret)}%;height:100%;background:${retColor(ret)};border-radius:3px;"></div></div>` : '<span style="color:var(--muted);font-size:10px;">—</span>'}
-      </div>
-      <div style="text-align:right;font-size:11px;color:var(--ink);">${v.ctr_pct !== null ? v.ctr_pct+'%' : '—'}</div>
-      <div style="text-align:right;font-size:11px;color:var(--ink);">${v.watch_minutes !== null ? fmtNum(v.watch_minutes) : '—'}</div>
-      <div style="text-align:right;font-size:11px;color:var(--muted);">${v.impressions !== null ? fmtNum(v.impressions) : '—'}</div>
-      <div style="text-align:right;font-size:11px;color:var(--green);font-weight:600;">${v.subs_gained !== null ? '+'+v.subs_gained : '—'}</div>` : ''}
-    </a>`;
-  }).join('');
-}
-
-function _applyDetailData(detail, analytics) {
-  const ch     = detail.channel;
-  const stats  = detail.stats || {};
-  const videos = detail.videos || [];
-  const ov     = analytics?.overview_30d || {};
-  const avgs   = analytics?.averages || {};
-  const totals = analytics?.channel_totals || {};
-
-  // ── Header + meta ──
-  document.getElementById('chd-name').textContent = ch.name;
-  const parts = [];
-  if (stats.country)  parts.push(`🌍 ${stats.country}`);
-  if (stats.created)  parts.push(`📅 Canal desde ${stats.created}`);
-  if (ch.niche)       parts.push(`🎯 ${ch.niche}`);
-  const now = new Date().toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  document.getElementById('chd-meta').innerHTML =
-    parts.join('  ·  ') +
-    `  <span style="display:inline-flex;align-items:center;gap:4px;background:rgba(34,197,94,.15);color:#16a34a;padding:1px 8px;border-radius:20px;font-size:10px;font-weight:600;margin-left:8px;">` +
-    `<span style="width:6px;height:6px;background:#22c55e;border-radius:50%;animation:pulse-live 1.5s ease-in-out infinite;display:inline-block;"></span>EN VIVO · ${now}</span>`;
-
-  // ── Big stats (siempre reales) ──
-  // Priorizar detail (suma real de vídeos) sobre analytics (contador canal con retraso)
-  const subs  = stats.subscribers  || totals.subscribers  || 0;
-  const views = stats.total_views  || totals.total_views  || 0;
-  const vids  = stats.videos_count || totals.videos       || 0;
-  document.getElementById('chd-subs').textContent   = fmtNum(subs);
-  document.getElementById('chd-views').textContent  = fmtNum(views);
-  document.getElementById('chd-vcount').textContent = fmtNum(vids);
-
-  const hasAnalyticsData = ov && Object.keys(ov).length > 0;
-
-  // ── KPIs 30d ──
-  if (hasAnalyticsData) {
-    document.getElementById('an-views30').textContent   = fmtNum(Math.round(ov.views || 0));
-    document.getElementById('an-minutes30').textContent = fmtNum(Math.round(ov.estimatedMinutesWatched || 0));
-    const sg = Math.round(ov.subscribersGained || 0);
-    const sl = Math.round(ov.subscribersLost   || 0);
-    document.getElementById('an-subs30').textContent    = `+${fmtNum(sg)} / −${fmtNum(sl)}`;
-    document.getElementById('an-impr30').textContent    = fmtNum(Math.round(ov.impressions || 0));
-  } else {
-    // Fallback: mostrar datos reales de Data API
-    document.getElementById('an-views30').textContent   = fmtNum(views) + ' (total canal)';
-    document.getElementById('an-minutes30').textContent = '—';
-    document.getElementById('an-subs30').textContent    = fmtNum(subs);
-    document.getElementById('an-impr30').textContent    = '—';
-    // Banner explicativo
-    const kpiDiv = document.getElementById('chd-kpis-30');
-    if (kpiDiv && !kpiDiv.dataset.warned) {
-      kpiDiv.dataset.warned = '1';
-      kpiDiv.insertAdjacentHTML('afterend',
-        `<div style="background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:11px;color:#92400e;margin-bottom:12px;">
-          ⏳ <strong>Analytics avanzadas disponibles con ~100+ views.</strong> Actualmente el canal tiene ${views} views — sigue generando contenido y aquí aparecerá retención, CTR, fuentes de tráfico y más.
-        </div>`
-      );
-    }
-  }
-
-  // ── Medias ──
-  if (hasAnalyticsData && avgs.views_per_video) {
-    document.getElementById('avg-views').textContent = fmtNum(avgs.views_per_video);
-    const retPct = avgs.retention_pct || 0;
-    const retEl = document.getElementById('avg-ret');
-    retEl.textContent = `${retPct}%`;
-    retEl.style.color = retColor(retPct);
-    document.getElementById('avg-ctr').textContent = `${(avgs.ctr_pct||0).toFixed(2)}%`;
-    document.getElementById('avg-dur').textContent = fmtSec(avgs.avg_duration_s || 0);
-    document.getElementById('avg-impr').textContent = fmtNum(avgs.impressions_per_video || 0);
-  } else if (videos.length) {
-    const totalV = videos.reduce((s,v)=>s+v.views,0);
-    document.getElementById('avg-views').textContent = fmtNum(Math.round(totalV/videos.length));
-    const totalL = videos.reduce((s,v)=>s+v.likes,0);
-    document.getElementById('avg-ret').textContent = '—';
-    document.getElementById('avg-ctr').textContent = '—';
-    document.getElementById('avg-dur').textContent = '—';
-    document.getElementById('avg-impr').textContent = '—';
-  }
-
-  // ── Fuentes tráfico ──
-  const traffic = analytics?.traffic || [];
-  if (traffic.length) {
-    const maxTV = Math.max(...traffic.map(t => t.views||0));
-    document.getElementById('chd-traffic').innerHTML = traffic.map(t => `
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="font-size:11px;color:var(--ink);width:170px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${t.label||t.insightTrafficSourceType}</div>
-        ${renderBar(t.views, maxTV)}
-        <div style="font-size:11px;font-weight:600;color:var(--ink);width:52px;text-align:right;">${fmtNum(t.views)}</div>
-        <div style="font-size:10px;color:var(--muted);width:52px;text-align:right;">${fmtNum(Math.round(t.estimatedMinutesWatched||0))}min</div>
-      </div>`).join('');
-  } else {
-    document.getElementById('chd-traffic').innerHTML =
-      `<div style="color:var(--muted);font-size:12px;">Disponible cuando el canal tenga más actividad</div>`;
-  }
-
-  // ── Tab VÍDEOS ──
-  _renderVideosTab(analytics?.videos || [], videos);
-
-  // ── Tab AUDIENCIA ──
-  const DEV_LABEL = {MOBILE:'📱 Móvil', DESKTOP:'🖥️ Escritorio', TABLET:'📟 Tablet', TV:'📺 Smart TV', GAME_CONSOLE:'🎮 Consola'};
-  const devs = analytics?.devices || [];
-  document.getElementById('chd-devices').innerHTML = devs.length
-    ? (() => { const m=Math.max(...devs.map(d=>d.views||0));
-        return devs.map(d=>`<div style="display:flex;align-items:center;gap:10px;"><div style="font-size:11px;color:var(--ink);width:130px;flex-shrink:0;">${DEV_LABEL[d.deviceType]||d.deviceType}</div>${renderBar(d.views,m,'var(--ink2)')}<div style="font-size:11px;font-weight:600;color:var(--ink);width:50px;text-align:right;">${fmtNum(d.views)}</div></div>`).join(''); })()
-    : '<div style="color:var(--muted);font-size:12px;">Sin suficientes datos todavía</div>';
-
-  const geo = analytics?.geo || [];
-  document.getElementById('chd-geo').innerHTML = geo.length
-    ? (() => { const m=Math.max(...geo.map(g=>g.views||0));
-        return geo.map(g=>`<div style="display:flex;align-items:center;gap:10px;"><div style="font-size:11px;color:var(--ink);width:130px;flex-shrink:0;">${g.country}</div>${renderBar(g.views,m,'#6366f1')}<div style="font-size:11px;font-weight:600;color:var(--ink);width:50px;text-align:right;">${fmtNum(g.views)}</div></div>`).join(''); })()
-    : '<div style="color:var(--muted);font-size:12px;">Sin suficientes datos todavía</div>';
-
-  const top3 = (analytics?.videos||[]).slice(0,3);
-  document.getElementById('chd-retention').innerHTML = top3.some(v=>v.retention_curve)
-    ? top3.map(v => renderRetentionCurve(v.retention_curve, v.title)).join('')
-    : `<div style="background:var(--cream);border-radius:10px;padding:16px;font-size:11px;color:var(--muted);text-align:center;">
-        📈 Las curvas de abandono aparecen cuando cada vídeo supere ~100 visualizaciones.<br>
-        <span style="font-size:10px;">Datos procesados por YouTube con 24-48h de retraso.</span>
-       </div>`;
-}
-
-async function _refreshLiveStats(channelId) {
-  try {
-    const detail = await fetch(`${API}/api/channels/${channelId}/detail`).then(r=>r.json());
-    const stats = detail.stats || {};
-    const subs  = stats.subscribers  || 0;
-    const views = stats.total_views  || 0;  // suma real de vídeos, más preciso
-    const vids  = stats.videos_count || 0;
-    document.getElementById('chd-subs').textContent   = fmtNum(subs);
-    document.getElementById('chd-views').textContent  = fmtNum(views);
-    document.getElementById('chd-vcount').textContent = fmtNum(vids);
-    // Actualizar badge EN VIVO
-    const now = new Date().toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    const liveBadge = document.querySelector('#chd-meta span[style*="EN VIVO"]');
-    if (liveBadge) liveBadge.innerHTML =
-      `<span style="width:6px;height:6px;background:#22c55e;border-radius:50%;animation:pulse-live 1.5s ease-in-out infinite;display:inline-block;"></span>EN VIVO · ${now}`;
-  } catch(e) {}
-}
-
 async function openChDetail(channelId) {
-  _chdChannelId = channelId;
-  if (_chdRefreshInterval) clearInterval(_chdRefreshInterval);
-
   const modal = document.getElementById('modal-ch-detail');
   modal.style.display = 'flex';
-  chdTab('resumen');
-
-  // Reset visual
+  // Reset
   document.getElementById('chd-name').textContent = 'Cargando…';
   document.getElementById('chd-meta').textContent = '';
-  ['chd-subs','chd-views','chd-vcount','an-views30','an-minutes30','an-subs30','an-impr30',
-   'avg-views','avg-ret','avg-ctr','avg-dur','avg-impr'].forEach(id => {
-    const el = document.getElementById(id); if(el) el.textContent = '…';
-  });
-  document.getElementById('chd-traffic').innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando…</div>';
-  document.getElementById('chd-videos-analytics').innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">Cargando…</div>';
-  document.getElementById('chd-retention').innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:16px;">Cargando…</div>';
+  document.getElementById('chd-subs').textContent = '—';
+  document.getElementById('chd-views').textContent = '—';
+  document.getElementById('chd-vcount').textContent = '—';
+  document.getElementById('chd-info').innerHTML = '';
+  document.getElementById('chd-videos').innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando vídeos…</div>';
 
   try {
-    // Carga en paralelo
-    const [detail, analytics] = await Promise.all([
-      fetch(`${API}/api/channels/${channelId}/detail`).then(r=>r.json()),
-      fetch(`${API}/api/channels/${channelId}/analytics`).then(r=>r.json()),
-    ]);
+    const data = await fetch(`${API}/api/channels/${channelId}/detail`).then(r => r.json());
+    const ch = data.channel;
+    const stats = data.stats;
+    const videos = data.videos || [];
 
-    _applyDetailData(detail, analytics);
+    document.getElementById('chd-name').textContent = ch.name;
+    document.getElementById('chd-subs').textContent  = stats ? fmtNum(stats.subscribers) : '—';
+    document.getElementById('chd-views').textContent = stats ? fmtNum(stats.total_views)  : '—';
+    document.getElementById('chd-vcount').textContent= stats ? fmtNum(stats.videos_count) : '—';
 
-    // Auto-refresh cada 30s solo para subs/views (Data API, casi real-time)
-    _chdRefreshInterval = setInterval(() => _refreshLiveStats(channelId), 30000);
+    // Meta info
+    const parts = [];
+    if (stats?.country) parts.push(`🌍 ${stats.country}`);
+    if (stats?.created) parts.push(`📅 Canal desde ${stats.created}`);
+    if (ch.niche) parts.push(`🎯 Nicho: ${ch.niche}`);
+    document.getElementById('chd-meta').textContent = parts.join('  ·  ') || 'Sin datos adicionales';
 
+    // Info row
+    const info = [];
+    if (stats?.description) {
+      const desc = stats.description.length > 180 ? stats.description.slice(0,180)+'…' : stats.description;
+      info.push(`<span style="color:var(--ink2);line-height:1.5;">${desc}</span>`);
+    }
+    document.getElementById('chd-info').innerHTML = info.join('') || '';
+
+    // Vídeos
+    if (!videos.length) {
+      document.getElementById('chd-videos').innerHTML = '<div style="color:var(--muted);font-size:12px;">No hay vídeos publicados aún.</div>';
+    } else {
+      document.getElementById('chd-videos').innerHTML = videos.map(v => `
+        <a href="https://youtube.com/watch?v=${v.id}" target="_blank" style="text-decoration:none;display:flex;gap:14px;align-items:flex-start;padding:12px;border-radius:10px;border:1px solid var(--border);background:#fff;transition:background .15s;" onmouseover="this.style.background='var(--cream)'" onmouseout="this.style.background='#fff'">
+          ${v.thumbnail ? `<img src="${v.thumbnail}" style="width:100px;height:56px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : '<div style="width:100px;height:56px;background:var(--cream2);border-radius:6px;flex-shrink:0;"></div>'}
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:600;color:var(--ink);line-height:1.4;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${v.title}</div>
+            <div style="display:flex;gap:16px;font-size:10px;color:var(--muted);flex-wrap:wrap;">
+              <span>👁 ${fmtNum(v.views)} views</span>
+              <span>👍 ${fmtNum(v.likes)}</span>
+              <span>💬 ${fmtNum(v.comments)}</span>
+              ${parseDuration(v.duration) ? `<span>⏱ ${parseDuration(v.duration)}</span>` : ''}
+              <span style="margin-left:auto;">📅 ${v.published}</span>
+            </div>
+          </div>
+        </a>`).join('');
+    }
   } catch(e) {
-    document.getElementById('chd-name').textContent = 'Error';
+    document.getElementById('chd-name').textContent = 'Error cargando datos';
     document.getElementById('chd-meta').textContent = e.toString();
   }
 }
 
 function closeChDetail() {
   document.getElementById('modal-ch-detail').style.display = 'none';
-  if (_chdRefreshInterval) { clearInterval(_chdRefreshInterval); _chdRefreshInterval = null; }
 }
 
 function openAddChannel() { document.getElementById('modal-channel').classList.add('open'); }
@@ -2163,40 +1855,28 @@ async function loadNavCost() {
   document.getElementById('nav-cost').textContent = f.total_cost.toFixed(2)+'€';
 }
 
-// ── Auto-detectar vídeo en curso al cargar la página ─────────────────────────
-// Si la rutina automática lanzó un vídeo, se muestra solo sin tener que buscarlo.
-async function autoOpenRunningJob() {
-  try {
-    const jobs = await fetch(`${API}/api/jobs`).then(r => r.json()).catch(() => []);
-    const running = jobs.find(j => j.status === 'running' || j.status === 'pending');
-    if (running) {
-      // Ir a la pestaña CREAR si no estamos ya ahí
-      const crearTab = document.querySelector('.nav-tab[onclick*="crear"]') ||
-                       [...document.querySelectorAll('.nav-tab')].find(b => b.textContent.trim() === 'CREAR');
-      if (crearTab) crearTab.click();
-      // Abrir el pipeline del job en curso
-      await openJobDetail(running.id);
-      // Badge visual para avisar que fue lanzado automáticamente
-      const banner = document.getElementById('auto-job-banner');
-      if (banner) {
-        banner.textContent = `🤖 Vídeo generado automáticamente: "${running.title}"`;
-        banner.style.display = 'block';
-      }
-    }
-  } catch(e) {}
-}
-
-// Sondeo periódico: si abres la página mientras el vídeo lleva tiempo corriendo
-// o si el agente lo lanza mientras tienes la pestaña abierta
-setInterval(async () => {
-  if (currentJobId) return; // ya hay uno abierto, no hacer nada
-  const jobs = await fetch(`${API}/api/jobs`).then(r => r.json()).catch(() => []);
-  const running = jobs.find(j => j.status === 'running' || j.status === 'pending');
-  if (running) autoOpenRunningJob();
-}, 30000);
-
 loadJobs(); loadChannels(); loadNavCost();
 autoOpenRunningJob();
+
+// ── Mobile bottom nav ────────────────────────────────────────────────────
+function mbnGo(page, btn) {
+  showPage(page, null);
+  document.querySelectorAll('.mbn-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+function _updateMbnBadge() {
+  const badge = document.getElementById('mbn-badge-crear');
+  if (!badge) return;
+  fetch(API + '/api/jobs').then(r=>r.json()).then(jobs => {
+    const hasRunning = jobs.some(j => j.status === 'running' || j.status === 'pending');
+    const hasDone    = jobs.some(j => j.status === 'done' && !j.youtube_url);
+    badge.className = 'mbn-badge' + (hasRunning || hasDone ? ' visible' : '');
+    badge.style.background = hasDone ? 'var(--green)' : '#e53';
+  }).catch(function(){});
+}
+_updateMbnBadge();
+setInterval(_updateMbnBadge, 15000);
 
 // ── Miniatura propia: preview y helpers ──────────────────────────────────────
 function _fileToDataURL(file) {
@@ -2325,6 +2005,393 @@ async function _checkShort(jobId) {
       if (btn) btn.href = url;
     }
   } catch(e) {}
+}
+</script>
+
+<!-- ════════════════════════════════════════════════════════
+     MOBILE UI — diseño optimizado para publicar desde móvil
+     ════════════════════════════════════════════════════════ -->
+<style>
+/* ── MOBILE BASE ───────────────────────────────────────── */
+/* ─── BOTTOM NAV BAR (solo mobile) ─── */
+#mobile-bottom-nav { display: none; }
+
+@media (max-width: 768px) {
+
+  /* ── NAV SUPERIOR: logo + coste, sin tabs ── */
+  nav {
+    padding: 0 20px;
+    height: 56px;
+    justify-content: space-between;
+  }
+  .logo { font-size: 14px; font-weight: 600; }
+  .logo-rest { display: none; }
+  .nav-tabs { display: none; }
+  .nav-end { font-size: 10px; gap: 6px; margin-left: auto; }
+  .nav-cost-val { font-size: 15px; font-weight: 600; }
+
+  /* ── BOTTOM NAV BAR ── */
+  #mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 60px;
+    background: var(--white);
+    border-top: 1.5px solid var(--border);
+    z-index: 200;
+    box-shadow: 0 -2px 16px rgba(0,0,0,.07);
+  }
+  .mbn-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border: none;
+    background: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+    transition: color .12s;
+  }
+  .mbn-btn.active { color: var(--gold); }
+  .mbn-icon { font-size: 22px; line-height: 1; }
+  .mbn-badge {
+    position: absolute;
+    top: 8px;
+    right: calc(50% - 16px);
+    width: 9px; height: 9px;
+    background: var(--red);
+    border-radius: 50%;
+    border: 2px solid white;
+    display: none;
+    animation: pulse-badge 1.5s infinite;
+  }
+  .mbn-badge.visible { display: block; }
+  @keyframes pulse-badge {
+    0%,100% { transform: scale(1); }
+    50%      { transform: scale(1.3); }
+  }
+
+  /* ── MAIN: padding para bottom nav ── */
+  main { padding: 16px 14px 80px; }
+
+  /* ── PAGE HEADER ── */
+  .page-head { margin-bottom: 16px; }
+  .page-title { font-size: 21px; }
+  .section-kicker { font-size: 9px; }
+  .page-head-row { flex-direction: column; gap: 10px; align-items: flex-start; }
+  .page-sub { font-size: 12px; }
+
+  /* ── TWO-COL → 1 columna, pipeline PRIMERO ── */
+  .two-col {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .two-col > div:first-child { order: 2; }
+  .two-col > div:last-child  { order: 1; }
+
+  /* ── PIPELINE CARD: protagonista en mobile ── */
+  .pipeline-card {
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .pipeline-head {
+    padding: 14px 16px 10px;
+    background: var(--cream2);
+  }
+  .pipeline-lbl {
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .pipeline-title-mobile {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .steps { padding: 0 14px 14px; }
+  .step { padding: 10px 0; gap: 10px; }
+  .step-icon { width: 28px; height: 28px; font-size: 13px; flex-shrink: 0; }
+  .step-name { font-size: 12px; font-weight: 600; }
+  .step-msg  { font-size: 11px; }
+  .step-cost { font-size: 11px; }
+  .step-elapsed { font-size: 10px; }
+
+  /* Progress bar prominente */
+  .progress-wrap { padding: 10px 16px 0; }
+  .progress-track { height: 7px; border-radius: 4px; }
+
+  /* Cost badge en header */
+  .cost-badge {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    padding: 5px 12px !important;
+    border-radius: 20px !important;
+  }
+
+  /* Botones del pipeline */
+  #btn-retry-render, #btn-cancel {
+    padding: 8px 16px !important;
+    font-size: 12px !important;
+    border-radius: 8px !important;
+  }
+
+  /* ── VIDEO REVIEW: pantalla completa ── */
+  #video-review {
+    padding: 16px !important;
+  }
+  #video-preview {
+    width: 100% !important;
+    max-height: 220px !important;
+    border-radius: 10px !important;
+    object-fit: contain;
+    background: #000;
+  }
+  #thumb-variants {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    gap: 8px !important;
+    padding-bottom: 6px !important;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  #thumb-variants::-webkit-scrollbar { display: none; }
+  #thumb-variants > div {
+    min-width: 130px !important;
+    scroll-snap-align: start;
+  }
+  #upload-channel-select {
+    font-size: 15px !important;
+    padding: 13px 14px !important;
+    border-radius: 10px !important;
+  }
+
+  /* ── BOTÓN PUBLICAR: el más importante ── */
+  #btn-upload-yt {
+    padding: 18px !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    border-radius: 14px !important;
+    background: #1a7a3e !important;
+    letter-spacing: .02em;
+    box-shadow: 0 4px 20px rgba(26,122,62,.4) !important;
+    margin-top: 4px;
+  }
+  #btn-upload-yt:active {
+    transform: scale(0.97);
+    box-shadow: 0 2px 8px rgba(26,122,62,.3) !important;
+  }
+  #btn-download {
+    padding: 15px 16px !important;
+    font-size: 14px !important;
+    border-radius: 12px !important;
+  }
+  #upload-status {
+    font-size: 13px !important;
+    line-height: 1.5;
+    padding: 6px 0;
+  }
+
+  /* ── FORMULARIO touch-friendly ── */
+  .field { margin-bottom: 16px; }
+  .field label { font-size: 10px; margin-bottom: 6px; }
+  .field input,
+  .field select,
+  .field textarea {
+    font-size: 16px !important;
+    padding: 13px 14px !important;
+    border-radius: 10px !important;
+    -webkit-appearance: none;
+  }
+  .field textarea { min-height: 90px; }
+
+  /* Tone buttons: grid 3 cols */
+  .tone-row-2 {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
+  }
+  .tone-opt {
+    padding: 10px 4px !important;
+    font-size: 11px !important;
+    font-weight: 600;
+    text-align: center;
+    border-radius: 8px !important;
+  }
+
+  /* Botón generar */
+  .btn-generate {
+    padding: 18px !important;
+    font-size: 15px !important;
+    border-radius: 14px !important;
+    font-weight: 700 !important;
+    width: 100%;
+    letter-spacing: .03em;
+    box-shadow: 0 4px 16px rgba(196,155,39,.3) !important;
+  }
+
+  /* ── CARDS ── */
+  .card { border-radius: 12px; }
+  .card-body { padding: 16px; }
+  .card-head { padding: 12px 16px; }
+
+  /* Jobs list */
+  .job-row { padding: 14px 0 !important; }
+
+  /* Ocultar welcome panel en mobile */
+  .welcome-panel { display: none; }
+
+  /* Canales */
+  .ch-grid { grid-template-columns: 1fr !important; }
+
+  /* Modal bottom-sheet */
+  #modal-ch-detail > div {
+    width: 100% !important;
+    min-width: unset !important;
+    margin: 0 !important;
+    border-radius: 20px 20px 0 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+  }
+  #modal-ch-detail {
+    padding: 0 !important;
+    align-items: flex-end !important;
+  }
+
+  /* Finanzas */
+  .stats-grid { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+  .stat-num { font-size: 22px !important; }
+  .finance-table { overflow-x: auto; }
+  table { min-width: 480px; }
+
+  /* Short */
+  #short-row { padding: 12px !important; }
+  #btn-download-short { padding: 13px 16px !important; font-size: 13px !important; }
+
+  /* Error panel */
+  .result-err { font-size: 12px !important; padding: 14px !important; line-height: 1.5; }
+}
+
+@media (min-width: 769px) {
+  #mobile-ready-banner { display: none !important; }
+}
+</style>
+
+<!-- Banner de vídeo listo (visible solo en móvil con ?job=xxx) -->
+<div id="mobile-ready-banner">
+  <div class="banner-title">✅ Vídeo listo para publicar</div>
+  <div class="banner-sub" id="banner-job-title">Añade la miniatura y sube a YouTube</div>
+</div>
+
+<script>
+// ── AUTO-CARGAR JOB DESDE URL ?job=xxx ──────────────────────────────
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const jobParam = params.get('job');
+  if (!jobParam) return;
+
+  // Mostrar banner en móvil
+  const isMobile = window.innerWidth <= 768;
+  if (isMobile) {
+    document.getElementById('mobile-ready-banner').style.display = 'block';
+    document.body.style.paddingTop = '70px';
+  }
+
+  // Esperar a que el DOM esté listo y cargar el job
+  window.addEventListener('DOMContentLoaded', function() {
+    // Cambiar a pestaña "crear" (ya está activa)
+    // Simular clic en el job para abrirlo en el pipeline
+    function tryLoadJob(retries) {
+      if (typeof openJobInPipeline === 'function') {
+        openJobInPipeline(jobParam);
+        return;
+      }
+      // Si la función no existe, intentamos con loadJobDetails
+      if (typeof loadJobDetails === 'function') {
+        loadJobDetails(jobParam);
+        return;
+      }
+      // Fallback: carga manual del estado
+      fetch('/api/jobs/' + jobParam)
+        .then(r => r.json())
+        .then(data => {
+          // Mostrar pipeline card
+          document.getElementById('welcome-card') && (document.getElementById('welcome-card').style.display = 'none');
+          const pc = document.getElementById('pipeline-card');
+          if (pc) pc.style.display = 'block';
+
+          // Si está done, mostrar review
+          if (data.status === 'done') {
+            const vr = document.getElementById('video-review');
+            if (vr) {
+              vr.style.display = 'block';
+              // Poner URL del vídeo
+              const vp = document.getElementById('video-preview');
+              if (vp && data.video_url) vp.src = data.video_url;
+              // Actualizar título del banner
+              document.getElementById('banner-job-title').textContent =
+                data.title || 'Vídeo listo — añade miniatura y publica';
+            }
+            // Scroll hasta video-review
+            setTimeout(() => {
+              document.getElementById('video-review')?.scrollIntoView({behavior:'smooth', block:'start'});
+            }, 400);
+          }
+
+          // Si existe la función global de polling, usarla
+          if (typeof window._currentJobId !== 'undefined') {
+            window._currentJobId = jobParam;
+          }
+          if (typeof startPolling === 'function') startPolling(jobParam);
+        })
+        .catch(e => {
+          if (retries > 0) setTimeout(() => tryLoadJob(retries-1), 800);
+        });
+    }
+    setTimeout(() => tryLoadJob(5), 300);
+  });
+})();
+</script>
+
+
+<script>
+// ── WhatsApp notification al equipo cuando el vídeo se publica ──────────────
+async function _notifyEquipo(youtubeUrl, videoTitle) {
+  const EVO_URL  = "https://evo.automatizacionnegocio.com";
+  const EVO_KEY  = "A7B34E229E0C-4368-9096-03BA55309F5F";
+  const EVO_INST = "Mike";
+  const NUMEROS  = ["34642383769", "34656966477", "34653021180"];
+
+  const msg = [
+    "El vídeo de hoy ya está publicado",
+    "Título: " + (videoTitle || "Nuevo vídeo"),
+    youtubeUrl,
+    "",
+    "Mike"
+  ].join("\n");
+
+  for (const num of NUMEROS) {
+    try {
+      await fetch(`${EVO_URL}/message/sendText/${EVO_INST}`, {
+        method: "POST",
+        headers: { "apikey": EVO_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ number: num, text: msg })
+      });
+    } catch(e) {
+      console.warn("WA notify failed for", num, e);
+    }
+  }
 }
 </script>
 </body>
