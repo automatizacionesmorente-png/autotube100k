@@ -1855,6 +1855,29 @@ async function loadNavCost() {
   document.getElementById('nav-cost').textContent = f.total_cost.toFixed(2)+'€';
 }
 
+// ── Auto-detectar vídeo en curso al cargar la página ──────────────────────
+async function autoOpenRunningJob() {
+  try {
+    const jobs = await fetch(`${API}/api/jobs`).then(r => r.json()).catch(() => []);
+    const running = jobs.find(j => j.status === 'running' || j.status === 'pending');
+    if (running) {
+      const crearTab = [...document.querySelectorAll('.nav-tab')].find(b => b.textContent.trim() === 'Crear');
+      if (crearTab) crearTab.click();
+      await openJobDetail(running.id);
+      const banner = document.getElementById('auto-job-banner');
+      if (banner) { banner.textContent = `🤖 "${running.title}"`; banner.style.display = 'block'; }
+    }
+  } catch(e) {}
+}
+
+// Sondeo periódico por si el agente lanza un vídeo mientras tienes la pestaña abierta
+setInterval(async () => {
+  if (currentJobId) return;
+  const jobs = await fetch(`${API}/api/jobs`).then(r => r.json()).catch(() => []);
+  const running = jobs.find(j => j.status === 'running' || j.status === 'pending');
+  if (running) autoOpenRunningJob();
+}, 30000);
+
 loadJobs(); loadChannels(); loadNavCost();
 autoOpenRunningJob();
 
