@@ -1570,8 +1570,8 @@ function fmtSec(s) {
 
 async function loadChannels(sync=false) {
   if (sync) {
-    // Sincronizar stats desde YouTube en background
-    fetch(`${API}/api/channels/sync`).catch(()=>{});
+    // Esperar sync completo antes de renderizar — así las tarjetas muestran datos frescos
+    try { await fetch(`${API}/api/channels/sync`); } catch(e) {}
   }
   const chs = await fetch(`${API}/api/channels`).then(r => r.json()).catch(()=>[]);
   fillChannelSelect(chs);
