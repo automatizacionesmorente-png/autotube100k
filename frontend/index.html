@@ -1569,10 +1569,7 @@ function fmtSec(s) {
 }
 
 async function loadChannels(sync=false) {
-  if (sync) {
-    // Esperar sync completo antes de renderizar — así las tarjetas muestran datos frescos
-    try { await fetch(`${API}/api/channels/sync`); } catch(e) {}
-  }
+  // Render inmediato con datos del DB (el sync periódico del backend los mantiene frescos)
   const chs = await fetch(`${API}/api/channels`).then(r => r.json()).catch(()=>[]);
   fillChannelSelect(chs);
   const grid = document.getElementById('channels-grid');
