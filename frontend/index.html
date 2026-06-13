@@ -806,33 +806,36 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
     <div id="chd-info" style="padding:16px 24px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;gap:24px;flex-wrap:wrap;"></div>
     <!-- Analytics panel -->
     <div id="chd-analytics-wrap" style="border-bottom:1px solid var(--border);">
-      <!-- KPIs overview -->
-      <div style="padding:20px 28px 16px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="padding:16px 20px 14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
           <div style="font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.06em;text-transform:uppercase;">Analytics del canal</div>
-          <div id="chd-analytics-status" style="font-size:10px;color:var(--muted);"></div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div id="chd-analytics-status" style="font-size:10px;color:var(--muted);"></div>
+            <button id="chd-analytics-refresh" onclick="refreshAnalytics()" style="background:none;border:1px solid var(--border2);border-radius:6px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;">↻</button>
+          </div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
-          <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
-            <div id="chd-a-views" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);">—</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;">Vistas totales</div>
+        <!-- KPIs: 4 col desktop, 2x2 mobile -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;" class="kpi-grid-4">
+          <div style="background:var(--cream);border-radius:10px;padding:10px 8px;text-align:center;">
+            <div id="chd-a-views" style="font-family:'Playfair Display',serif;font-size:18px;color:var(--ink);">—</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;">Vistas</div>
           </div>
-          <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
-            <div id="chd-a-ret" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);">—</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;">Retención media</div>
+          <div style="background:var(--cream);border-radius:10px;padding:10px 8px;text-align:center;">
+            <div id="chd-a-ret" style="font-family:'Playfair Display',serif;font-size:18px;color:var(--ink);">—</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;">Retención</div>
           </div>
-          <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
-            <div id="chd-a-ctr" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);">—</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;">CTR clics</div>
+          <div style="background:var(--cream);border-radius:10px;padding:10px 8px;text-align:center;">
+            <div id="chd-a-ctr" style="font-family:'Playfair Display',serif;font-size:18px;color:var(--ink);">—</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;">CTR</div>
           </div>
-          <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
-            <div id="chd-a-dur" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);">—</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;">Duración media</div>
+          <div style="background:var(--cream);border-radius:10px;padding:10px 8px;text-align:center;">
+            <div id="chd-a-dur" style="font-family:'Playfair Display',serif;font-size:18px;color:var(--ink);">—</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;">Dur. media</div>
           </div>
         </div>
       </div>
-      <!-- Distribución: tráfico + dispositivos + geo -->
-      <div id="chd-analytics-dist" style="display:none;padding:0 28px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;"></div>
+      <!-- Distribución: tráfico + dispositivos + geo — apila en móvil -->
+      <div id="chd-analytics-dist" style="display:none;padding:0 20px 16px;"></div>
     </div>
     <!-- Vídeos unificados -->
     <div style="padding:20px 28px 28px;">
@@ -840,6 +843,25 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
       <div id="chd-videos" style="display:flex;flex-direction:column;gap:10px;">
         <div style="color:var(--muted);font-size:12px;">Cargando…</div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL GUIÓN ══ -->
+<div id="modal-script" onclick="if(event.target===this)closeScript()" style="display:none;position:fixed;inset:0;background:rgba(28,25,20,.55);z-index:300;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:700px;box-shadow:0 24px 80px rgba(0,0,0,.18);overflow:hidden;display:flex;flex-direction:column;max-height:85vh;">
+    <div style="background:var(--ink);padding:20px 24px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+      <div>
+        <div style="font-size:10px;color:rgba(255,255,255,.5);letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px;">Guión del vídeo</div>
+        <div id="script-modal-title" style="font-family:'Playfair Display',serif;font-size:18px;color:#fff;">—</div>
+      </div>
+      <button onclick="closeScript()" style="background:rgba(255,255,255,.12);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;flex-shrink:0;">✕</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:24px;">
+      <pre id="script-modal-body" style="white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.8;color:var(--ink2);margin:0;"></pre>
+    </div>
+    <div style="padding:12px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;flex-shrink:0;">
+      <button onclick="closeScript()" style="background:var(--ink);color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:12px;cursor:pointer;">Cerrar</button>
     </div>
   </div>
 </div>
@@ -1528,6 +1550,12 @@ async function openJobDetail(jobId) {
       const dot = document.getElementById('dot-' + key);
       if (dot) dot.className = 'step-icon done';
     });
+    // Botón "Ver guión" en el paso script
+    const scriptMsg = document.getElementById('msg-script');
+    if (scriptMsg) {
+      const scriptTitle = (job.title || 'Guión').replace(/'/g, "\\'");
+      scriptMsg.innerHTML = `Completado &nbsp;<button onclick="openScript('${jobId}','${scriptTitle}')" style="font-size:10px;padding:2px 8px;border:1px solid var(--border2);border-radius:5px;background:none;cursor:pointer;color:var(--ink2);">Ver guión ✦</button>`;
+    }
     document.getElementById('pipeline-lbl').textContent = '✅ Vídeo listo para revisión';
     document.getElementById('btn-cancel').style.display = 'none';
     if (job.youtube_url) {
@@ -1649,15 +1677,22 @@ async function openChDetail(channelId) {
   document.getElementById('chd-analytics-status').textContent = 'Cargando…';
 
   try {
+    // Fetch detail + analytics en paralelo; analytics con timeout 20s para evitar cuelgues en móvil
+    const analyticsPromise = Promise.race([
+      fetch(`${API}/api/channels/${channelId}/analytics`).then(r => r.ok ? r.json() : null),
+      new Promise(res => setTimeout(() => res(null), 20000))
+    ]).catch(() => null);
+
     const [data, analytics] = await Promise.all([
       fetch(`${API}/api/channels/${channelId}/detail`).then(r => r.json()),
-      fetch(`${API}/api/channels/${channelId}/analytics`).then(r => r.json()).catch(() => null)
+      analyticsPromise
     ]);
     const ch = data.channel;
     const stats = data.stats;
     const videos = data.videos || [];
 
     document.getElementById('chd-name').textContent = ch.name;
+    document.getElementById('chd-name').dataset.channelId = channelId;
     document.getElementById('chd-subs').textContent  = stats ? fmtNum(stats.subscribers) : '—';
     document.getElementById('chd-views').textContent = stats ? fmtNum(stats.total_views)  : '—';
     document.getElementById('chd-vcount').textContent= stats ? fmtNum(stats.videos_count) : '—';
@@ -1839,6 +1874,34 @@ async function openChDetail(channelId) {
 
 function closeChDetail() {
   document.getElementById('modal-ch-detail').style.display = 'none';
+}
+
+async function openScript(jobId, title) {
+  const modal = document.getElementById('modal-script');
+  document.getElementById('script-modal-title').textContent = title || 'Guión';
+  document.getElementById('script-modal-body').textContent = 'Cargando…';
+  modal.style.display = 'flex';
+  try {
+    const r = await fetch(`${API}/api/jobs/${jobId}/script`);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    document.getElementById('script-modal-body').textContent = d.script || '(guión vacío)';
+  } catch(e) {
+    document.getElementById('script-modal-body').textContent = 'Error al cargar el guión: ' + e.message;
+  }
+}
+function closeScript() {
+  document.getElementById('modal-script').style.display = 'none';
+}
+
+async function refreshAnalytics() {
+  const btn = document.getElementById('chd-analytics-refresh');
+  if (btn) { btn.textContent = '↻…'; btn.disabled = true; }
+  const channelId = document.getElementById('chd-name').dataset.channelId;
+  if (channelId) {
+    await openChDetail(channelId);
+  }
+  if (btn) { btn.textContent = '↻'; btn.disabled = false; }
 }
 
 function openAddChannel() { document.getElementById('modal-channel').classList.add('open'); }
@@ -2325,8 +2388,24 @@ async function _checkShort(jobId) {
     width: 100% !important; min-width: unset !important;
     margin: 0 !important; border-radius: 20px 20px 0 0 !important;
     position: fixed !important; bottom: 0 !important; left: 0 !important;
+    max-height: 92vh !important; overflow-y: auto !important;
   }
   #modal-ch-detail { padding: 0 !important; align-items: flex-end !important; }
+
+  /* ── ANALYTICS responsive ── */
+  .kpi-grid-4 { grid-template-columns: 1fr 1fr !important; }
+  #chd-analytics-dist { grid-template-columns: 1fr !important; }
+  #chd-analytics-wrap { padding: 0 !important; }
+  #chd-analytics-wrap > div { padding-left: 16px !important; padding-right: 16px !important; }
+
+  /* ── MODAL GUIÓN ── */
+  #modal-script > div {
+    width: 100% !important; min-width: unset !important;
+    margin: 0 !important; border-radius: 20px 20px 0 0 !important;
+    position: fixed !important; bottom: 0 !important; left: 0 !important;
+    max-height: 88vh !important;
+  }
+  #modal-script { padding: 0 !important; align-items: flex-end !important; }
 
   /* ── FINANZAS ── */
   .stats-grid { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
