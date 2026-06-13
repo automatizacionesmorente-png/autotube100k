@@ -804,6 +804,33 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
     </div>
     <!-- Canal info -->
     <div id="chd-info" style="padding:16px 24px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;gap:24px;flex-wrap:wrap;"></div>
+    <!-- Analytics 30d -->
+    <div style="padding:20px 28px 8px;border-bottom:1px solid var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.06em;text-transform:uppercase;">Analytics últimos 30 días</div>
+        <div id="chd-analytics-status" style="font-size:10px;color:var(--muted);"></div>
+      </div>
+      <div id="chd-analytics-overview" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
+        <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
+          <div id="chd-a-views" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);">—</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;">Vistas</div>
+        </div>
+        <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
+          <div id="chd-a-ret" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);">—</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;">Retención</div>
+        </div>
+        <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
+          <div id="chd-a-ctr" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);">—</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;">CTR</div>
+        </div>
+        <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
+          <div id="chd-a-dur" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);">—</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;">Duración media</div>
+        </div>
+      </div>
+      <!-- Per-video analytics table -->
+      <div id="chd-analytics-table" style="margin-bottom:8px;"></div>
+    </div>
     <!-- Últimos vídeos -->
     <div style="padding:24px 28px;">
       <div style="font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.06em;text-transform:uppercase;margin-bottom:16px;">Últimos vídeos publicados</div>
@@ -1532,6 +1559,11 @@ function fmtNum(n) {
   if (n >= 1000)    return (n/1000).toFixed(1) + 'K';
   return n.toLocaleString();
 }
+function fmtSec(s) {
+  if (!s || s <= 0) return '—';
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  return m + ':' + String(sec).padStart(2, '0');
+}
 
 async function loadChannels(sync=false) {
   if (sync) {
@@ -1610,9 +1642,18 @@ async function openChDetail(channelId) {
   document.getElementById('chd-vcount').textContent = '—';
   document.getElementById('chd-info').innerHTML = '';
   document.getElementById('chd-videos').innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando vídeos…</div>';
+  document.getElementById('chd-a-views').textContent = '—';
+  document.getElementById('chd-a-ret').textContent = '—';
+  document.getElementById('chd-a-ctr').textContent = '—';
+  document.getElementById('chd-a-dur').textContent = '—';
+  document.getElementById('chd-analytics-table').innerHTML = '';
+  document.getElementById('chd-analytics-status').textContent = 'Cargando…';
 
   try {
-    const data = await fetch(`${API}/api/channels/${channelId}/detail`).then(r => r.json());
+    const [data, analytics] = await Promise.all([
+      fetch(`${API}/api/channels/${channelId}/detail`).then(r => r.json()),
+      fetch(`${API}/api/channels/${channelId}/analytics`).then(r => r.json()).catch(() => null)
+    ]);
     const ch = data.channel;
     const stats = data.stats;
     const videos = data.videos || [];
@@ -1636,6 +1677,49 @@ async function openChDetail(channelId) {
       info.push(`<span style="color:var(--ink2);line-height:1.5;">${desc}</span>`);
     }
     document.getElementById('chd-info').innerHTML = info.join('') || '';
+
+    // ── Analytics panel ──────────────────────────────────────────────────────
+    if (analytics) {
+      const ov = analytics.overview_30d || {};
+      const av = analytics.averages || {};
+      const avids = analytics.videos || [];
+
+      const totalViews30 = ov.views ?? av.views_per_video * (avids.length || 1) ?? 0;
+      const retPct  = av.retention_pct  > 0 ? av.retention_pct.toFixed(1) + '%'  : '—';
+      const ctrPct  = av.ctr_pct        > 0 ? av.ctr_pct.toFixed(1) + '%'        : '—';
+      const durSec  = av.avg_duration_s > 0 ? fmtSec(av.avg_duration_s)           : '—';
+      const v30     = ov.views > 0 ? fmtNum(ov.views) : (analytics.channel_totals?.total_views > 0 ? fmtNum(analytics.channel_totals.total_views) : '—');
+
+      document.getElementById('chd-a-views').textContent = v30;
+      document.getElementById('chd-a-ret').textContent   = retPct;
+      document.getElementById('chd-a-ctr').textContent   = ctrPct;
+      document.getElementById('chd-a-dur').textContent   = durSec;
+      document.getElementById('chd-analytics-status').textContent = avids.length ? `${avids.length} vídeo${avids.length>1?'s':''} con datos` : 'Acumulando datos…';
+
+      if (avids.length) {
+        const rows = avids.map(v => `
+          <div style="display:grid;grid-template-columns:1fr 60px 60px 60px 60px;gap:8px;align-items:center;padding:8px 10px;border-radius:8px;font-size:11px;border-bottom:1px solid var(--border);">
+            <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);font-weight:500;">${v.title || '—'}</div>
+            <div style="text-align:center;color:var(--ink2);">${v.views > 0 ? fmtNum(v.views) : '—'}</div>
+            <div style="text-align:center;color:${v.avg_retention_pct > 40 ? '#2a7a4f' : 'var(--muted)'};">${v.avg_retention_pct > 0 ? v.avg_retention_pct.toFixed(1)+'%' : '—'}</div>
+            <div style="text-align:center;color:var(--muted);">${v.ctr_pct > 0 ? v.ctr_pct.toFixed(1)+'%' : '—'}</div>
+            <div style="text-align:center;color:var(--muted);">${v.avg_duration_s > 0 ? fmtSec(v.avg_duration_s) : '—'}</div>
+          </div>`).join('');
+        document.getElementById('chd-analytics-table').innerHTML = `
+          <div style="display:grid;grid-template-columns:1fr 60px 60px 60px 60px;gap:8px;padding:4px 10px;margin-bottom:2px;">
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">Vídeo</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;text-align:center;">Vistas</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;text-align:center;">Retención</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;text-align:center;">CTR</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;text-align:center;">Dur. media</div>
+          </div>
+          ${rows}`;
+      } else {
+        document.getElementById('chd-analytics-table').innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 10px 10px;">Los datos por vídeo aparecerán cuando YouTube Analytics procese el historial del canal.</div>';
+      }
+    } else {
+      document.getElementById('chd-analytics-status').textContent = 'Sin datos';
+    }
 
     // Vídeos
     if (!videos.length) {
