@@ -831,16 +831,14 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
           </div>
         </div>
       </div>
-      <!-- Por vídeo -->
-      <div id="chd-analytics-table" style="padding:0 28px 16px;"></div>
       <!-- Distribución: tráfico + dispositivos + geo -->
       <div id="chd-analytics-dist" style="display:none;padding:0 28px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;"></div>
     </div>
-    <!-- Últimos vídeos -->
-    <div style="padding:24px 28px;">
-      <div style="font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.06em;text-transform:uppercase;margin-bottom:16px;">Últimos vídeos publicados</div>
-      <div id="chd-videos" style="display:flex;flex-direction:column;gap:12px;">
-        <div style="color:var(--muted);font-size:12px;">Cargando vídeos…</div>
+    <!-- Vídeos unificados -->
+    <div style="padding:20px 28px 28px;">
+      <div style="font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px;">Vídeos del canal</div>
+      <div id="chd-videos" style="display:flex;flex-direction:column;gap:10px;">
+        <div style="color:var(--muted);font-size:12px;">Cargando…</div>
       </div>
     </div>
   </div>
@@ -1646,12 +1644,11 @@ async function openChDetail(channelId) {
   document.getElementById('chd-views').textContent = '—';
   document.getElementById('chd-vcount').textContent = '—';
   document.getElementById('chd-info').innerHTML = '';
-  document.getElementById('chd-videos').innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando vídeos…</div>';
+  document.getElementById('chd-videos').innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando…</div>';
   document.getElementById('chd-a-views').textContent = '—';
   document.getElementById('chd-a-ret').textContent = '—';
   document.getElementById('chd-a-ctr').textContent = '—';
   document.getElementById('chd-a-dur').textContent = '—';
-  document.getElementById('chd-analytics-table').innerHTML = '';
   document.getElementById('chd-analytics-status').textContent = 'Cargando…';
 
   try {
@@ -1703,64 +1700,9 @@ async function openChDetail(channelId) {
       document.getElementById('chd-a-dur').textContent   = durSec;
       document.getElementById('chd-analytics-status').textContent = avids.length ? `${avids.length} vídeo${avids.length>1?'s':''} con datos` : 'Acumulando datos…';
 
-      // ── Per-video table with expandable retention curve ───────────────────
-      if (avids.length) {
-        let tableHtml = `<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;display:grid;grid-template-columns:1fr 55px 70px 55px 65px;gap:6px;padding:4px 0 6px;border-bottom:1px solid var(--border);margin-bottom:4px;">
-          <div>Vídeo</div><div style="text-align:center;">Vistas</div><div style="text-align:center;">Retención</div><div style="text-align:center;">CTR</div><div style="text-align:center;">Dur. media</div>
-        </div>`;
-        avids.forEach((v, i) => {
-          const retColor = v.avg_retention_pct >= 30 ? '#2a7a4f' : v.avg_retention_pct >= 10 ? '#b8860b' : '#c0392b';
-          const curve    = v.retention_curve || [];
-          const curveId  = `curve-${i}`;
-          tableHtml += `<div style="border-bottom:1px solid var(--border);">
-            <div onclick="document.getElementById('${curveId}').style.display=document.getElementById('${curveId}').style.display==='none'?'block':'none'"
-                 style="display:grid;grid-template-columns:1fr 55px 70px 55px 65px;gap:6px;align-items:center;padding:8px 0;cursor:pointer;font-size:11px;">
-              <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);font-weight:500;" title="${v.title}">${v.title || '—'}</div>
-              <div style="text-align:center;color:var(--ink2);">${v.views > 0 ? fmtNum(v.views) : '—'}</div>
-              <div style="text-align:center;font-weight:600;color:${retColor};">${v.avg_retention_pct > 0 ? v.avg_retention_pct.toFixed(1)+'%' : '—'}</div>
-              <div style="text-align:center;color:var(--muted);">${v.ctr_pct > 0 ? v.ctr_pct.toFixed(1)+'%' : '—'}</div>
-              <div style="text-align:center;color:var(--muted);">${v.avg_duration_s > 0 ? fmtSec(v.avg_duration_s) : '—'}</div>
-            </div>`;
-          if (curve.length > 2) {
-            // Build retention curve SVG
-            const W=600, H=80, pad=4;
-            const pts = curve.map(p => {
-              const x = pad + (p.pct/100) * (W-pad*2);
-              const y = H - pad - (p.ratio/100) * (H-pad*2);
-              return `${x},${y}`;
-            }).join(' ');
-            const dropPct = curve[0]?.ratio > 0 ? (100 - curve[Math.min(10, curve.length-1)]?.ratio).toFixed(0) : null;
-            tableHtml += `<div id="${curveId}" style="display:none;padding:8px 0 12px;background:var(--cream);border-radius:8px;margin-bottom:8px;">
-              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 10px 6px;display:flex;justify-content:space-between;">
-                <span>Curva de abandono — ${v.title?.split(' ').slice(0,5).join(' ')}</span>
-                ${dropPct ? `<span style="color:#c0392b;">−${dropPct}% en el primer 10%</span>` : ''}
-              </div>
-              <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:60px;display:block;padding:0 10px;">
-                <!-- Grid lines at 25/50/75% -->
-                <line x1="${pad}" y1="${H-pad-(0.25*(H-pad*2))}" x2="${W-pad}" y2="${H-pad-(0.25*(H-pad*2))}" stroke="#ddd" stroke-width="1"/>
-                <line x1="${pad}" y1="${H-pad-(0.50*(H-pad*2))}" x2="${W-pad}" y2="${H-pad-(0.50*(H-pad*2))}" stroke="#ddd" stroke-width="1"/>
-                <line x1="${pad}" y1="${H-pad-(0.75*(H-pad*2))}" x2="${W-pad}" y2="${H-pad-(0.75*(H-pad*2))}" stroke="#ddd" stroke-width="1"/>
-                <!-- Fill area -->
-                <polygon points="${pad},${H-pad} ${pts} ${W-pad},${H-pad}" fill="rgba(59,130,246,0.12)"/>
-                <!-- Line -->
-                <polyline points="${pts}" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linejoin="round"/>
-                <!-- Labels -->
-                <text x="${pad+2}" y="${H-1}" font-size="8" fill="#999">0%</text>
-                <text x="${(W-pad*2)*0.5}" y="${H-1}" font-size="8" fill="#999" text-anchor="middle">50%</text>
-                <text x="${W-pad-2}" y="${H-1}" font-size="8" fill="#999" text-anchor="end">100%</text>
-                <text x="${pad+2}" y="10" font-size="8" fill="#999">100%</text>
-              </svg>
-              <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:2px;">← Progreso del vídeo →</div>
-            </div>`;
-          } else {
-            tableHtml += `<div id="${curveId}" style="display:none;padding:8px 10px 10px;font-size:10px;color:var(--muted);">Curva de retención disponible cuando haya más visualizaciones.</div>`;
-          }
-          tableHtml += `</div>`;
-        });
-        document.getElementById('chd-analytics-table').innerHTML = tableHtml;
-      } else {
-        document.getElementById('chd-analytics-table').innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0 10px;">Los datos por vídeo aparecerán cuando YouTube Analytics procese el historial del canal.</div>';
-      }
+      // Analytics data indexed by video ID for merging
+      window._analyticsById = {};
+      avids.forEach(v => { window._analyticsById[v.id] = v; });
 
       // ── Distribución: tráfico + dispositivos + geo ────────────────────────
       const distEl = document.getElementById('chd-analytics-dist');
@@ -1798,24 +1740,99 @@ async function openChDetail(channelId) {
       document.getElementById('chd-analytics-status').textContent = 'Sin datos';
     }
 
-    // Vídeos
+    // ── Vídeos unificados: detalle + analytics mezclados, expandibles ────────
+    const aMap = window._analyticsById || {};
     if (!videos.length) {
       document.getElementById('chd-videos').innerHTML = '<div style="color:var(--muted);font-size:12px;">No hay vídeos publicados aún.</div>';
     } else {
-      document.getElementById('chd-videos').innerHTML = videos.map(v => `
-        <a href="https://youtube.com/watch?v=${v.id}" target="_blank" style="text-decoration:none;display:flex;gap:14px;align-items:flex-start;padding:12px;border-radius:10px;border:1px solid var(--border);background:#fff;transition:background .15s;" onmouseover="this.style.background='var(--cream)'" onmouseout="this.style.background='#fff'">
-          ${v.thumbnail ? `<img src="${v.thumbnail}" style="width:100px;height:56px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : '<div style="width:100px;height:56px;background:var(--cream2);border-radius:6px;flex-shrink:0;"></div>'}
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:12px;font-weight:600;color:var(--ink);line-height:1.4;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${v.title}</div>
-            <div style="display:flex;gap:16px;font-size:10px;color:var(--muted);flex-wrap:wrap;">
-              <span>👁 ${fmtNum(v.views)} views</span>
-              <span>👍 ${fmtNum(v.likes)}</span>
-              <span>💬 ${fmtNum(v.comments)}</span>
-              ${parseDuration(v.duration) ? `<span>⏱ ${parseDuration(v.duration)}</span>` : ''}
-              <span style="margin-left:auto;">📅 ${v.published}</span>
+      document.getElementById('chd-videos').innerHTML = videos.map((v, i) => {
+        const an    = aMap[v.id] || {};
+        const curve = an.retention_curve || [];
+        const vid   = `vcard-${i}`;
+        const retColor = an.avg_retention_pct >= 30 ? '#2a7a4f' : an.avg_retention_pct >= 10 ? '#b8860b' : '#c0392b';
+
+        // Retention curve SVG
+        let curveSvg = '';
+        if (curve.length > 2) {
+          const W=560, H=72, pad=4;
+          const pts = curve.map(p => {
+            const x = pad + (p.pct/100)*(W-pad*2);
+            const y = H - pad - Math.min(p.ratio/100, 1)*(H-pad*2);
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+          }).join(' ');
+          const drop = curve[0]?.ratio > 0 ? (curve[0].ratio - (curve[Math.min(9,curve.length-1)]?.ratio||0)).toFixed(0) : null;
+          curveSvg = `
+            <div style="margin-top:12px;background:var(--cream);border-radius:8px;padding:10px 12px 8px;">
+              <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">
+                <span>Curva de abandono</span>
+                ${drop && drop > 0 ? `<span style="color:#c0392b;">−${drop}% en el primer 10%</span>` : ''}
+              </div>
+              <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:56px;display:block;">
+                <line x1="${pad}" y1="${H-pad-(0.25*(H-pad*2))}" x2="${W-pad}" y2="${H-pad-(0.25*(H-pad*2))}" stroke="#e5e5e5" stroke-width="1"/>
+                <line x1="${pad}" y1="${H-pad-(0.5*(H-pad*2))}" x2="${W-pad}" y2="${H-pad-(0.5*(H-pad*2))}" stroke="#e5e5e5" stroke-width="1"/>
+                <line x1="${pad}" y1="${H-pad-(0.75*(H-pad*2))}" x2="${W-pad}" y2="${H-pad-(0.75*(H-pad*2))}" stroke="#e5e5e5" stroke-width="1"/>
+                <polygon points="${pad},${H-pad} ${pts} ${W-pad},${H-pad}" fill="rgba(59,130,246,0.10)"/>
+                <polyline points="${pts}" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                <text x="${pad}" y="${H+1}" font-size="7" fill="#bbb">inicio</text>
+                <text x="${W/2}" y="${H+1}" font-size="7" fill="#bbb" text-anchor="middle">mitad</text>
+                <text x="${W-pad}" y="${H+1}" font-size="7" fill="#bbb" text-anchor="end">final</text>
+                <text x="${pad}" y="9" font-size="7" fill="#bbb">100%</text>
+                <text x="${pad}" y="${H/2+3}" font-size="7" fill="#bbb">50%</text>
+              </svg>
+            </div>`;
+        } else if (an.avg_retention_pct > 0) {
+          curveSvg = `<div style="margin-top:10px;font-size:10px;color:var(--muted);">Curva disponible cuando el vídeo tenga más visualizaciones.</div>`;
+        }
+
+        const hasAnalytics = an.views > 0 || an.avg_retention_pct > 0;
+
+        return `<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#fff;">
+          <!-- Header: siempre visible -->
+          <div onclick="(function(el){el.style.display=el.style.display==='block'?'none':'block'})(document.getElementById('${vid}'))"
+               style="display:flex;gap:12px;align-items:flex-start;padding:12px 14px;cursor:pointer;">
+            ${v.thumbnail ? `<img src="${v.thumbnail}" style="width:96px;height:54px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : `<div style="width:96px;height:54px;background:var(--cream2);border-radius:6px;flex-shrink:0;"></div>`}
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12px;font-weight:600;color:var(--ink);line-height:1.4;margin-bottom:5px;">${v.title}</div>
+              <div style="display:flex;gap:14px;font-size:10px;color:var(--muted);flex-wrap:wrap;align-items:center;">
+                <span>👁 ${fmtNum(v.views)}</span>
+                <span>👍 ${fmtNum(v.likes)}</span>
+                <span>💬 ${fmtNum(v.comments)}</span>
+                ${parseDuration(v.duration) ? `<span>⏱ ${parseDuration(v.duration)}</span>` : ''}
+                ${hasAnalytics ? `<span style="color:${retColor};font-weight:600;">${an.avg_retention_pct.toFixed(1)}% ret.</span>` : ''}
+                <span style="margin-left:auto;color:var(--muted);">📅 ${v.published}</span>
+              </div>
+            </div>
+            <div style="font-size:16px;color:var(--muted);align-self:center;flex-shrink:0;">›</div>
+          </div>
+          <!-- Expandible: stats + curva -->
+          <div id="${vid}" style="display:none;border-top:1px solid var(--border);padding:14px 16px;background:var(--cream);">
+            ${hasAnalytics ? `
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px;">
+              <div style="background:#fff;border-radius:8px;padding:10px;text-align:center;">
+                <div style="font-size:16px;font-weight:600;color:var(--ink);">${fmtNum(an.views)}</div>
+                <div style="font-size:9px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.06em;">Vistas</div>
+              </div>
+              <div style="background:#fff;border-radius:8px;padding:10px;text-align:center;">
+                <div style="font-size:16px;font-weight:600;color:${retColor};">${an.avg_retention_pct > 0 ? an.avg_retention_pct.toFixed(1)+'%' : '—'}</div>
+                <div style="font-size:9px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.06em;">Retención</div>
+              </div>
+              <div style="background:#fff;border-radius:8px;padding:10px;text-align:center;">
+                <div style="font-size:16px;font-weight:600;color:var(--ink);">${an.ctr_pct > 0 ? an.ctr_pct.toFixed(1)+'%' : '—'}</div>
+                <div style="font-size:9px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.06em;">CTR</div>
+              </div>
+              <div style="background:#fff;border-radius:8px;padding:10px;text-align:center;">
+                <div style="font-size:16px;font-weight:600;color:var(--ink);">${an.avg_duration_s > 0 ? fmtSec(an.avg_duration_s) : '—'}</div>
+                <div style="font-size:9px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.06em;">Dur. media</div>
+              </div>
+            </div>
+            ${curveSvg}
+            ` : `<div style="font-size:11px;color:var(--muted);padding:4px 0;">Analytics aún procesando este vídeo (24-72h tras publicación).</div>`}
+            <div style="margin-top:12px;text-align:right;">
+              <a href="https://youtube.com/watch?v=${v.id}" target="_blank" style="font-size:10px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:4px 10px;border-radius:6px;">Ver en YouTube ↗</a>
             </div>
           </div>
-        </a>`).join('');
+        </div>`;
+      }).join('');
     }
   } catch(e) {
     document.getElementById('chd-name').textContent = 'Error cargando datos';
