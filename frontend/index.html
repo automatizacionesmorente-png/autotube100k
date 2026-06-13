@@ -804,32 +804,37 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
     </div>
     <!-- Canal info -->
     <div id="chd-info" style="padding:16px 24px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;gap:24px;flex-wrap:wrap;"></div>
-    <!-- Analytics 30d -->
-    <div style="padding:20px 28px 8px;border-bottom:1px solid var(--border);">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <div style="font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.06em;text-transform:uppercase;">Analytics últimos 30 días</div>
-        <div id="chd-analytics-status" style="font-size:10px;color:var(--muted);"></div>
+    <!-- Analytics panel -->
+    <div id="chd-analytics-wrap" style="border-bottom:1px solid var(--border);">
+      <!-- KPIs overview -->
+      <div style="padding:20px 28px 16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.06em;text-transform:uppercase;">Analytics del canal</div>
+          <div id="chd-analytics-status" style="font-size:10px;color:var(--muted);"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+          <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
+            <div id="chd-a-views" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);">—</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;">Vistas totales</div>
+          </div>
+          <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
+            <div id="chd-a-ret" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);">—</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;">Retención media</div>
+          </div>
+          <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
+            <div id="chd-a-ctr" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);">—</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;">CTR clics</div>
+          </div>
+          <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
+            <div id="chd-a-dur" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);">—</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;">Duración media</div>
+          </div>
+        </div>
       </div>
-      <div id="chd-analytics-overview" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
-        <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
-          <div id="chd-a-views" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);">—</div>
-          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;">Vistas</div>
-        </div>
-        <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
-          <div id="chd-a-ret" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);">—</div>
-          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;">Retención</div>
-        </div>
-        <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
-          <div id="chd-a-ctr" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);">—</div>
-          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;">CTR</div>
-        </div>
-        <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
-          <div id="chd-a-dur" style="font-family:'Playfair Display',serif;font-size:20px;color:var(--ink);">—</div>
-          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;">Duración media</div>
-        </div>
-      </div>
-      <!-- Per-video analytics table -->
-      <div id="chd-analytics-table" style="margin-bottom:8px;"></div>
+      <!-- Por vídeo -->
+      <div id="chd-analytics-table" style="padding:0 28px 16px;"></div>
+      <!-- Distribución: tráfico + dispositivos + geo -->
+      <div id="chd-analytics-dist" style="display:none;padding:0 28px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;"></div>
     </div>
     <!-- Últimos vídeos -->
     <div style="padding:24px 28px;">
@@ -1680,16 +1685,17 @@ async function openChDetail(channelId) {
 
     // ── Analytics panel ──────────────────────────────────────────────────────
     if (analytics) {
-      const ov = analytics.overview_30d || {};
-      const av = analytics.averages || {};
-      const avids = analytics.videos || [];
+      const ov    = analytics.overview_30d || {};
+      const av    = analytics.averages    || {};
+      const avids = analytics.videos      || [];
+      const traffic = analytics.traffic   || [];
+      const devices = analytics.devices   || [];
+      const geo     = analytics.geo       || [];
 
-      const totalViews30 = ov.views ?? av.views_per_video * (avids.length || 1) ?? 0;
-      const retPct  = av.retention_pct  > 0 ? av.retention_pct.toFixed(1) + '%'  : '—';
-      const ctrPct  = av.ctr_pct        > 0 ? av.ctr_pct.toFixed(1) + '%'        : '—';
-      const durSec  = av.avg_duration_s > 0 ? fmtSec(av.avg_duration_s)           : '—';
-      // Prioridad: views 30d de Analytics → total_views del canal (dato fresco) → caché DB
-      const v30     = ov.views > 0 ? fmtNum(ov.views) : (stats?.total_views > 0 ? fmtNum(stats.total_views) : (analytics.channel_totals?.total_views > 0 ? fmtNum(analytics.channel_totals.total_views) : '—'));
+      const retPct = av.retention_pct > 0 ? av.retention_pct.toFixed(1) + '%' : '—';
+      const ctrPct = av.ctr_pct       > 0 ? av.ctr_pct.toFixed(1) + '%'       : '—';
+      const durSec = av.avg_duration_s > 0 ? fmtSec(av.avg_duration_s)         : '—';
+      const v30    = ov.views > 0 ? fmtNum(ov.views) : (stats?.total_views > 0 ? fmtNum(stats.total_views) : (analytics.channel_totals?.total_views > 0 ? fmtNum(analytics.channel_totals.total_views) : '—'));
 
       document.getElementById('chd-a-views').textContent = v30;
       document.getElementById('chd-a-ret').textContent   = retPct;
@@ -1697,26 +1703,96 @@ async function openChDetail(channelId) {
       document.getElementById('chd-a-dur').textContent   = durSec;
       document.getElementById('chd-analytics-status').textContent = avids.length ? `${avids.length} vídeo${avids.length>1?'s':''} con datos` : 'Acumulando datos…';
 
+      // ── Per-video table with expandable retention curve ───────────────────
       if (avids.length) {
-        const rows = avids.map(v => `
-          <div style="display:grid;grid-template-columns:1fr 60px 60px 60px 60px;gap:8px;align-items:center;padding:8px 10px;border-radius:8px;font-size:11px;border-bottom:1px solid var(--border);">
-            <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);font-weight:500;">${v.title || '—'}</div>
-            <div style="text-align:center;color:var(--ink2);">${v.views > 0 ? fmtNum(v.views) : '—'}</div>
-            <div style="text-align:center;color:${v.avg_retention_pct > 40 ? '#2a7a4f' : 'var(--muted)'};">${v.avg_retention_pct > 0 ? v.avg_retention_pct.toFixed(1)+'%' : '—'}</div>
-            <div style="text-align:center;color:var(--muted);">${v.ctr_pct > 0 ? v.ctr_pct.toFixed(1)+'%' : '—'}</div>
-            <div style="text-align:center;color:var(--muted);">${v.avg_duration_s > 0 ? fmtSec(v.avg_duration_s) : '—'}</div>
-          </div>`).join('');
-        document.getElementById('chd-analytics-table').innerHTML = `
-          <div style="display:grid;grid-template-columns:1fr 60px 60px 60px 60px;gap:8px;padding:4px 10px;margin-bottom:2px;">
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">Vídeo</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;text-align:center;">Vistas</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;text-align:center;">Retención</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;text-align:center;">CTR</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;text-align:center;">Dur. media</div>
-          </div>
-          ${rows}`;
+        let tableHtml = `<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;display:grid;grid-template-columns:1fr 55px 70px 55px 65px;gap:6px;padding:4px 0 6px;border-bottom:1px solid var(--border);margin-bottom:4px;">
+          <div>Vídeo</div><div style="text-align:center;">Vistas</div><div style="text-align:center;">Retención</div><div style="text-align:center;">CTR</div><div style="text-align:center;">Dur. media</div>
+        </div>`;
+        avids.forEach((v, i) => {
+          const retColor = v.avg_retention_pct >= 30 ? '#2a7a4f' : v.avg_retention_pct >= 10 ? '#b8860b' : '#c0392b';
+          const curve    = v.retention_curve || [];
+          const curveId  = `curve-${i}`;
+          tableHtml += `<div style="border-bottom:1px solid var(--border);">
+            <div onclick="document.getElementById('${curveId}').style.display=document.getElementById('${curveId}').style.display==='none'?'block':'none'"
+                 style="display:grid;grid-template-columns:1fr 55px 70px 55px 65px;gap:6px;align-items:center;padding:8px 0;cursor:pointer;font-size:11px;">
+              <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);font-weight:500;" title="${v.title}">${v.title || '—'}</div>
+              <div style="text-align:center;color:var(--ink2);">${v.views > 0 ? fmtNum(v.views) : '—'}</div>
+              <div style="text-align:center;font-weight:600;color:${retColor};">${v.avg_retention_pct > 0 ? v.avg_retention_pct.toFixed(1)+'%' : '—'}</div>
+              <div style="text-align:center;color:var(--muted);">${v.ctr_pct > 0 ? v.ctr_pct.toFixed(1)+'%' : '—'}</div>
+              <div style="text-align:center;color:var(--muted);">${v.avg_duration_s > 0 ? fmtSec(v.avg_duration_s) : '—'}</div>
+            </div>`;
+          if (curve.length > 2) {
+            // Build retention curve SVG
+            const W=600, H=80, pad=4;
+            const pts = curve.map(p => {
+              const x = pad + (p.pct/100) * (W-pad*2);
+              const y = H - pad - (p.ratio/100) * (H-pad*2);
+              return `${x},${y}`;
+            }).join(' ');
+            const dropPct = curve[0]?.ratio > 0 ? (100 - curve[Math.min(10, curve.length-1)]?.ratio).toFixed(0) : null;
+            tableHtml += `<div id="${curveId}" style="display:none;padding:8px 0 12px;background:var(--cream);border-radius:8px;margin-bottom:8px;">
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 10px 6px;display:flex;justify-content:space-between;">
+                <span>Curva de abandono — ${v.title?.split(' ').slice(0,5).join(' ')}</span>
+                ${dropPct ? `<span style="color:#c0392b;">−${dropPct}% en el primer 10%</span>` : ''}
+              </div>
+              <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:60px;display:block;padding:0 10px;">
+                <!-- Grid lines at 25/50/75% -->
+                <line x1="${pad}" y1="${H-pad-(0.25*(H-pad*2))}" x2="${W-pad}" y2="${H-pad-(0.25*(H-pad*2))}" stroke="#ddd" stroke-width="1"/>
+                <line x1="${pad}" y1="${H-pad-(0.50*(H-pad*2))}" x2="${W-pad}" y2="${H-pad-(0.50*(H-pad*2))}" stroke="#ddd" stroke-width="1"/>
+                <line x1="${pad}" y1="${H-pad-(0.75*(H-pad*2))}" x2="${W-pad}" y2="${H-pad-(0.75*(H-pad*2))}" stroke="#ddd" stroke-width="1"/>
+                <!-- Fill area -->
+                <polygon points="${pad},${H-pad} ${pts} ${W-pad},${H-pad}" fill="rgba(59,130,246,0.12)"/>
+                <!-- Line -->
+                <polyline points="${pts}" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linejoin="round"/>
+                <!-- Labels -->
+                <text x="${pad+2}" y="${H-1}" font-size="8" fill="#999">0%</text>
+                <text x="${(W-pad*2)*0.5}" y="${H-1}" font-size="8" fill="#999" text-anchor="middle">50%</text>
+                <text x="${W-pad-2}" y="${H-1}" font-size="8" fill="#999" text-anchor="end">100%</text>
+                <text x="${pad+2}" y="10" font-size="8" fill="#999">100%</text>
+              </svg>
+              <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:2px;">← Progreso del vídeo →</div>
+            </div>`;
+          } else {
+            tableHtml += `<div id="${curveId}" style="display:none;padding:8px 10px 10px;font-size:10px;color:var(--muted);">Curva de retención disponible cuando haya más visualizaciones.</div>`;
+          }
+          tableHtml += `</div>`;
+        });
+        document.getElementById('chd-analytics-table').innerHTML = tableHtml;
       } else {
-        document.getElementById('chd-analytics-table').innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 10px 10px;">Los datos por vídeo aparecerán cuando YouTube Analytics procese el historial del canal.</div>';
+        document.getElementById('chd-analytics-table').innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0 10px;">Los datos por vídeo aparecerán cuando YouTube Analytics procese el historial del canal.</div>';
+      }
+
+      // ── Distribución: tráfico + dispositivos + geo ────────────────────────
+      const distEl = document.getElementById('chd-analytics-dist');
+      if (traffic.length || devices.length || geo.length) {
+        distEl.style.display = 'grid';
+        const maxTraffic = Math.max(...traffic.map(t => t.views || 0), 1);
+        const maxDev     = Math.max(...devices.map(d => d.views || 0), 1);
+        const maxGeo     = Math.max(...geo.map(g => g.views || 0), 1);
+        const barSection = (title, rows, labelKey, valueKey, maxVal) => {
+          const bars = rows.slice(0,5).map(r => {
+            const w = Math.round((r[valueKey] / maxVal) * 100);
+            return `<div style="margin-bottom:8px;">
+              <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink2);margin-bottom:3px;">
+                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">${r[labelKey] || r.deviceType || r.country || '—'}</span>
+                <span style="color:var(--muted);flex-shrink:0;margin-left:4px;">${r[valueKey]}</span>
+              </div>
+              <div style="background:var(--border);border-radius:3px;height:4px;overflow:hidden;">
+                <div style="background:var(--ink);width:${w}%;height:100%;border-radius:3px;"></div>
+              </div>
+            </div>`;
+          }).join('');
+          return `<div>
+            <div style="font-size:9px;font-weight:600;color:var(--ink);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">${title}</div>
+            ${bars || '<div style="font-size:10px;color:var(--muted);">Sin datos</div>'}
+          </div>`;
+        };
+        distEl.innerHTML =
+          barSection('Fuentes de tráfico', traffic, 'label', 'views', maxTraffic) +
+          barSection('Dispositivos', devices, 'deviceType', 'views', maxDev) +
+          barSection('Países', geo, 'country', 'views', maxGeo);
+      } else {
+        distEl.style.display = 'none';
       }
     } else {
       document.getElementById('chd-analytics-status').textContent = 'Sin datos';
