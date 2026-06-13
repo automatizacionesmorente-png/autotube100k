@@ -1414,11 +1414,23 @@ function onStep({step, status, message, progress, cost, realtime, sub_pct, eta_s
     if (etaEl) etaEl.style.display = 'none';
   }
 
+  // Botón "Ver guión" en cuanto el paso script termina (también mientras el resto del pipeline sigue)
+  if (step === 'script' && status === 'done') {
+    _addScriptBtn(currentJobId, '');
+  }
+
   if (status === 'error') {
     stopStatusPolling();
     document.getElementById('btn-cancel').style.display = 'none';
     document.getElementById('btn-generate').disabled = false;
   }
+}
+
+function _addScriptBtn(jobId, title) {
+  const scriptMsg = document.getElementById('msg-script');
+  if (!scriptMsg || scriptMsg.querySelector('button')) return; // ya tiene botón
+  const safeTitle = (title || '').replace(/'/g, "\\'");
+  scriptMsg.innerHTML = `${scriptMsg.textContent.replace('En curso…','Completado').replace('Esperando…','Completado')} &nbsp;<button onclick="openScript('${jobId}','${safeTitle}')" style="font-size:10px;padding:2px 8px;border:1px solid var(--border2);border-radius:5px;background:none;cursor:pointer;color:var(--ink2);">Ver guión ✦</button>`;
 }
 
 function onEnd({job}) {
@@ -1532,6 +1544,13 @@ async function openJobDetail(jobId) {
   // Si el job sigue running, reconectar SSE + polling
   if (job.status === 'running' || job.status === 'pending') {
     currentJobId = jobId;
+    // Si el script ya pasó (estamos en un paso posterior), mostrar botón "Ver guión" ya
+    const stepOrder = Object.keys(STEPS_META);
+    const scriptIdx = stepOrder.indexOf('script');
+    const currentIdx = stepOrder.indexOf(job.current_step);
+    if (scriptIdx !== -1 && currentIdx > scriptIdx) {
+      _addScriptBtn(jobId, job.title || '');
+    }
     // Mostrar "Reintentar render" si lleva más de 30 min atascado en render
     const isStuckRender = job.current_step === 'render' && job.status === 'running';
     document.getElementById('btn-retry-render').style.display = isStuckRender ? 'inline-block' : 'none';
@@ -1550,12 +1569,7 @@ async function openJobDetail(jobId) {
       const dot = document.getElementById('dot-' + key);
       if (dot) dot.className = 'step-icon done';
     });
-    // Botón "Ver guión" en el paso script
-    const scriptMsg = document.getElementById('msg-script');
-    if (scriptMsg) {
-      const scriptTitle = (job.title || 'Guión').replace(/'/g, "\\'");
-      scriptMsg.innerHTML = `Completado &nbsp;<button onclick="openScript('${jobId}','${scriptTitle}')" style="font-size:10px;padding:2px 8px;border:1px solid var(--border2);border-radius:5px;background:none;cursor:pointer;color:var(--ink2);">Ver guión ✦</button>`;
-    }
+    _addScriptBtn(jobId, job.title || '');
     document.getElementById('pipeline-lbl').textContent = '✅ Vídeo listo para revisión';
     document.getElementById('btn-cancel').style.display = 'none';
     if (job.youtube_url) {
