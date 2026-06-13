@@ -1688,7 +1688,8 @@ async function openChDetail(channelId) {
       const retPct  = av.retention_pct  > 0 ? av.retention_pct.toFixed(1) + '%'  : '—';
       const ctrPct  = av.ctr_pct        > 0 ? av.ctr_pct.toFixed(1) + '%'        : '—';
       const durSec  = av.avg_duration_s > 0 ? fmtSec(av.avg_duration_s)           : '—';
-      const v30     = ov.views > 0 ? fmtNum(ov.views) : (analytics.channel_totals?.total_views > 0 ? fmtNum(analytics.channel_totals.total_views) : '—');
+      // Prioridad: views 30d de Analytics → total_views del canal (dato fresco) → caché DB
+      const v30     = ov.views > 0 ? fmtNum(ov.views) : (stats?.total_views > 0 ? fmtNum(stats.total_views) : (analytics.channel_totals?.total_views > 0 ? fmtNum(analytics.channel_totals.total_views) : '—'));
 
       document.getElementById('chd-a-views').textContent = v30;
       document.getElementById('chd-a-ret').textContent   = retPct;
