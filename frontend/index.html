@@ -804,38 +804,26 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
     </div>
     <!-- Canal info -->
     <div id="chd-info" style="padding:16px 24px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;gap:24px;flex-wrap:wrap;"></div>
-    <!-- Analytics panel -->
+    <!-- Analytics panel — full dashboard -->
     <div id="chd-analytics-wrap" style="border-bottom:1px solid var(--border);">
-      <div style="padding:16px 20px 14px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-          <div style="font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.06em;text-transform:uppercase;">Analytics del canal</div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <div id="chd-analytics-status" style="font-size:10px;color:var(--muted);"></div>
-            <button id="chd-analytics-refresh" onclick="refreshAnalytics()" style="background:none;border:1px solid var(--border2);border-radius:6px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer;">↻</button>
-          </div>
+      <!-- Header -->
+      <div style="padding:16px 20px 12px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--ink);letter-spacing:.07em;text-transform:uppercase;">Analytics del canal</div>
+          <div id="chd-analytics-status" style="font-size:9px;color:var(--muted);margin-top:2px;"></div>
         </div>
-        <!-- KPIs: 4 col desktop, 2x2 mobile -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;" class="kpi-grid-4">
-          <div style="background:var(--cream);border-radius:10px;padding:10px 8px;text-align:center;">
-            <div id="chd-a-views" style="font-family:'Playfair Display',serif;font-size:18px;color:var(--ink);">—</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;">Vistas</div>
-          </div>
-          <div style="background:var(--cream);border-radius:10px;padding:10px 8px;text-align:center;">
-            <div id="chd-a-ret" style="font-family:'Playfair Display',serif;font-size:18px;color:var(--ink);">—</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;">Retención</div>
-          </div>
-          <div style="background:var(--cream);border-radius:10px;padding:10px 8px;text-align:center;">
-            <div id="chd-a-ctr" style="font-family:'Playfair Display',serif;font-size:18px;color:var(--ink);">—</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;">CTR</div>
-          </div>
-          <div style="background:var(--cream);border-radius:10px;padding:10px 8px;text-align:center;">
-            <div id="chd-a-dur" style="font-family:'Playfair Display',serif;font-size:18px;color:var(--ink);">—</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;">Dur. media</div>
-          </div>
-        </div>
+        <button id="chd-analytics-refresh" onclick="refreshAnalytics()" style="background:none;border:1px solid var(--border2);border-radius:6px;padding:3px 10px;font-size:10px;color:var(--muted);cursor:pointer;">↻ Actualizar</button>
       </div>
-      <!-- Distribución: tráfico + dispositivos + geo — apila en móvil -->
-      <div id="chd-analytics-dist" style="display:none;padding:0 20px 16px;"></div>
+      <!-- Dashboard body — populated by renderAnalyticsDashboard() -->
+      <div id="chd-analytics-body" style="padding:0 20px 20px;">
+        <div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">Cargando datos…</div>
+      </div>
+      <!-- legacy compat -->
+      <div id="chd-a-views" style="display:none;"></div>
+      <div id="chd-a-ret" style="display:none;"></div>
+      <div id="chd-a-ctr" style="display:none;"></div>
+      <div id="chd-a-dur" style="display:none;"></div>
+      <div id="chd-analytics-dist" style="display:none;"></div>
     </div>
 
     <!-- ── ANÁLISIS IA ─────────────────────────────────────────────────── -->
@@ -1751,64 +1739,16 @@ async function openChDetail(channelId) {
     document.getElementById('chd-info').innerHTML = info.join('') || '';
 
     // ── Analytics panel ──────────────────────────────────────────────────────
-    if (analytics) {
-      const ov    = analytics.overview_30d || {};
-      const av    = analytics.averages    || {};
-      const avids = analytics.videos      || [];
-      const traffic = analytics.traffic   || [];
-      const devices = analytics.devices   || [];
-      const geo     = analytics.geo       || [];
-
-      const retPct = av.retention_pct > 0 ? av.retention_pct.toFixed(1) + '%' : '—';
-      const ctrPct = av.ctr_pct       > 0 ? av.ctr_pct.toFixed(1) + '%'       : '—';
-      const durSec = av.avg_duration_s > 0 ? fmtSec(av.avg_duration_s)         : '—';
-      const v30    = ov.views > 0 ? fmtNum(ov.views) : (stats?.total_views > 0 ? fmtNum(stats.total_views) : (analytics.channel_totals?.total_views > 0 ? fmtNum(analytics.channel_totals.total_views) : '—'));
-
-      document.getElementById('chd-a-views').textContent = v30;
-      document.getElementById('chd-a-ret').textContent   = retPct;
-      document.getElementById('chd-a-ctr').textContent   = ctrPct;
-      document.getElementById('chd-a-dur').textContent   = durSec;
-      document.getElementById('chd-analytics-status').textContent = avids.length ? `${avids.length} vídeo${avids.length>1?'s':''} con datos` : 'Acumulando datos…';
-
-      // Analytics data indexed by video ID for merging
+    // Index per-video analytics for video card merging
+    if (analytics?.videos) {
       window._analyticsById = {};
-      avids.forEach(v => { window._analyticsById[v.id] = v; });
-
-      // ── Distribución: tráfico + dispositivos + geo ────────────────────────
-      const distEl = document.getElementById('chd-analytics-dist');
-      if (traffic.length || devices.length || geo.length) {
-        distEl.style.display = 'grid';
-        const maxTraffic = Math.max(...traffic.map(t => t.views || 0), 1);
-        const maxDev     = Math.max(...devices.map(d => d.views || 0), 1);
-        const maxGeo     = Math.max(...geo.map(g => g.views || 0), 1);
-        const barSection = (title, rows, labelKey, valueKey, maxVal) => {
-          const bars = rows.slice(0,5).map(r => {
-            const w = Math.round((r[valueKey] / maxVal) * 100);
-            return `<div style="margin-bottom:8px;">
-              <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink2);margin-bottom:3px;">
-                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">${r[labelKey] || r.deviceType || r.country || '—'}</span>
-                <span style="color:var(--muted);flex-shrink:0;margin-left:4px;">${r[valueKey]}</span>
-              </div>
-              <div style="background:var(--border);border-radius:3px;height:4px;overflow:hidden;">
-                <div style="background:var(--ink);width:${w}%;height:100%;border-radius:3px;"></div>
-              </div>
-            </div>`;
-          }).join('');
-          return `<div>
-            <div style="font-size:9px;font-weight:600;color:var(--ink);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">${title}</div>
-            ${bars || '<div style="font-size:10px;color:var(--muted);">Sin datos</div>'}
-          </div>`;
-        };
-        distEl.innerHTML =
-          barSection('Fuentes de tráfico', traffic, 'label', 'views', maxTraffic) +
-          barSection('Dispositivos', devices, 'deviceType', 'views', maxDev) +
-          barSection('Países', geo, 'country', 'views', maxGeo);
-      } else {
-        distEl.style.display = 'none';
-      }
+      analytics.videos.forEach(v => { window._analyticsById[v.id] = v; });
+      const cnt = analytics.videos.length;
+      document.getElementById('chd-analytics-status').textContent = cnt ? `${cnt} vídeo${cnt>1?'s':''} con datos` : 'Acumulando datos…';
     } else {
-      document.getElementById('chd-analytics-status').textContent = 'Sin datos';
+      document.getElementById('chd-analytics-status').textContent = analytics ? 'Acumulando datos…' : 'Sin datos';
     }
+    renderAnalyticsDashboard(analytics, channelId, stats);
 
     // ── Insights IA ───────────────────────────────────────────────────────────
     renderInsights(insights, channelId);
@@ -1933,6 +1873,251 @@ async function openScript(jobId, title) {
 }
 function closeScript() {
   document.getElementById('modal-script').style.display = 'none';
+}
+
+function renderAnalyticsDashboard(analytics, channelId, stats) {
+  const el = document.getElementById('chd-analytics-body');
+  if (!el) return;
+  if (!analytics) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:12px;padding:12px 0;">Sin datos de analíticas aún — se sincronizan automáticamente.</div>`;
+    return;
+  }
+
+  const ov  = analytics.overview_30d   || {};
+  const av  = analytics.averages       || {};
+  const ct  = analytics.channel_totals || {};
+  const traffic  = analytics.traffic   || [];
+  const devices  = analytics.devices   || [];
+  const geo      = analytics.geo       || [];
+  const ageRaw   = analytics.age       || [];
+  const dowRaw   = analytics.hour      || [];  // day-of-week data
+  const trend    = analytics.trend_30d || [];
+
+  const fmtMin = m => m >= 60 ? `${(m/60).toFixed(1)}h` : `${Math.round(m)}min`;
+
+  // ── KPI values ─────────────────────────────────────────────────────────
+  const v30   = ov.views > 0 ? fmtNum(ov.views) : (ct.total_views > 0 ? fmtNum(ct.total_views) : '—');
+  const min30 = ov.estimated_minutes > 0 ? fmtMin(ov.estimated_minutes) : '—';
+  const ret   = av.retention_pct  > 0 ? av.retention_pct.toFixed(1)  + '%' : '—';
+  const dur   = av.avg_duration_s > 0 ? fmtSec(av.avg_duration_s) : '—';
+  const vtot  = ct.total_views    > 0 ? fmtNum(ct.total_views) : (stats?.total_views > 0 ? fmtNum(stats.total_views) : '—');
+  const subs  = ct.subscribers    > 0 ? fmtNum(ct.subscribers)  : (stats?.subscribers   > 0 ? fmtNum(stats.subscribers)  : '—');
+
+  const kpiCard = (label, value, sub) => `
+    <div style="background:var(--surface2,#f7f7f7);border-radius:10px;padding:12px 14px;min-width:0;">
+      <div style="font-size:9px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;">${label}</div>
+      <div style="font-size:22px;font-weight:700;color:var(--ink);line-height:1;">${value}</div>
+      ${sub ? `<div style="font-size:10px;color:var(--muted);margin-top:3px;">${sub}</div>` : ''}
+    </div>`;
+
+  // ── Sparkline SVG (30d trend) ───────────────────────────────────────────
+  let sparkHtml = '';
+  if (trend.length > 1) {
+    const W = 580, H = 56, pad = 4;
+    const vals = trend.map(d => d.views || 0);
+    const maxV = Math.max(...vals, 1);
+    const pts  = vals.map((v, i) => {
+      const x = pad + (i / (vals.length - 1)) * (W - pad * 2);
+      const y = H - pad - (v / maxV) * (H - pad * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    const first = trend[0]?.day?.slice(5) || '';
+    const last  = trend[trend.length-1]?.day?.slice(5) || '';
+    const peak  = vals.indexOf(Math.max(...vals));
+    const peakX = pad + (peak / (vals.length - 1)) * (W - pad * 2);
+    const peakY = H - pad - (vals[peak] / maxV) * (H - pad * 2);
+    sparkHtml = `
+      <div style="margin-bottom:18px;">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Tendencia 30 días</div>
+        <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:56px;display:block;overflow:visible;">
+          <defs>
+            <linearGradient id="spark-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--ink)" stop-opacity="0.15"/>
+              <stop offset="100%" stop-color="var(--ink)" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <polyline points="${pts}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+          <circle cx="${peakX.toFixed(1)}" cy="${peakY.toFixed(1)}" r="3.5" fill="var(--ink)"/>
+          <text x="${peakX.toFixed(1)}" y="${(peakY - 7).toFixed(1)}" text-anchor="middle" font-size="9" fill="var(--ink)" font-weight="600">${vals[peak]}</text>
+        </svg>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-top:2px;">
+          <span>${first}</span><span>${last}</span>
+        </div>
+      </div>`;
+  }
+
+  // ── Age breakdown ────────────────────────────────────────────────────────
+  let ageHtml = '';
+  if (ageRaw.length > 0) {
+    const ageMap = {};
+    const AGE_ORDER = ['13-17','18-24','25-34','35-44','45-54','55-64','65+'];
+    ageRaw.forEach(r => {
+      const g = r.gender === 'male' ? 'H' : r.gender === 'female' ? 'M' : 'O';
+      const label = r.ageGroup || '?';
+      if (!ageMap[label]) ageMap[label] = { total: 0, H: 0, M: 0 };
+      ageMap[label].total += r.viewerPercentage || 0;
+      ageMap[label][g]   += r.viewerPercentage || 0;
+    });
+    const rows = AGE_ORDER.filter(a => ageMap[a]).map(a => ({ age: a, ...ageMap[a] }));
+    if (rows.length > 0) {
+      const maxPct = Math.max(...rows.map(r => r.total), 1);
+      const bars = rows.map(r => {
+        const w  = Math.round((r.total / maxPct) * 100);
+        const wH = maxPct > 0 ? Math.round((r.H  / maxPct) * 100) : 0;
+        const wM = maxPct > 0 ? Math.round((r.M  / maxPct) * 100) : 0;
+        return `<div style="margin-bottom:7px;">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink2);margin-bottom:3px;">
+            <span>${r.age}</span>
+            <span style="color:var(--muted);">${r.total.toFixed(1)}%</span>
+          </div>
+          <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden;position:relative;">
+            <div style="position:absolute;left:0;top:0;height:100%;width:${wH}%;background:#4a90d9;border-radius:4px 0 0 4px;"></div>
+            <div style="position:absolute;left:${wH}%;top:0;height:100%;width:${wM}%;background:#e8739c;"></div>
+          </div>
+        </div>`;
+      }).join('');
+      ageHtml = `
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">Edad</div>
+          <div style="font-size:9px;color:var(--muted);margin-bottom:8px;display:flex;gap:12px;">
+            <span><span style="display:inline-block;width:8px;height:8px;background:#4a90d9;border-radius:2px;margin-right:3px;"></span>Hombres</span>
+            <span><span style="display:inline-block;width:8px;height:8px;background:#e8739c;border-radius:2px;margin-right:3px;"></span>Mujeres</span>
+          </div>
+          ${bars}
+        </div>`;
+    }
+  }
+
+  // ── Geo with flags ───────────────────────────────────────────────────────
+  const FLAG = { MX:'🇲🇽', ES:'🇪🇸', US:'🇺🇸', AR:'🇦🇷', CO:'🇨🇴', CL:'🇨🇱', PE:'🇵🇪', VE:'🇻🇪', EC:'🇪🇨', BO:'🇧🇴', UY:'🇺🇾', PY:'🇵🇾', GT:'🇬🇹', HN:'🇭🇳', SV:'🇸🇻', NI:'🇳🇮', CR:'🇨🇷', PA:'🇵🇦', DO:'🇩🇴', CU:'🇨🇺', DE:'🇩🇪', FR:'🇫🇷', GB:'🇬🇧', IT:'🇮🇹', CA:'🇨🇦', BR:'🇧🇷', JP:'🇯🇵', KR:'🇰🇷', AU:'🇦🇺', NL:'🇳🇱' };
+  let geoHtml = '';
+  if (geo.length > 0) {
+    const maxGeo = Math.max(...geo.map(g => g.views || 0), 1);
+    const gRows = geo.slice(0, 6).map(g => {
+      const w = Math.round((g.views / maxGeo) * 100);
+      const flag = FLAG[g.country] || '🌐';
+      return `<div style="margin-bottom:7px;">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink2);margin-bottom:3px;">
+          <span>${flag} ${g.country}</span>
+          <span style="color:var(--muted);">${g.views}</span>
+        </div>
+        <div style="background:var(--border);border-radius:4px;height:4px;overflow:hidden;">
+          <div style="background:var(--ink);width:${w}%;height:100%;border-radius:4px;"></div>
+        </div>
+      </div>`;
+    }).join('');
+    geoHtml = `
+      <div>
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">Países</div>
+        ${gRows}
+      </div>`;
+  }
+
+  // ── Traffic sources ──────────────────────────────────────────────────────
+  const TRAFFIC_ICON = { 'Vídeos relacionados':'🔗', 'Subs':'📩', 'Externo':'🌐', 'Sin enlace':'🔍', 'Página canal':'📺', 'Inicio':'🏠', 'Buscar':'🔎', 'Sugeridos':'✨' };
+  let trafficHtml = '';
+  if (traffic.length > 0) {
+    const maxT = Math.max(...traffic.map(t => t.views || 0), 1);
+    const tRows = traffic.slice(0, 6).map(t => {
+      const w = Math.round((t.views / maxT) * 100);
+      const icon = Object.entries(TRAFFIC_ICON).find(([k]) => t.label?.includes(k.split(' ')[0]))?.[1] || '📊';
+      return `<div style="margin-bottom:7px;">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink2);margin-bottom:3px;">
+          <span>${icon} ${t.label}</span>
+          <span style="color:var(--muted);">${t.views}</span>
+        </div>
+        <div style="background:var(--border);border-radius:4px;height:4px;overflow:hidden;">
+          <div style="background:var(--ink);width:${w}%;height:100%;border-radius:4px;"></div>
+        </div>
+      </div>`;
+    }).join('');
+    trafficHtml = `
+      <div>
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">Cómo te encuentran</div>
+        ${tRows}
+      </div>`;
+  }
+
+  // ── Devices ──────────────────────────────────────────────────────────────
+  const DEV_ICON = { 'MOBILE':'📱', 'TABLET':'📱', 'DESKTOP':'💻', 'TV':'📺', 'GAME_CONSOLE':'🎮' };
+  const DEV_LABEL = { 'MOBILE':'Móvil', 'TABLET':'Tablet', 'DESKTOP':'Escritorio', 'TV':'Smart TV', 'GAME_CONSOLE':'Consola' };
+  let devHtml = '';
+  if (devices.length > 0) {
+    const totalDev = devices.reduce((s, d) => s + (d.views || 0), 0) || 1;
+    const dCards = devices.slice(0, 4).map(d => {
+      const pct = ((d.views / totalDev) * 100).toFixed(0);
+      const icon = DEV_ICON[d.deviceType?.toUpperCase()] || '📱';
+      const label = DEV_LABEL[d.deviceType?.toUpperCase()] || d.deviceType;
+      return `<div style="text-align:center;background:var(--surface2,#f7f7f7);border-radius:10px;padding:10px 8px;">
+        <div style="font-size:22px;margin-bottom:4px;">${icon}</div>
+        <div style="font-size:18px;font-weight:700;color:var(--ink);">${pct}%</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px;">${label}</div>
+        <div style="font-size:9px;color:var(--muted);">${d.views} vis.</div>
+      </div>`;
+    }).join('');
+    devHtml = `
+      <div style="margin-bottom:18px;">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">Dispositivos</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;">
+          ${dCards}
+        </div>
+      </div>`;
+  }
+
+  // ── Day of week ──────────────────────────────────────────────────────────
+  const DOW = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  let dowHtml = '';
+  if (dowRaw.length > 0) {
+    const maxDow = Math.max(...dowRaw.map(d => d.views || 0), 1);
+    const dowBars = DOW.map((name, i) => {
+      const row = dowRaw.find(d => String(d.dayOfWeek) === String(i));
+      const v = row?.views || 0;
+      const h = Math.round((v / maxDow) * 48);
+      const isTop = v === maxDow;
+      return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;">
+        <div style="font-size:9px;font-weight:${isTop?'700':'400'};color:${isTop?'var(--ink)':'var(--muted)'};">${v||''}</div>
+        <div style="width:100%;display:flex;align-items:flex-end;height:48px;">
+          <div style="width:100%;background:${isTop?'var(--ink)':'var(--border)'};border-radius:3px 3px 0 0;height:${Math.max(h,2)}px;"></div>
+        </div>
+        <div style="font-size:9px;color:var(--muted);">${name}</div>
+      </div>`;
+    }).join('');
+    dowHtml = `
+      <div style="margin-bottom:18px;">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">Día de la semana</div>
+        <div style="display:flex;gap:4px;align-items:flex-end;">${dowBars}</div>
+      </div>`;
+  }
+
+  // ── Assemble ─────────────────────────────────────────────────────────────
+  const hasAudience = ageHtml || geoHtml;
+  const hasDistrib  = trafficHtml || devHtml;
+
+  el.innerHTML = `
+    <style>
+      .an-2col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+      @media(max-width:480px){ .an-2col { grid-template-columns:1fr !important; } }
+    </style>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-bottom:20px;">
+      ${kpiCard('Vistas 30d', v30, 'últimos 30 días')}
+      ${kpiCard('Min. vistos', min30, 'últimos 30 días')}
+      ${kpiCard('Retención', ret, 'promedio vídeos')}
+      ${kpiCard('Duración media', dur, 'por visualización')}
+      ${kpiCard('Total vistas', vtot, 'histórico canal')}
+      ${kpiCard('Suscriptores', subs, 'total canal')}
+    </div>
+
+    ${sparkHtml}
+
+    ${hasAudience ? `<div class="an-2col" style="margin-bottom:18px;">${ageHtml || '<div></div>'}${geoHtml || '<div></div>'}</div>` : ''}
+
+    ${hasDistrib ? `<div class="an-2col" style="margin-bottom:18px;">${trafficHtml || '<div></div>'}${devHtml ? `<div>${devHtml}</div>` : '<div></div>'}</div>` : devHtml}
+
+    ${dowHtml}
+
+    ${!hasAudience && !hasDistrib && !sparkHtml && !dowHtml ? `<div style="color:var(--muted);font-size:11px;padding:8px 0;">Los datos detallados aparecerán cuando haya más visualizaciones.</div>` : ''}
+  `;
 }
 
 async function refreshAnalytics() {
