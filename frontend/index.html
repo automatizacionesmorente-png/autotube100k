@@ -2425,6 +2425,19 @@ async function loadNavCost() {
 loadJobs(); loadChannels(); loadNavCost();
 autoOpenRunningJob();
 
+async function autoOpenRunningJob() {
+  try {
+    const jobs = await fetch(API + '/api/jobs').then(r => r.json());
+    if (!jobs.length) return;
+    // Priority 1: a job currently running → show it
+    const running = jobs.find(j => j.status === 'running' || j.status === 'pending');
+    if (running) { openJobDetail(running.id); return; }
+    // Priority 2: latest done job not yet uploaded → show for review
+    const ready = jobs.find(j => j.status === 'done' && j.video_path && !j.youtube_url);
+    if (ready) { openJobDetail(ready.id); }
+  } catch(e) {}
+}
+
 // ── Mobile bottom nav ────────────────────────────────────────────────────
 function mbnGo(page, btn) {
   showPage(page, null);
