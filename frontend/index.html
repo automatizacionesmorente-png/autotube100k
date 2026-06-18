@@ -837,6 +837,25 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
       <!-- Distribución: tráfico + dispositivos + geo — apila en móvil -->
       <div id="chd-analytics-dist" style="display:none;padding:0 20px 16px;"></div>
     </div>
+
+    <!-- ── ANÁLISIS IA ─────────────────────────────────────────────────── -->
+    <div id="chd-insights-wrap" style="border-bottom:1px solid var(--border);padding:16px 20px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:28px;height:28px;background:var(--ink);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;">✦</div>
+          <div>
+            <div style="font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.06em;text-transform:uppercase;">Análisis IA del canal</div>
+            <div id="chd-insights-date" style="font-size:9px;color:var(--muted);">Generado por Claude Haiku · actualiza cada 4h</div>
+          </div>
+        </div>
+        <button onclick="refreshInsights()" id="chd-insights-refresh-btn"
+          style="background:none;border:1px solid var(--border2);border-radius:6px;padding:3px 10px;font-size:10px;color:var(--muted);cursor:pointer;">↻ Actualizar</button>
+      </div>
+      <div id="chd-insights-body">
+        <div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">Cargando análisis…</div>
+      </div>
+    </div>
+
     <!-- Vídeos unificados -->
     <div style="padding:20px 28px 28px;">
       <div style="font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px;">Vídeos del canal</div>
@@ -1684,6 +1703,7 @@ async function openChDetail(channelId) {
   document.getElementById('chd-vcount').textContent = '—';
   document.getElementById('chd-info').innerHTML = '';
   document.getElementById('chd-videos').innerHTML = '<div style="color:var(--muted);font-size:12px;">Cargando…</div>';
+  document.getElementById('chd-insights-body').innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">Cargando análisis…</div>';
   document.getElementById('chd-a-views').textContent = '—';
   document.getElementById('chd-a-ret').textContent = '—';
   document.getElementById('chd-a-ctr').textContent = '—';
@@ -1691,15 +1711,19 @@ async function openChDetail(channelId) {
   document.getElementById('chd-analytics-status').textContent = 'Cargando…';
 
   try {
-    // Fetch detail + analytics en paralelo; analytics con timeout 20s para evitar cuelgues en móvil
+    // Fetch detail + analytics + insights en paralelo
     const analyticsPromise = Promise.race([
       fetch(`${API}/api/channels/${channelId}/analytics`).then(r => r.ok ? r.json() : null),
       new Promise(res => setTimeout(() => res(null), 20000))
     ]).catch(() => null);
 
-    const [data, analytics] = await Promise.all([
+    const insightsPromise = fetch(`${API}/api/channels/${channelId}/insights`)
+      .then(r => r.ok ? r.json() : null).catch(() => null);
+
+    const [data, analytics, insights] = await Promise.all([
       fetch(`${API}/api/channels/${channelId}/detail`).then(r => r.json()),
-      analyticsPromise
+      analyticsPromise,
+      insightsPromise
     ]);
     const ch = data.channel;
     const stats = data.stats;
@@ -1785,6 +1809,9 @@ async function openChDetail(channelId) {
     } else {
       document.getElementById('chd-analytics-status').textContent = 'Sin datos';
     }
+
+    // ── Insights IA ───────────────────────────────────────────────────────────
+    renderInsights(insights, channelId);
 
     // ── Vídeos unificados: detalle + analytics mezclados, expandibles ────────
     const aMap = window._analyticsById || {};
@@ -1916,6 +1943,104 @@ async function refreshAnalytics() {
     await openChDetail(channelId);
   }
   if (btn) { btn.textContent = '↻'; btn.disabled = false; }
+}
+
+function renderInsights(ins, channelId) {
+  const el = document.getElementById('chd-insights-body');
+  if (!ins || ins.error) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:11px;text-align:center;padding:16px 0;">${ins?.error || 'Sin análisis disponible aún — se genera automáticamente cada 4h.'}</div>`;
+    return;
+  }
+
+  const scoreColor = ins.score_general >= 7 ? '#2a7a4f' : ins.score_general >= 4 ? '#b8860b' : '#c0392b';
+  const scoreLabel = ins.score_general >= 7 ? 'Buen ritmo' : ins.score_general >= 4 ? 'En construcción' : 'Necesita mejoras';
+
+  const pill = (text, color) => `<span style="display:inline-block;background:${color}18;color:${color};border:1px solid ${color}33;border-radius:20px;padding:2px 10px;font-size:10px;font-weight:600;">${text}</span>`;
+
+  const listItems = (arr, icon) => arr.map(item =>
+    typeof item === 'string'
+      ? `<li style="margin-bottom:6px;font-size:11px;color:var(--ink2);line-height:1.5;">${icon} ${item}</li>`
+      : `<li style="margin-bottom:8px;"><div style="font-size:11px;font-weight:600;color:var(--ink);">${icon} ${item.titulo}</div><div style="font-size:10px;color:var(--muted);margin-top:2px;line-height:1.5;">${item.detalle}</div></li>`
+  ).join('');
+
+  el.innerHTML = `
+    <!-- Score + estado -->
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;padding:14px 16px;background:var(--cream);border-radius:12px;">
+      <div style="text-align:center;flex-shrink:0;">
+        <div style="font-family:'Playfair Display',serif;font-size:32px;font-weight:700;color:${scoreColor};line-height:1;">${ins.score_general}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">/ 10</div>
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:4px;">${scoreLabel}</div>
+        <div style="font-size:11px;color:var(--ink2);line-height:1.5;">${ins.estado_canal}</div>
+      </div>
+    </div>
+
+    ${ins.alerta_critica ? `
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:flex-start;">
+      <span style="font-size:16px;flex-shrink:0;">⚠️</span>
+      <div>
+        <div style="font-size:10px;font-weight:700;color:#c0392b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Alerta crítica</div>
+        <div style="font-size:11px;color:#7f1d1d;line-height:1.5;">${ins.alerta_critica}</div>
+      </div>
+    </div>` : ''}
+
+    <!-- Hallazgos clave -->
+    <div style="margin-bottom:14px;">
+      <div style="font-size:10px;font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Hallazgos clave</div>
+      <ul style="margin:0;padding:0;list-style:none;">${listItems(ins.hallazgos_clave || [], '◈')}</ul>
+    </div>
+
+    <!-- Qué funciona + Qué mejorar en 2 col -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;" class="insights-2col">
+      <div style="background:#f0fdf4;border-radius:10px;padding:12px 14px;">
+        <div style="font-size:10px;font-weight:700;color:#2a7a4f;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">✓ Qué funciona</div>
+        <ul style="margin:0;padding:0;list-style:none;">${listItems(ins.que_funciona || [], '')}</ul>
+      </div>
+      <div style="background:#fef9ec;border-radius:10px;padding:12px 14px;">
+        <div style="font-size:10px;font-weight:700;color:#b8860b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">↑ Qué mejorar</div>
+        <ul style="margin:0;padding:0;list-style:none;">${listItems(ins.que_mejorar || [], '')}</ul>
+      </div>
+    </div>
+
+    <!-- Mejor vídeo -->
+    ${ins.mejor_video ? `
+    <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+      <div style="font-size:10px;font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">★ Mejor vídeo</div>
+      <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px;">"${ins.mejor_video.titulo}"</div>
+      <div style="font-size:10px;color:var(--ink2);margin-bottom:4px;line-height:1.5;"><strong>Por qué funcionó:</strong> ${ins.mejor_video.por_que}</div>
+      <div style="font-size:10px;color:#2a7a4f;line-height:1.5;"><strong>Replicar:</strong> ${ins.mejor_video.replicar}</div>
+    </div>` : ''}
+
+    <!-- Recomendación próximo vídeo -->
+    ${ins.recomendacion_proximo ? `
+    <div style="background:var(--ink);border-radius:12px;padding:14px 16px;">
+      <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">▶ Recomendación para el próximo vídeo</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" class="insights-2col">
+        <div><div style="font-size:9px;color:rgba(255,255,255,.5);text-transform:uppercase;margin-bottom:3px;">Tipo de tema</div><div style="font-size:11px;color:#fff;line-height:1.4;">${ins.recomendacion_proximo.tipo_tema}</div></div>
+        <div><div style="font-size:9px;color:rgba(255,255,255,.5);text-transform:uppercase;margin-bottom:3px;">Duración óptima</div><div style="font-size:11px;color:#fff;line-height:1.4;">${ins.recomendacion_proximo.duracion_optima}</div></div>
+        <div><div style="font-size:9px;color:rgba(255,255,255,.5);text-transform:uppercase;margin-bottom:3px;">Estructura hook</div><div style="font-size:11px;color:#fff;line-height:1.4;">${ins.recomendacion_proximo.estructura_hook}</div></div>
+        <div><div style="font-size:9px;color:rgba(255,255,255,.5);text-transform:uppercase;margin-bottom:3px;">Audiencia objetivo</div><div style="font-size:11px;color:#fff;line-height:1.4;">${ins.recomendacion_proximo.audiencia_objetivo}</div></div>
+      </div>
+    </div>` : ''}
+  `;
+  // Guardar channelId para el refresh
+  el.dataset.channelId = channelId;
+}
+
+async function refreshInsights() {
+  const btn = document.getElementById('chd-insights-refresh-btn');
+  if (btn) { btn.textContent = '↻…'; btn.disabled = true; }
+  const channelId = document.getElementById('chd-name').dataset.channelId;
+  if (!channelId) return;
+  document.getElementById('chd-insights-body').innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">Generando análisis con Claude…</div>';
+  try {
+    const ins = await fetch(`${API}/api/channels/${channelId}/insights?refresh=true`).then(r => r.json());
+    renderInsights(ins, channelId);
+  } catch(e) {
+    document.getElementById('chd-insights-body').innerHTML = `<div style="color:#c0392b;font-size:11px;text-align:center;padding:16px 0;">Error: ${e.message}</div>`;
+  }
+  if (btn) { btn.textContent = '↻ Actualizar'; btn.disabled = false; }
 }
 
 function openAddChannel() { document.getElementById('modal-channel').classList.add('open'); }
@@ -2409,6 +2534,7 @@ async function _checkShort(jobId) {
   /* ── ANALYTICS responsive ── */
   .kpi-grid-4 { grid-template-columns: 1fr 1fr !important; }
   #chd-analytics-dist { grid-template-columns: 1fr !important; }
+  .insights-2col { grid-template-columns: 1fr !important; }
   #chd-analytics-wrap { padding: 0 !important; }
   #chd-analytics-wrap > div { padding-left: 16px !important; padding-right: 16px !important; }
 
