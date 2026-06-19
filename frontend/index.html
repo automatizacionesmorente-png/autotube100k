@@ -1897,7 +1897,7 @@ function renderAnalyticsDashboard(analytics, channelId, stats) {
 
   // ── KPI values ─────────────────────────────────────────────────────────
   const v30   = ov.views > 0 ? fmtNum(ov.views) : (ct.total_views > 0 ? fmtNum(ct.total_views) : '—');
-  const min30 = ov.estimated_minutes > 0 ? fmtMin(ov.estimated_minutes) : '—';
+  const min30 = ov.estimatedMinutesWatched > 0 ? fmtMin(ov.estimatedMinutesWatched) : '—';
   const ret   = av.retention_pct  > 0 ? av.retention_pct.toFixed(1)  + '%' : '—';
   const dur   = av.avg_duration_s > 0 ? fmtSec(av.avg_duration_s) : '—';
   const vtot  = ct.total_views    > 0 ? fmtNum(ct.total_views) : (stats?.total_views > 0 ? fmtNum(stats.total_views) : '—');
@@ -1921,8 +1921,8 @@ function renderAnalyticsDashboard(analytics, channelId, stats) {
       const y = H - pad - (v / maxV) * (H - pad * 2);
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     }).join(' ');
-    const first = trend[0]?.day?.slice(5) || '';
-    const last  = trend[trend.length-1]?.day?.slice(5) || '';
+    const first = trend[0]?.date?.slice(5) || '';
+    const last  = trend[trend.length-1]?.date?.slice(5) || '';
     const peak  = vals.indexOf(Math.max(...vals));
     const peakX = pad + (peak / (vals.length - 1)) * (W - pad * 2);
     const peakY = H - pad - (vals[peak] / maxV) * (H - pad * 2);
@@ -1947,42 +1947,29 @@ function renderAnalyticsDashboard(analytics, channelId, stats) {
   }
 
   // ── Age breakdown ────────────────────────────────────────────────────────
+  // API returns [{age: "45-54", pct: 25.0}, ...] — only groups with enough data
   let ageHtml = '';
   if (ageRaw.length > 0) {
-    const ageMap = {};
     const AGE_ORDER = ['13-17','18-24','25-34','35-44','45-54','55-64','65+'];
-    ageRaw.forEach(r => {
-      const g = r.gender === 'male' ? 'H' : r.gender === 'female' ? 'M' : 'O';
-      const label = r.ageGroup || '?';
-      if (!ageMap[label]) ageMap[label] = { total: 0, H: 0, M: 0 };
-      ageMap[label].total += r.viewerPercentage || 0;
-      ageMap[label][g]   += r.viewerPercentage || 0;
-    });
-    const rows = AGE_ORDER.filter(a => ageMap[a]).map(a => ({ age: a, ...ageMap[a] }));
+    const rows = AGE_ORDER.map(a => ageRaw.find(r => r.age === a)).filter(Boolean);
     if (rows.length > 0) {
-      const maxPct = Math.max(...rows.map(r => r.total), 1);
+      const maxPct = Math.max(...rows.map(r => r.pct), 1);
       const bars = rows.map(r => {
-        const w  = Math.round((r.total / maxPct) * 100);
-        const wH = maxPct > 0 ? Math.round((r.H  / maxPct) * 100) : 0;
-        const wM = maxPct > 0 ? Math.round((r.M  / maxPct) * 100) : 0;
+        const w = Math.round((r.pct / maxPct) * 100);
         return `<div style="margin-bottom:7px;">
           <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink2);margin-bottom:3px;">
             <span>${r.age}</span>
-            <span style="color:var(--muted);">${r.total.toFixed(1)}%</span>
+            <span style="color:var(--muted);">${r.pct.toFixed(1)}%</span>
           </div>
-          <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden;position:relative;">
-            <div style="position:absolute;left:0;top:0;height:100%;width:${wH}%;background:#4a90d9;border-radius:4px 0 0 4px;"></div>
-            <div style="position:absolute;left:${wH}%;top:0;height:100%;width:${wM}%;background:#e8739c;"></div>
+          <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden;">
+            <div style="background:var(--ink);width:${w}%;height:100%;border-radius:4px;"></div>
           </div>
         </div>`;
       }).join('');
       ageHtml = `
         <div>
-          <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">Edad</div>
-          <div style="font-size:9px;color:var(--muted);margin-bottom:8px;display:flex;gap:12px;">
-            <span><span style="display:inline-block;width:8px;height:8px;background:#4a90d9;border-radius:2px;margin-right:3px;"></span>Hombres</span>
-            <span><span style="display:inline-block;width:8px;height:8px;background:#e8739c;border-radius:2px;margin-right:3px;"></span>Mujeres</span>
-          </div>
+          <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Edad</div>
+          <div style="font-size:9px;color:var(--muted);margin-bottom:8px;">Fuente: YouTube Analytics</div>
           ${bars}
         </div>`;
     }
