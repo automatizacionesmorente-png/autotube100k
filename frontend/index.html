@@ -558,6 +558,8 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
   </div>
   <div class="nav-end">
     Este mes &nbsp;·&nbsp; <span class="nav-cost-val" id="nav-cost">0.00€</span>
+    &nbsp;·&nbsp; <a href="/privacy.html" style="color:inherit;opacity:.6;font-size:12px;">Privacidad</a>
+    &nbsp;·&nbsp; <a href="/terms.html" style="color:inherit;opacity:.6;font-size:12px;">Términos</a>
   </div>
 </nav>
 
@@ -1155,9 +1157,6 @@ function _showUploaded(youtubeUrl, studioUrl) {
   // Abrir YouTube Studio automáticamente para revisar
   const openUrl = studioUrl || `https://studio.youtube.com`;
   window.open(openUrl, '_blank');
-  // Notificar al equipo por WhatsApp
-  const _jobTitle = window._currentJobTitle || document.getElementById('pipeline-lbl')?.textContent?.replace('Pipeline en curso','').trim() || '';
-  _notifyEquipo(youtubeUrl, _jobTitle).catch(()=>{});
 }
 
 async function _pollUpload(jobId) {
@@ -2906,36 +2905,9 @@ async function _checkShort(jobId) {
   });
 })();
 </script>
-
-
-<script>
-// ── WhatsApp notification al equipo cuando el vídeo se publica ──────────────
-async function _notifyEquipo(youtubeUrl, videoTitle) {
-  const EVO_URL  = "https://evo.automatizacionnegocio.com";
-  const EVO_KEY  = "A7B34E229E0C-4368-9096-03BA55309F5F";
-  const EVO_INST = "Mike";
-  const NUMEROS  = ["34642383769", "34656966477", "34653021180"];
-
-  const msg = [
-    "El vídeo de hoy ya está publicado",
-    "Título: " + (videoTitle || "Nuevo vídeo"),
-    youtubeUrl,
-    "",
-    "Mike"
-  ].join("\n");
-
-  for (const num of NUMEROS) {
-    try {
-      await fetch(`${EVO_URL}/message/sendText/${EVO_INST}`, {
-        method: "POST",
-        headers: { "apikey": EVO_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({ number: num, text: msg })
-      });
-    } catch(e) {
-      console.warn("WA notify failed for", num, e);
-    }
-  }
-}
-</script>
+<footer style="text-align:center;padding:24px 16px 40px;font-size:13px;color:#888;">
+  <a href="/privacy.html" style="color:#888;text-decoration:underline;margin:0 10px;">Política de Privacidad</a>
+  <a href="/terms.html" style="color:#888;text-decoration:underline;margin:0 10px;">Términos de Servicio</a>
+</footer>
 </body>
 </html>
