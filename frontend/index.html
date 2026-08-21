@@ -552,7 +552,8 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
     <span class="logo-auto">Auto</span><span class="logo-tube">Tube</span><span class="logo-rest">&nbsp;100k</span>
   </div>
   <div class="nav-tabs">
-    <button class="nav-tab active" onclick="showPage('crear',this)">Crear</button>
+    <button class="nav-tab active" id="nav-tab-crear" onclick="showPage('crear',this)">Crear</button>
+    <button class="nav-tab" onclick="showPage('cola',this)">Cola</button>
     <button class="nav-tab" onclick="showPage('canales',this)">Canales</button>
     <button class="nav-tab" onclick="showPage('finanzas',this)">Finanzas</button>
   </div>
@@ -875,6 +876,18 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
   </div>
 </div>
 
+<!-- ══ COLA ══ -->
+<div id="page-cola" class="page">
+  <div class="page-head">
+    <div class="section-kicker">Vídeos generados, pendientes de subir</div>
+    <div class="page-title">Cola</div>
+    <div class="page-sub">Todos los vídeos ya renderizados que aún no están en YouTube — para no generar de más por accidente</div>
+  </div>
+  <div id="cola-body">
+    <div class="empty" style="padding:40px 0;"><div class="empty-icon" style="font-size:20px">⏳</div><div class="empty-title">Cargando…</div></div>
+  </div>
+</div>
+
 <!-- ══ FINANZAS ══ -->
 <div id="page-finanzas" class="page">
   <div class="page-head">
@@ -1027,6 +1040,51 @@ function showPage(name, btn) {
   });
   if (name === 'canales')  loadChannels(true);
   if (name === 'finanzas') loadFinance();
+  if (name === 'cola')     loadCola();
+}
+
+async function loadCola() {
+  const el = document.getElementById('cola-body');
+  el.innerHTML = '<div class="empty" style="padding:40px 0;"><div class="empty-icon" style="font-size:20px">⏳</div><div class="empty-title">Cargando…</div></div>';
+  const [jobs, channels] = await Promise.all([
+    fetch(`${API}/api/jobs`).then(r => r.json()).catch(() => []),
+    fetch(`${API}/api/channels`).then(r => r.json()).catch(() => []),
+  ]);
+  const chName = {};
+  (channels || []).forEach(c => { chName[c.id] = c.name; });
+
+  const pending = jobs.filter(j => j.status === 'done' && !j.youtube_url);
+  if (!pending.length) {
+    el.innerHTML = '<div class="empty" style="padding:40px 0;"><div class="empty-icon" style="font-size:20px">✅</div><div class="empty-title">Sin vídeos pendientes</div><div class="empty-note">Todo lo generado ya está subido a YouTube.</div></div>';
+    return;
+  }
+
+  // Agrupar por canal, ordenar cada grupo por fecha ascendente (el más antiguo = el próximo a subir)
+  const groups = {};
+  pending.forEach(j => {
+    const key = j.channel_id || 'sin-canal';
+    (groups[key] = groups[key] || []).push(j);
+  });
+  Object.values(groups).forEach(g => g.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || '')));
+
+  el.innerHTML = Object.entries(groups).map(([chId, list]) => `
+    <div style="margin-bottom:28px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--ink);">${chName[chId] || 'Sin canal asignado'}</div>
+        <div style="background:var(--ink);color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;">${list.length} pendiente${list.length === 1 ? '' : 's'}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        ${list.map((j, i) => `
+          <div class="job-row" onclick="showPage('crear', document.getElementById('nav-tab-crear'));openJobDetail('${j.id}')" style="cursor:pointer;">
+            <div style="width:22px;height:22px;border-radius:50%;background:${i === 0 ? 'var(--gold)' : 'var(--border2)'};color:${i === 0 ? '#fff' : 'var(--muted)'};font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${i + 1}</div>
+            <div class="flex-1 min-0">
+              <div class="job-title">${j.title}</div>
+              <div class="job-meta">${(j.created_at || '').substring(0, 16)} ${i === 0 ? '· próximo a subir' : ''}</div>
+            </div>
+            <div class="job-cost">${(j.cost_total || 0).toFixed(3)}€</div>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
 }
 
 function selectTone(el) {
