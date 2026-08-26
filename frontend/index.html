@@ -1481,10 +1481,15 @@ function onError({message}) {
 }
 
 async function loadJobs() {
-  const jobs = await fetch(`${API}/api/jobs`).then(r => r.json()).catch(()=>[]);
+  const allJobs = await fetch(`${API}/api/jobs`).then(r => r.json()).catch(()=>[]);
   const el = document.getElementById('jobs-list');
+  // Ocultar los que ya se subieron (solos o automáticamente) — aquí solo
+  // queremos ver lo que todavía necesita atención: pendientes de subir,
+  // en curso, o con error. Los canales automáticos (Mundo Colosal, Hidden
+  // Earth, Shorts) desaparecen de esta lista en cuanto se publican solos.
+  const jobs = allJobs.filter(j => !(j.status === 'done' && j.youtube_url));
   if (!jobs.length) {
-    el.innerHTML = '<div class="empty" style="padding:20px 0;"><div class="empty-icon" style="font-size:20px">🎬</div><div class="empty-title">Sin vídeos aún</div></div>';
+    el.innerHTML = '<div class="empty" style="padding:20px 0;"><div class="empty-icon" style="font-size:20px">✅</div><div class="empty-title">Nada pendiente</div><div class="empty-note">Todo lo generado ya está subido.</div></div>';
     return;
   }
   const statusLabel = { running:'En curso…', done:'Completado', error:'Error', pending:'Pendiente' };
