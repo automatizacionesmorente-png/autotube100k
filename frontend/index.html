@@ -555,6 +555,7 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
     <button class="nav-tab active" id="nav-tab-crear" onclick="showPage('crear',this)">Crear</button>
     <button class="nav-tab" onclick="showPage('canales',this)">Canales</button>
     <button class="nav-tab" onclick="showPage('finanzas',this)">Finanzas</button>
+  <button class="nav-tab" onclick="showPage('analisis',this)">Análisis</button>
   </div>
   <div class="nav-end">
     Este mes &nbsp;·&nbsp; <span class="nav-cost-val" id="nav-cost">0.00€</span>
@@ -577,6 +578,10 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
   <button class="mbn-btn" onclick="mbnGo('finanzas',this)" id="mbn-finanzas">
     <span class="mbn-icon">💰</span>
     <span>Finanzas</span>
+  </button>
+  <button class="mbn-btn" onclick="mbnGo('analisis',this)" id="mbn-analisis">
+    <span class="mbn-icon">📈</span>
+    <span>Análisis</span>
   </button>
 </div>
 
@@ -875,6 +880,24 @@ main { max-width: 1080px; margin: 0 auto; padding: 44px 40px 80px; }
   </div>
 </div>
 
+<!-- ══ ANÁLISIS ══ -->
+<div id="page-analisis" class="page">
+  <div class="page-head">
+    <div class="section-kicker" id="analysis-sync">Cargando…</div>
+    <div class="page-title">Análisis</div>
+    <div class="page-sub">Qué funciona y qué no, con datos reales de YouTube — se actualiza solo cada día</div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-head"><span class="card-label">Patrones detectados</span></div>
+    <div class="card-body" id="analysis-insights">
+      <div class="empty" style="padding:20px 0;"><div class="empty-icon">🔎</div><div class="empty-title">Sin datos aún</div></div>
+    </div>
+  </div>
+
+  <div id="analysis-channels"></div>
+</div>
+
 <!-- ══ FINANZAS ══ -->
 <div id="page-finanzas" class="page">
   <div class="page-head">
@@ -1027,6 +1050,7 @@ function showPage(name, btn) {
   });
   if (name === 'canales')  loadChannels(true);
   if (name === 'finanzas') loadFinance();
+  if (name === 'analisis') loadAnalysis();
 }
 
 function selectTone(el) {
@@ -2284,6 +2308,73 @@ const PROVIDER_META = {
   'openai':    { color: '#a07c18', icon: '◉', label: 'OpenAI — platform.openai.com/usage' },
   'gratis':    { color: '#2e6e47', icon: '✓', label: 'Gratis' },
 };
+
+async function loadAnalysis() {
+  const a = await fetch(`${API}/api/analysis`).then(r=>r.json())
+    .catch(()=>({last_synced:null, channels:[], insights:[]}));
+
+  document.getElementById('analysis-sync').textContent =
+    a.last_synced ? `Última sincronización: ${a.last_synced} UTC` : 'Sin sincronizar aún';
+
+  // ── Patrones detectados ──────────────────────────────
+  const insEl = document.getElementById('analysis-insights');
+  if (!a.insights || !a.insights.length) {
+    insEl.innerHTML = '<div class="empty" style="padding:16px 0;"><div class="empty-title">Aún no hay suficientes datos para detectar patrones</div></div>';
+  } else {
+    insEl.innerHTML = a.insights.map(ins => `
+      <div style="padding:14px 0;border-bottom:1px solid var(--border);">
+        <div style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:4px;">
+          ${ins.channel} — ${ins.type === 'formato' ? 'Formato' : 'Títulos'}
+        </div>
+        <div style="font-size:13px;color:var(--ink);line-height:1.6;">${ins.text}</div>
+        ${ins.examples ? `<div style="margin-top:8px;font-size:12px;color:var(--muted);">Ejemplos: ${ins.examples.map(e=>`"${e}"`).join(' · ')}</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // ── Por canal ─────────────────────────────────────────
+  const chEl = document.getElementById('analysis-channels');
+  chEl.innerHTML = (a.channels || []).map(ch => {
+    const s = ch.by_format.short, l = ch.by_format.long;
+    const fmtRow = (label, f) => f ? `
+      <div class="stat">
+        <div class="stat-lbl">${label} (${f.count})</div>
+        <div class="stat-num">${f.avg_views}</div>
+        <div class="stat-note">vistas media · máx ${f.max_views}</div>
+      </div>` : `
+      <div class="stat"><div class="stat-lbl">${label}</div><div class="stat-num">—</div><div class="stat-note">sin datos</div></div>`;
+
+    const vidRow = v => `
+      <div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
+        <span style="color:var(--ink);flex:1;">${v.title}</span>
+        <span style="color:var(--gold);font-weight:700;font-variant-numeric:tabular-nums;">${v.views.toLocaleString('es-ES')}</span>
+      </div>`;
+
+    return `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;">
+        <span class="card-label">${ch.name}</span>
+        <span style="font-size:10px;color:var(--muted);">${ch.total_videos} vídeos sincronizados</span>
+      </div>
+      <div class="card-body">
+        <div class="stats-grid" style="margin-bottom:16px;">
+          ${fmtRow('Shorts', s)}
+          ${fmtRow('Vídeos largos', l)}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+          <div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Mejores</div>
+            ${ch.top_videos.slice(0,5).map(vidRow).join('') || '<div class="empty-title" style="font-size:12px;">Sin datos</div>'}
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Peores</div>
+            ${ch.bottom_videos.slice(0,5).map(vidRow).join('') || '<div class="empty-title" style="font-size:12px;">Sin datos</div>'}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
 
 async function loadFinance() {
   const f = await fetch(`${API}/api/finance`).then(r=>r.json())
